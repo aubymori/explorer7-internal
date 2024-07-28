@@ -103,7 +103,7 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::CanPinApp(IUnknown* p1)
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetRelaunchProperties(HWND* p1,DWORD* p2,DWORD* p3,DWORD* p4,DWORD* p5,DWORD* p6)
 {
 	dbgprintf(L"GetRelaunchProperties");
-	return m_resolver8->GetRelaunchProperties(p1,p2,p3,p4,p5,p6);
+	return m_resolver8->GetRelaunchProperties(p1,p2,p3,p4,p5,p6,nullptr);
 }
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromWindowProperties(HWND* p1,IUnknown* p2)
