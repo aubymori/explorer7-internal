@@ -211,8 +211,9 @@ int WINAPI SetWindowRgnNEW( HWND hWnd, HRGN hRgn, BOOL bRedraw )
 
 HRESULT WINAPI SetWindowThemeNEW(HWND hwnd,LPCWSTR pszSubAppName,LPCWSTR pszSubIdList)
 {
-	if ( lstrcmp(pszSubAppName,L"VerticalShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"VerticalShowDesktop8",pszSubIdList);
-	if ( lstrcmp(pszSubAppName,L"ShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"ShowDesktop8",pszSubIdList);
+	//Ittr: Temporarily comment these out as unneeded - we want original 7 theme classes to be used where appropriate!
+	//if ( lstrcmp(pszSubAppName,L"VerticalShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"VerticalShowDesktop8",pszSubIdList);
+	//if ( lstrcmp(pszSubAppName,L"ShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"ShowDesktop8",pszSubIdList);
 	return SetWindowTheme(hwnd,pszSubAppName,pszSubIdList);
 }
 
