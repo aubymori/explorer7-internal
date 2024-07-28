@@ -139,6 +139,7 @@ void ShimDesktop8()
 	PostMessage(hwnd_desktop,0x45E,0,2); //wallpaper host
 	PostMessage(hwnd_desktop,0x45C,2,3); //wallpaper & icons
 	PostMessage(hwnd_desktop,0x45B,0,0); //final init
+	PostMessage(hwnd_desktop,0x40B,0,0); //pins
 }
 
 PVOID WINAPI SHCreateDesktopNEW(PVOID p1)
@@ -451,6 +452,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		PVOID rslvr8 = NULL;
 		CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IAppResolver8,&rslvr8);
 		//create our object
+
 		CStartMenuResolver* resolver7 = new CStartMenuResolver((IAppResolver8*)rslvr8);
 		result = resolver7->QueryInterface(riid,ppv);
 		if (result == S_OK)

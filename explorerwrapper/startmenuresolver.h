@@ -53,7 +53,7 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE GetBestShortcutAndAppIDForAppPath(DWORD*,IUnknown*,DWORD*) = 0;	
 	virtual HRESULT STDMETHODCALLTYPE CanPinApp(IUnknown*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE CanPinAppShortcut(IUnknown*, IUnknown*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetRelaunchProperties(HWND*,DWORD*,DWORD*,DWORD*,DWORD*,DWORD*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetRelaunchProperties(HWND*,DWORD*,DWORD*,DWORD*,DWORD*,DWORD*, int* a7) = 0;
 	virtual HRESULT STDMETHODCALLTYPE GenerateShortcutFromWindowProperties(HWND*,IUnknown*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE GenerateShortcutFromItemProperties(IUnknown*,IUnknown*) = 0;
 };
