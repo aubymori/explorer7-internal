@@ -191,6 +191,7 @@
     <ClInclude Include="immersivefactory.h" />
     <ClInclude Include="immersiveshell.h" />
     <ClInclude Include="projection.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="startmenupin.h" />
     <ClInclude Include="startmenuresolver.h" />
     <ClInclude Include="systraywrapper.h" />

@@ -17,6 +17,10 @@
 #include <vector>
 //#include "Detours/detours.h"
 #include "trayclock.h"
+#include "resource.h"
+
+//uncomment to force classic theme
+//#define FORCE_CLASSIC
 
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
@@ -266,6 +270,56 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 	return DwmpActivateLivePreview(a1,a2,a3,a4,a5);
 }
 
+//fix for classic start menu icon
+typedef HANDLE(WINAPI* BrandingLoadImage_t)(
+	LPCWSTR lpszModule,
+	UINT    uImageId,
+	UINT    type,
+	int     cx,
+	int     cy,
+	UINT    fuLoad
+);
+BrandingLoadImage_t BrandingLoadImage = nullptr;
+HANDLE WINAPI BrandingLoadImageNEW(
+	LPCWSTR lpszModule,
+	UINT    uImageId,
+	UINT    type,
+	int     cx,
+	int     cy,
+	UINT    fuLoad
+)
+{
+	WCHAR msg[256];
+	wsprintfW(msg, L"BrandingLoadImage, id: %u", uImageId);
+	MessageBoxW(NULL, msg, L"debug", NULL);
+
+	UINT uNewId = 0;
+	switch (uImageId)
+	{
+		case 1041:
+			uNewId = IDB_START;
+			break;
+		case 2041:
+			uNewId = IDB_START_125;
+			break;
+		case 3041:
+			uNewId = IDB_START_150;
+			break;
+	}
+
+	if (uNewId)
+		return LoadImageW(
+			g_hInstance,
+			MAKEINTRESOURCE(uNewId),
+			type, cx, cy, fuLoad
+		);
+	else
+		return BrandingLoadImage(
+			lpszModule, uImageId, type,
+			cx, cy, fuLoad
+		);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -298,6 +352,11 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",IsWindowVisible,IsWindowVisibleNEW);
 	//change show desktop btn
 	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",SetWindowTheme,SetWindowThemeNEW);
+	//fix classic start menu icon (pls fix)
+	/*HMODULE winbrand = LoadLibrary(L"winbrand.dll");
+	BrandingLoadImage = (BrandingLoadImage_t)GetProcAddress(winbrand, "BrandingLoadImage");
+	if (BrandingLoadImage)
+		ChangeImportedAddress(GetModuleHandle(NULL),"winbrand.dll",BrandingLoadImage,BrandingLoadImageNEW);*/
 	//shell32 - hack created startmenupin instance		
 	StartMenuPin_PatchShell32();
 	//shell32 - patch delayload shit
@@ -393,6 +452,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	{
 		case DLL_PROCESS_ATTACH:
 			{
+#ifdef FORCE_CLASSIC
+				SetThemeAppProperties(0);
+#endif
 				AssFuckShunimpl();
 
 				dbgprintf(L"Dll Attach\n");
