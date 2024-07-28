@@ -140,6 +140,7 @@ LRESULT __thiscall CStartMenuPin::SetRemovedChangeCount(DWORD value)
 #pragma function(memcpy)
 HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 {
+	dbgprintf(L"StartMenuPin: NewCreateStartMenuPinInstance");
 	WCHAR iid[40];
 	StringFromGUID2(riid,iid,40);
 	IUnknown* pinobj;
