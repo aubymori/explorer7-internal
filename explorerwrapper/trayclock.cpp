@@ -1,23 +1,23 @@
 #include "trayclock.h"
 
-BOOL Win32TrayClockExperience(HWND hWnd)
+BOOL ShowTrayClock(HWND hWnd)
 {
     if (!hWnd) return FALSE;
     HRESULT hr = S_OK;
-    Win32Clock* pWin32Clock = NULL;
+    ITrayClock *pClock = NULL;
     hr = CoCreateInstance(
-        (REFCLSID)GUID_Win32Clock,
+        (REFCLSID)CLSID_TrayClock,
         NULL,
         CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER,
-        (REFIID)IID_Win32Clock,
-        (void**)&pWin32Clock
+        (REFIID)IID_ITrayClock,
+        (void**)&pClock
     );
     if (SUCCEEDED(hr))
     {
         RECT rc;
         GetWindowRect(hWnd, &rc);
-        pWin32Clock->lpVtbl->ShowWin32Clock(pWin32Clock, hWnd, &rc);
-        pWin32Clock->lpVtbl->ReleaseRaymondChen(pWin32Clock);
+        pClock->Show(hWnd, &rc);
+        pClock->Release();
     }
     return TRUE;
 }

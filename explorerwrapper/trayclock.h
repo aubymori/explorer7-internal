@@ -3,43 +3,21 @@
 #include <objbase.h>
 
 // implementation of Win32Clock
-DEFINE_GUID(GUID_Win32Clock,
-    0x0A323554A,
-    0x0FE1, 0x4E49, 0xae, 0xe1,
-    0x67, 0x22, 0x46, 0x5d, 0x79, 0x9f
+DEFINE_GUID(CLSID_TrayClock,
+    0xA323554A,
+    0x0FE1, 0x4E49, 0xAE, 0xE1,
+    0x67, 0x22, 0x46, 0x5D, 0x79, 0x9F
 );
-DEFINE_GUID(IID_Win32Clock,
+DEFINE_GUID(IID_ITrayClock,
     0x7A5FCA8A,
-    0x76B1, 0x44C8, 0xa9, 0x7c,
-    0xe7, 0x17, 0x3c, 0xca, 0x5f, 0x4f
+    0x76B1, 0x44C8, 0xA9, 0x7C,
+    0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F
 );
-typedef interface Win32Clock Win32Clock;
-typedef struct Win32ClockVtbl
+
+MIDL_INTERFACE("7A5FCA8A-76B1-44C8-A97C-E7173CCA5F3F")
+ITrayClock : public IUnknown
 {
-    BEGIN_INTERFACE
-
-        HRESULT(STDMETHODCALLTYPE* QueryInterface)(
-            Win32Clock* This,
-            /* [in] */ REFIID riid,
-            /* [annotation][iid_is][out] */
-            _COM_Outptr_  void** ppvObject);
-
-    ULONG(STDMETHODCALLTYPE* AddRef)(
-        Win32Clock* This);
-
-    ULONG(STDMETHODCALLTYPE* ReleaseRaymondChen)(
-        Win32Clock* This);
-
-    HRESULT(STDMETHODCALLTYPE* ShowWin32Clock)(
-        Win32Clock* This,
-        /* [in] */ HWND hWnd,
-        /* [in] */ LPRECT lpRect);
-
-    END_INTERFACE
-} Win32ClockVtbl;
-
-interface Win32Clock
-{
-    CONST_VTBL struct Win32ClockVtbl* lpVtbl;
+    virtual HRESULT STDMETHODCALLTYPE Show(HWND hWndParent, LPRECT lprc) = 0;
 };
-BOOL Win32TrayClockExperience(HWND hWnd);
+
+BOOL ShowTrayClock(HWND hWnd);
