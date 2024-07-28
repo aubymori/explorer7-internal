@@ -196,6 +196,7 @@
     <ClInclude Include="systraywrapper.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="trash.h" />
+    <ClInclude Include="trayclock.h" />
     <ClInclude Include="traynotify.h" />
     <ClInclude Include="userassist.h" />
   </ItemGroup>
@@ -234,6 +235,7 @@
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
     </ClCompile>
     <ClCompile Include="systraywrapper.cpp" />
+    <ClCompile Include="trayclock.cpp" />
     <ClCompile Include="traynotify.cpp" />
     <ClCompile Include="userassist.cpp" />
     <ClCompile Include="explorer_wrappers.cpp" />

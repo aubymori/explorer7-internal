@@ -1,125 +1,131 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Файлы исходного кода">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Заголовочные файлы">
+    <Filter Include="Header files">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="Файлы ресурсов">
+    <Filter Include="Source code files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Resource files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="targetver.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="forwards.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="startmenuresolver.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="appresolvernotify.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="systraywrapper.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="immersiveshell.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="traynotify.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="authui.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="startmenupin.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="EnumStartMenu.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="userassist.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="dbgprint.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="trash.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="immersivefactory.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="projection.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="autoplay.h">
-      <Filter>Заголовочные файлы</Filter>
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="trayclock.h">
+      <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="dbgprint.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="startmenuresolver.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="appresolvernotify.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="systraywrapper.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="immersiveshell.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="traynotify.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="authui.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="startmenupin.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="EnumStartMenu.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="userassist.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="immersivefactory.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="projection.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="autoplay.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="explorer_wrappers.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="shell32_wrappers.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="minCRT.cpp">
-      <Filter>Файлы исходного кода</Filter>
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="trayclock.cpp">
+      <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wrapper.rc">
-      <Filter>Файлы ресурсов</Filter>
+      <Filter>Resource files</Filter>
     </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -16,6 +16,7 @@
 #include "projection.h"
 #include <vector>
 //#include "Detours/detours.h"
+#include "trayclock.h"
 
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
