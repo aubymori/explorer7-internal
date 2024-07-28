@@ -393,6 +393,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	HRESULT result;
 	if (rclsid == CLSID_SysTray) //create Metro before tray
 	{
+		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 		//CreateTwinUI();
 	}
@@ -403,19 +404,38 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 
 	if (rclsid == CLSID_StartMenuCacheAndAppResolver && result == E_NOINTERFACE)
 	{
+		dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
 		PVOID rslvr8 = NULL;
 		CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IAppResolver8,&rslvr8);
 		//create our object
 		CStartMenuResolver* resolver7 = new CStartMenuResolver((IAppResolver8*)rslvr8);
 		result = resolver7->QueryInterface(riid,ppv);
+		if (result == S_OK)
+			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 	}
 	if (result == S_OK && rclsid == CLSID_SysTray) //wrap stobject
 	{
+		dbgprintf(L"wrap stobject\n");
 		*ppv = new CSysTrayWrapper((IOleCommandTarget*)*ppv);
 	}
-	if (result == S_OK && rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
+	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
 	{
-		*ppv = new CAuthUIWrapper((IShutdownChoices*)*ppv);
+		dbgprintf(L"wrap authui\n");
+		if (*ppv)
+		{
+			dbgprintf(L"good\n");
+			*ppv = new CAuthUIWrapper((IShutdownChoices8*)*ppv);
+		}
+		else
+		{
+			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IShutdownChoices8, ppv);
+			if (*ppv)
+			{
+				dbgprintf(L"good 2\n");
+				*ppv = new CAuthUIWrapper((IShutdownChoices8*)*ppv);
+			}
+		}
+
 	}
 	return result;
 }

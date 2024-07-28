@@ -36,7 +36,7 @@ __int64 __fastcall SHAboutInfoWNEW(unsigned __int16* a1, unsigned int a2)
 bool(__fastcall* IsSearchEnabled)();
 extern "C" bool WINAPI IsSearchEnabledNEW()
 {
-	dbgprintf(L"IsSearchEnabledNEW\n");
+	//dbgprintf(L"IsSearchEnabledNEW\n");
 	return 1;
 }
 
