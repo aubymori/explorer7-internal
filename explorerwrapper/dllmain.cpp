@@ -223,6 +223,40 @@ UINT WINAPI SetErrorModeNEW( UINT uMode )
 	return SetErrorMode(uMode);
 }
 
+typedef BOOL (WINAPI* IsShellWindow_t)(HWND);
+IsShellWindow_t IsShellFrameWindow = nullptr;
+IsShellWindow_t IsShellManagedWindow = nullptr;
+
+typedef HWND(WINAPI* GhostWindowFromHungWindow_t)(HWND);
+GhostWindowFromHungWindow_t GhostWindowFromHungWindow = nullptr;
+
+//removes immersive background windows
+//(Microsoft Text Input Host, Shell Experience Host, etc.)
+BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
+{
+	if (!IsWindowVisible(hWnd))
+		return FALSE;
+
+	BOOL bCloaked;
+	DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, &bCloaked, sizeof(BOOL));
+	if (bCloaked)
+		return FALSE;
+
+	if (IsShellFrameWindow && GhostWindowFromHungWindow)
+	{
+		if (IsShellFrameWindow(hWnd) && !GhostWindowFromHungWindow(hWnd))
+			return TRUE;
+	}
+
+	if (IsShellManagedWindow)
+	{
+		if (IsShellManagedWindow(hWnd) && GetPropW(hWnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") == NULL)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
 __int64 (__fastcall* DwmpActivateLivePreview)(int a1, __int64 a2, __int64 a3, int a4, void* a5);
 __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void* a5)
 {
@@ -254,6 +288,13 @@ void HookAPIs()
 	//ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowCompositionAttribute,SetWindowCompositionAttributeNEW);
 	//ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmEnableBlurBehindWindow,DwmEnableBlurBehindWindowNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowRgn,SetWindowRgnNEW);
+	//load functions needed for task enum hook
+	HMODULE user32 = LoadLibrary(L"user32.dll");
+	IsShellFrameWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2573);
+	IsShellManagedWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2574);
+	GhostWindowFromHungWindow = (GhostWindowFromHungWindow_t)GetProcAddress(user32, "GhostWindowFromHungWindow");
+	//perform the actual hook
+	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",IsWindowVisible,IsWindowVisibleNEW);
 	//change show desktop btn
 	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",SetWindowTheme,SetWindowThemeNEW);
 	//shell32 - hack created startmenupin instance		
