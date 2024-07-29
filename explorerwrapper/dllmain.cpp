@@ -19,6 +19,13 @@
 #include "trayclock.h"
 #include "resource.h"
 
+#define _WIN_BLUE 1 //Win8.1-specific changes
+#define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
+#define _WIN_RS1 0 //Win10RS1-specific changes - currently unused
+#define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
+#define _WIN_VB 0 //Win10VB-specific changes - currently unused
+#define _DISABLE_COMPOSITION 0 //For debugging without disabling DWM
+
 //uncomment to force classic theme
 //#define FORCE_CLASSIC
 
@@ -176,10 +183,33 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData)
 {	
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d",hwnd,pAttrData->attribute,*(DWORD*)pAttrData->pData);
-	if (pAttrData->attribute == 0x10) //changed in 7->8
+	if (_WIN_BLUE) //If we are 8.1 or higher
+	{
+		//Ittr: Restore active colorization based on attribute from ForceActiveWindowAppearance function in 9600 explorer
+		pAttrData->attribute = 0xF;
+		if (IsCompositionActive() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //force active colorization
+		{
+			SetWindowCompositionAttribute(hwnd,pAttrData);
+			WINCOMPATTRDATA colorization;
+			struct ATTR13DATA
+			{
+				DWORD p1;
+				DWORD p2;
+				DWORD p3;
+				DWORD p4;
+			};
+			ATTR13DATA attr13 = {0};
+			attr13.p1 = 4;
+			colorization.attribute = 0x15;
+			colorization.pData = &attr13;
+			colorization.dataSize = 0x10;
+			return SetWindowCompositionAttribute(hwnd,&colorization);
+		}
+	}
+	else if (pAttrData->attribute == 0x10) //changed in 7->8
 	{
 		pAttrData->attribute = 0xF;
-		if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
+		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero
 		{
 			SetWindowCompositionAttribute(hwnd,pAttrData);
 			WINCOMPATTRDATA rtm;
@@ -203,7 +233,34 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND *pBlurBehind)
 {
-	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
+	/*if (_WIN_BLUE) --Doesn't work yet
+	{
+		if (IsCompositionActive() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))
+		{
+			WINCOMPATTRDATA transparency;
+			struct ATTR13DATA
+			{
+				DWORD p1;
+				DWORD p2;
+				DWORD p3;
+				DWORD p4;
+			};
+			ATTR13DATA attr13 = { 0 };
+			attr13.p1 = 2;
+			transparency.attribute = 0x19;
+			transparency.pData = &attr13;
+			transparency.dataSize = 0x16;
+			SetWindowCompositionAttribute(hwnd, &transparency);
+
+			pBlurBehind->hRgnBlur = 0i64;
+			pBlurBehind->fTransitionOnMaximized = 1;
+			pBlurBehind->dwFlags = 3;
+			pBlurBehind->fEnable = 1;
+			return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
+		}
+	}*/
+	//else if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
+	if (!_WIN_BLUE && (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))) //bad temporary hack to ensure this doesnt run on 8.1+
 		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd,pBlurBehind);
 }
@@ -271,6 +328,21 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 	return DwmpActivateLivePreview(a1,a2,a3,a4,a5);
 }
 
+//Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
+BOOL WINAPI IsCompositionActiveNEW()
+{
+	if (_DISABLE_COMPOSITION) { return FALSE; }
+
+	return IsCompositionActive();
+}
+
+HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
+{
+	if (_DISABLE_COMPOSITION) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
+
+	return DwmIsCompositionEnabled(pfEnabled);
+}
+
 //fix for classic start menu icon
 typedef HANDLE(WINAPI* BrandingLoadImage_t)(
 	LPCWSTR lpszModule,
@@ -334,15 +406,19 @@ void HookAPIs()
 	//ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)902), GetProcAddress(GetModuleHandle(L"shunimpl.dll"),(LPSTR)473));
 	//change appid
 	ChangeImportedAddress(GetModuleHandle(NULL),"kernel32.dll",SetErrorMode,SetErrorModeNEW);
+	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
+	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",IsCompositionActive,IsCompositionActiveNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmIsCompositionEnabled,DwmIsCompositionEnabledNEW);
 	//adapt colorization api
 	DwmGetColorizationParametersOrig = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"dwmapi.dll"),(LPSTR)127);
 	DwmpActivateLivePreview = (decltype(DwmpActivateLivePreview))GetProcAddress(GetModuleHandle(L"dwmapi.dll"),(LPSTR)113);
 	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll", DwmpActivateLivePreview, DwmpActivateLivePreviewNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmGetColorizationParametersOrig,DwmGetColorizationParametersNEW);
 	//8RTM - composition
+	//Ittr: Restore active DWM "colorization" to previews, taskbar and start menu (how this renders is theme-dependent)
 	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"),"SetWindowCompositionAttribute");
-	//ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowCompositionAttribute,SetWindowCompositionAttributeNEW);
-	//ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmEnableBlurBehindWindow,DwmEnableBlurBehindWindowNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowCompositionAttribute,SetWindowCompositionAttributeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmEnableBlurBehindWindow,DwmEnableBlurBehindWindowNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowRgn,SetWindowRgnNEW);
 	//load functions needed for task enum hook
 	HMODULE user32 = LoadLibrary(L"user32.dll");
@@ -426,8 +502,7 @@ GetProcAddress_Hook(
 	return GetProcAddress(hModule,lpProcName);
 }
 
-
-
+//Basically this allows explorer to actually work on builds >9200
 void AssFuckShunimpl()
 {
 	char* dllmainSHUNIMPL = (char*)FindPattern((uintptr_t)GetModuleHandle(L"shunimpl.dll"),"48 83 EC 28 83 FA 01");
