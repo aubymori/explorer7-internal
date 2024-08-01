@@ -409,6 +409,38 @@ void FixWin7TrayClock()
 	}
 }
 
+//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+
+void ShowWin32Menus()
+{
+	//The bytes are the same in both dlls for ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu function
+	char* immersiveBytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
+
+	//Load both DLLs. ExplorerFrame gets added in later so we have to account for that
+	char* canApplySH32 = (char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes);
+	char* canApplyEF = (char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes);
+
+	//If the bytes are found in shell32...
+	if (canApplySH32)
+	{
+		char bytes[] = { 0xB0, 0x00, 0xC3 }; //New bytes to write in that basically make the function return 0
+		//Magical byte replacement code
+		DWORD old;
+		VirtualProtect(canApplySH32, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
+		memcpy(canApplySH32, bytes, sizeof(bytes));
+		VirtualProtect(canApplySH32, sizeof(bytes), old, 0);
+	}
+	//If the bytes are found in ExplorerFrame.dll...
+	if (canApplyEF)
+	{
+		char bytes[] = { 0xB0, 0x00, 0xC3 }; //New bytes to write in that basically make the function return 0
+		//Magical byte replacement code
+		DWORD old;
+		VirtualProtect(canApplyEF, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
+		memcpy(canApplyEF, bytes, sizeof(bytes));
+		VirtualProtect(canApplyEF, sizeof(bytes), old, 0);
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -549,6 +581,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 				SetThemeAppProperties(0);
 #endif
 				AssFuckShunimpl();
+
+				ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 
 				dbgprintf(L"Dll Attach\n");
 				g_hInstance = hModule;
