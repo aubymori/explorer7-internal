@@ -16,7 +16,6 @@
 #include "projection.h"
 #include <vector>
 //#include "Detours/detours.h"
-#include "trayclock.h"
 #include "resource.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
@@ -393,6 +392,23 @@ HANDLE WINAPI BrandingLoadImageNEW(
 		);
 }
 
+void FixWin7TrayClock()
+{
+	char* iidw7TrayClock = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9");
+
+	if (iidw7TrayClock)
+	{
+		SIZE_T size = sizeof(GUID);
+
+		char bytes[] = { 0x8A, 0xCA, 0x5F, 0x7A, 0xB1, 0x76, 0xC8, 0x44, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F };
+
+		DWORD old;
+		VirtualProtect(iidw7TrayClock, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(iidw7TrayClock, bytes, size);
+		VirtualProtect(iidw7TrayClock, size, old, 0);
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -438,6 +454,7 @@ void HookAPIs()
 	StartMenuPin_PatchShell32();
 	//shell32 - patch delayload shit
 	HookShell32();
+	FixWin7TrayClock();
 }
 
 HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
