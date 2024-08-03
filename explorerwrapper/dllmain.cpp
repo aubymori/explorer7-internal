@@ -392,53 +392,43 @@ HANDLE WINAPI BrandingLoadImageNEW(
 		);
 }
 
-void FixWin7TrayClock()
+//Ittr: Consolidated function for pattern byte replacements.
+void ChangeImportedPattern(void* dllPattern, const char* newBytes, bool isGuid) //thank you wiktor
 {
-	char* iidw7TrayClock = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9");
-
-	if (iidw7TrayClock)
+	if (dllPattern)
 	{
-		SIZE_T size = sizeof(GUID);
+		SIZE_T size;
+		if (isGuid == true) { size = sizeof(GUID); } else { size = sizeof(newBytes); }
 
-		char bytes[] = { 0x8A, 0xCA, 0x5F, 0x7A, 0xB1, 0x76, 0xC8, 0x44, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F };
-
+		//Magical byte replacement code
 		DWORD old;
-		VirtualProtect(iidw7TrayClock, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(iidw7TrayClock, bytes, size);
-		VirtualProtect(iidw7TrayClock, size, old, 0);
+		VirtualProtect(dllPattern, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(dllPattern, newBytes, size);
+		VirtualProtect(dllPattern, size, old, 0);
 	}
 }
 
-//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+
+void FixWin7TrayClock()
+{
+	//The bytes for the old and since-replaced Windows 7 tray clock IID
+	char* iidw7TrayClock = "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9";
+
+	//Load and patch explorer EXE with the new IID used since Windows 8.1
+	char bytes[] = { 0x8A, 0xCA, 0x5F, 0x7A, 0xB1, 0x76, 0xC8, 0x44, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F };
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(NULL), "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9"), bytes, true);
+}
+
+//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
+//Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
 void ShowWin32Menus()
 {
 	//The bytes are the same in both dlls for ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu function
 	char* immersiveBytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
 
-	//Load both DLLs. ExplorerFrame gets added in later so we have to account for that
-	char* canApplySH32 = (char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes);
-	char* canApplyEF = (char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes);
-
-	//If the bytes are found in shell32...
-	if (canApplySH32)
-	{
-		char bytes[] = { 0xB0, 0x00, 0xC3 }; //New bytes to write in that basically make the function return 0
-		//Magical byte replacement code
-		DWORD old;
-		VirtualProtect(canApplySH32, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
-		memcpy(canApplySH32, bytes, sizeof(bytes));
-		VirtualProtect(canApplySH32, sizeof(bytes), old, 0);
-	}
-	//If the bytes are found in ExplorerFrame.dll...
-	if (canApplyEF)
-	{
-		char bytes[] = { 0xB0, 0x00, 0xC3 }; //New bytes to write in that basically make the function return 0
-		//Magical byte replacement code
-		DWORD old;
-		VirtualProtect(canApplyEF, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
-		memcpy(canApplyEF, bytes, sizeof(bytes));
-		VirtualProtect(canApplyEF, sizeof(bytes), old, 0);
-	}
+	//Load and patch both DLLs. ExplorerFrame gets called in later so we have to account for that
+	char bytes[] = { 0xB0, 0x00, 0xC3 };
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, false);
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
 }
 
 void HookShell32();
@@ -551,6 +541,7 @@ GetProcAddress_Hook(
 	return GetProcAddress(hModule,lpProcName);
 }
 
+//TODO: Migrate to use ChangeImportedPattern or equivalent when said function is finalised. Not migrated yet due to importance of shunimpl
 //Basically this allows explorer to actually work on builds >9200
 void AssFuckShunimpl()
 {
