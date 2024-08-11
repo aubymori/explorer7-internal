@@ -15,6 +15,7 @@
 #include "immersivefactory.h"
 #include "projection.h"
 #include <vector>
+#include <LMServer.h>
 //#include "Detours/detours.h"
 #include "resource.h"
 
@@ -296,25 +297,13 @@ GhostWindowFromHungWindow_t GhostWindowFromHungWindow = nullptr;
 //(Microsoft Text Input Host, Shell Experience Host, etc.)
 BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 {
-	if (!IsWindowVisible(hWnd))
-		return FALSE;
-
-	BOOL bCloaked;
-	DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, &bCloaked, sizeof(BOOL));
-	if (bCloaked)
-		return FALSE;
-
-	if (IsShellFrameWindow && GhostWindowFromHungWindow)
-	{
-		if (IsShellFrameWindow(hWnd) && !GhostWindowFromHungWindow(hWnd))
-			return TRUE;
-	}
-
 	if (IsShellManagedWindow)
 	{
 		if (IsShellManagedWindow(hWnd) && GetPropW(hWnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") == NULL)
 			return FALSE;
 	}
+	if (!IsWindowVisible(hWnd))
+		return FALSE;
 
 	return TRUE;
 }
@@ -477,6 +466,7 @@ void HookAPIs()
 	//shell32 - patch delayload shit
 	HookShell32();
 	FixWin7TrayClock();
+	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 }
 
 HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
@@ -573,8 +563,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 #endif
 				AssFuckShunimpl();
 
-				ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
-
 				dbgprintf(L"Dll Attach\n");
 				g_hInstance = hModule;
 				if ( GetModuleHandle(L"DisplaySwitch.exe") )
@@ -645,21 +633,26 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
 	{
 		dbgprintf(L"wrap authui\n");
+		LPBYTE pByteBuffer = new BYTE[1024];
+		NetServerGetInfo(NULL, 101, &pByteBuffer);
+		LPSERVER_INFO_101 info = (LPSERVER_INFO_101)pByteBuffer;
 		if (*ppv)
 		{
 			dbgprintf(L"good\n");
-			*ppv = new CAuthUIWrapper((IShutdownChoices8*)*ppv);
+			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
 		}
 		else
 		{
-			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IShutdownChoices8, ppv);
+			IID dk = IID_IShutdownChoices8;
+			if (info->sv101_version_major == 10)
+				dk = IID_IShutdownChoices10;
+			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
-				*ppv = new CAuthUIWrapper((IShutdownChoices8*)*ppv);
+				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
 			}
 		}
-
 	}
 	return result;
 }

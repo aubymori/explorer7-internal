@@ -93,7 +93,6 @@ void HookShell32()
 	dbgprintf(L"4\n");
 	SHAboutInfoWorker = (decltype(SHAboutInfoWorker))GetProcAddress(LoadLibrary(L"shlwapi.dll"),"SHAboutInfoWorker");
 	dbgprintf(L"5\n");
-	auto ordinal161 = GetProcAddress(LoadLibrary(L"shlawpi.dll"),(LPSTR)161);
 	//auto ordinal902 = GetProcAddress(LoadLibrary(L"shell32.dll"),(LPSTR)902);
 	ChangeImportedAddress(LoadLibrary(L"shell32.dll"),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.dll"), "SHAboutInfo"), SHAboutInfoWNEW);
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)902), IsSearchEnabledNEW);
