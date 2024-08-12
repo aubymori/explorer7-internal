@@ -419,13 +419,11 @@ void ShowWin32Menus()
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, false);
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
 }
-
-void FixAuthUI()
+BOOL patternFound;
+BOOL FixAuthUI(bool check)
 {
-	// 48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 
-	// 48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 85
-	// 85 C0 78 16 
-	// 48 8B 8E 98 00 00 00 48 8D 96 A0 00 00 00 48 8B 01 FF 50 20
+	// gwx pattern
+	// CLogoffPane::_InitShutdownObjects
 	const char* bytes = "48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 "
 						"48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
 						"85 C0 78 16 "
@@ -436,10 +434,16 @@ void FixAuthUI()
 					0x85, 0xC0, 0x78, 0x16,
 					0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
 
-	char* pattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL),bytes);
+
+	char* pattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytes);
 
 	if (pattern)
 	{
+		patternFound = TRUE;
+		if (check)
+		{
+			return TRUE;
+		}
 		SIZE_T size = sizeof(patch);
 
 		DWORD old;
@@ -447,6 +451,7 @@ void FixAuthUI()
 		memcpy(pattern, patch, size);
 		VirtualProtect(pattern, size, old, 0);
 	}
+	return 2;
 }
 
 void HookShell32();
@@ -496,7 +501,7 @@ void HookAPIs()
 	HookShell32();
 	FixWin7TrayClock();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
-	FixAuthUI();
+	FixAuthUI(false);
 
 }
 
@@ -602,7 +607,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 					HookImmersive();
 				}
 				else
-					HookAPIs();		
+				{
+					FixAuthUI(true);
+					HookAPIs();
+				}
 			}
 			break;
 		case DLL_THREAD_ATTACH:
@@ -677,7 +685,11 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			IID dk = IID_IShutdownChoices8;
 			if (info->sv101_version_major == 10)
 				dk = IID_IShutdownChoices10;
-			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
+
+			if (patternFound)
+				result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
+			else
+				CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
