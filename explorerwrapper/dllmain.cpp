@@ -420,6 +420,35 @@ void ShowWin32Menus()
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
 }
 
+void FixAuthUI()
+{
+	// 48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 
+	// 48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 85
+	// 85 C0 78 16 
+	// 48 8B 8E 98 00 00 00 48 8D 96 A0 00 00 00 48 8B 01 FF 50 20
+	const char* bytes = "48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 "
+						"48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
+						"85 C0 78 16 "
+						"48 8B 8E 98 00 00 00 48 8D 96 A0 00 00 00 48 8B 01 FF 50 20";
+
+	char patch[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 
+					0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 
+					0x85, 0xC0, 0x78, 0x16,
+					0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+
+	char* pattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL),bytes);
+
+	if (pattern)
+	{
+		SIZE_T size = sizeof(patch);
+
+		DWORD old;
+		VirtualProtect(pattern, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(pattern, patch, size);
+		VirtualProtect(pattern, size, old, 0);
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -467,6 +496,8 @@ void HookAPIs()
 	HookShell32();
 	FixWin7TrayClock();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
+	FixAuthUI();
+
 }
 
 HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
@@ -646,7 +677,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			IID dk = IID_IShutdownChoices8;
 			if (info->sv101_version_major == 10)
 				dk = IID_IShutdownChoices10;
-			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
