@@ -33,6 +33,7 @@ BOOL g_alttabhooked;
 HWND hwnd_desktop;
 HWND hwnd_taskbar;
 HWND hwnd_startmenu;
+HWND hwnd_taskthumb;
 HINSTANCE g_hInstance;
 DWORD dwRegisterNotify;
 HANDLE hEvent_DesktopVisible;
@@ -55,6 +56,28 @@ struct WINCOMPATTRDATA
     DWORD attribute; // the attribute to query, see below
     PVOID pData; // buffer to store the result
     ULONG dataSize; // size of the pData buffer
+};
+
+enum ACCENT_STATE : INT {				// Affects the rendering of the background of a window. These names are only for ACCENT_POLICY purposes 
+	ACCENT_DISABLED = 0,					// Default value. Background is black.
+	ACCENT_ENABLE_GRADIENT = 1,				// Background is GradientColor, alpha channel ignored.
+	ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,	// Background is GradientColor.
+	ACCENT_ENABLE_BLURBEHIND = 3,			// Background is GradientColor, with blur effect.
+	ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,	// Background is GradientColor, with acrylic blur effect.
+	ACCENT_ENABLE_HOSTBACKDROP = 5,			// Unknown.
+	ACCENT_INVALID_STATE = 6				// Unknown. Seems to draw background fully transparent.
+};
+
+struct ACCENT_POLICY {			// Determines how a window's background is rendered.
+	ACCENT_STATE	AccentState;	// Background effect.
+	UINT			AccentFlags;	// Flags. Set to 2 to tell GradientColor is used, rest is unknown.
+	COLORREF		GradientColor;	// Background color.
+	LONG			AnimationId;	// Unknown
+};
+
+enum WINDOWCOMPOSITIONATTRIB : INT {	// Determines what attribute is being manipulated.
+	WCA_ACCENT_POLICY = 0x13,
+	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 0xF				// The attribute being get or set is an accent policy.
 };
 
 typedef BOOL (WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
@@ -109,6 +132,13 @@ static HWND GetStartMenuWnd()
 		EnumThreadWindows(GetCurrentThreadId(),FindSMCallback,(LPARAM)dv2atom);
 	}
 	return hwnd_startmenu;
+}
+
+static HWND GetTaskListThumbWnd()
+{
+	if (!hwnd_taskthumb)
+		hwnd_taskthumb = FindWindow(L"TaskListThumbnailWnd", NULL);
+	return hwnd_taskthumb;
 }
 
 LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -180,33 +210,24 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 	return ret;
 }
 
+//Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
+void ForceActiveWindowAppearance(HWND hwnd)
+{
+	ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
+	WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
+	SetWindowCompositionAttribute(hwnd, &data);
+}
+
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData)
 {	
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d",hwnd,pAttrData->attribute,*(DWORD*)pAttrData->pData);
-	if (_WIN_BLUE) //If we are 8.1 or higher
+	if (_WIN_BLUE && IsCompositionActive()) //If we are 8.1 or higher for some reason Tihiy's original hack doesn't work so we forcefully run this instead
 	{
 		//Ittr: Restore active colorization based on attribute from ForceActiveWindowAppearance function in 9600 explorer
-		pAttrData->attribute = 0xF;
-		if (IsCompositionActive() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //force active colorization
-		{
-			SetWindowCompositionAttribute(hwnd,pAttrData);
-			WINCOMPATTRDATA colorization;
-			struct ATTR13DATA
-			{
-				DWORD p1;
-				DWORD p2;
-				DWORD p3;
-				DWORD p4;
-			};
-			ATTR13DATA attr13 = {0};
-			attr13.p1 = 4;
-			colorization.attribute = 0x15;
-			colorization.pData = &attr13;
-			colorization.dataSize = 0x10;
-			return SetWindowCompositionAttribute(hwnd,&colorization);
-		}
+		ForceActiveWindowAppearance(hwnd);
+		return SetWindowCompositionAttribute(hwnd, pAttrData);
 	}
-	else if (pAttrData->attribute == 0x10) //changed in 7->8
+	else if (!_WIN_BLUE && pAttrData->attribute == 0x10) //changed in 7->8
 	{
 		pAttrData->attribute = 0xF;
 		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero
@@ -419,6 +440,7 @@ void ShowWin32Menus()
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, false);
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
 }
+
 BOOL patternFound;
 BOOL FixAuthUI(bool check)
 {
