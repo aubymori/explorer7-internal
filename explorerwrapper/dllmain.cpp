@@ -441,37 +441,79 @@ void ShowWin32Menus()
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
 }
 
-BOOL patternFound;
-BOOL FixAuthUI(bool check)
+BOOL FixAuthUI()
 {
-	// gwx pattern
 	// CLogoffPane::_InitShutdownObjects
 	const char* bytes = "48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 "
 						"48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
-						"85 C0 78 16 "
+						"85 C0 ?? ?? "
 						"48 8B 8E 98 00 00 00 48 8D 96 A0 00 00 00 48 8B 01 FF 50 20";
 
-	char patch[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 
-					0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 
-					0x85, 0xC0, 0x78, 0x16,
-					0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
-
+	// CLogoffPane::_OnCreate
+	const char* bytesOld = "48 8B 8B 98 00 00 00 48 8B 53 40 45 33 C0 48 8B 01 FF 50 18 "
+							"48 8B 8B 98 00 00 00 48 8B 01 FF 50 30 44 8B C8 "
+							"85 C0 ?? ?? ?? ?? ?? ?? "
+							"48 8B 8B 98 00 00 00 48 8D 93 A0 00 00 00 48 8B 01 FF 50 20";
 
 	char* pattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytes);
+	char* pattern1 = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytesOld);
 
 	if (pattern)
 	{
-		patternFound = TRUE;
-		if (check)
-		{
-			return TRUE;
-		}
-		SIZE_T size = sizeof(patch);
-
 		DWORD old;
-		VirtualProtect(pattern, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(pattern, patch, size);
-		VirtualProtect(pattern, size, old, 0);
+		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+		SIZE_T size = sizeof(patch1);
+
+		// mov rax, [rcx]
+		// call qword ptr [rax+18h]
+		char* inst1 = pattern + 14;
+		VirtualProtect(inst1, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(inst1, patch1, size);
+		VirtualProtect(inst1, size, old, 0);
+
+		// mov rax, [rcx]
+		// call qword ptr [rax+30h]
+		char* inst2 = pattern + 27;
+		VirtualProtect(inst2, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(inst2, patch1, size);
+		VirtualProtect(inst2, size, old, 0);
+
+		// mov rax, [rcx]
+		// call qword ptr [rax+20h]
+		char* inst3 = pattern + 53;
+		VirtualProtect(inst3, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(inst3, patch1, size);
+		VirtualProtect(inst3, size, old, 0);
+
+	}
+	if (pattern1)
+	{
+		DWORD old;
+		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+		SIZE_T size = sizeof(patch1);
+
+		// mov rax, [rcx]
+		// call qword ptr [rax+18h]
+		char* inst1 = pattern1 + 14;
+		VirtualProtect(inst1, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(inst1, patch1, size);
+		VirtualProtect(inst1, size, old, 0);
+
+		// mov rax, [rcx]
+		// call qword ptr [rax+30h]
+		char* inst2 = pattern1 + 27;
+		old = NULL;
+		VirtualProtect(inst2, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(inst2, patch1, size);
+		VirtualProtect(inst2, size, old, 0);
+
+		// mov rax, [rcx]
+		// call qword ptr [rax+20h]
+		char* inst3 = pattern1 + 58;
+		old = NULL;
+		VirtualProtect(inst3, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(inst3, patch1, size);
+		VirtualProtect(inst3, size, old, 0);
 	}
 	return 2;
 }
@@ -523,7 +565,7 @@ void HookAPIs()
 	HookShell32();
 	FixWin7TrayClock();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
-	FixAuthUI(false);
+	FixAuthUI();
 
 }
 
@@ -630,7 +672,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 				}
 				else
 				{
-					FixAuthUI(true);
 					HookAPIs();
 				}
 			}
@@ -708,10 +749,10 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			if (info->sv101_version_major == 10)
 				dk = IID_IShutdownChoices10;
 
-			if (patternFound)
+			//if (patternFound)
 				result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
-			else
-				CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
+			//else
+				//CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
