@@ -441,14 +441,16 @@ void ShowWin32Menus()
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
 }
 
-BOOL FixAuthUI()
+void FixAuthUI()
 {
+	// Newer explorer versions use this
 	// CLogoffPane::_InitShutdownObjects
 	const char* bytes = "48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 "
 						"48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
 						"85 C0 ?? ?? "
 						"48 8B 8E 98 00 00 00 48 8D 96 A0 00 00 00 48 8B 01 FF 50 20";
 
+	// Older explorer versions use this
 	// CLogoffPane::_OnCreate
 	const char* bytesOld = "48 8B 8B 98 00 00 00 48 8B 53 40 45 33 C0 48 8B 01 FF 50 18 "
 							"48 8B 8B 98 00 00 00 48 8B 01 FF 50 30 44 8B C8 "
@@ -486,7 +488,8 @@ BOOL FixAuthUI()
 		VirtualProtect(inst3, size, old, 0);
 
 	}
-	if (pattern1)
+
+	if (pattern1 && !pattern) //Ittr: Only apply to CLogoffPane::_OnCreate if we need to, otherwise this causes crashing on later 7 explorer.
 	{
 		DWORD old;
 		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
@@ -515,7 +518,6 @@ BOOL FixAuthUI()
 		memcpy(inst3, patch1, size);
 		VirtualProtect(inst3, size, old, 0);
 	}
-	return 2;
 }
 
 void HookShell32();
@@ -566,7 +568,6 @@ void HookAPIs()
 	FixWin7TrayClock();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 	FixAuthUI();
-
 }
 
 HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
@@ -693,8 +694,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	return TRUE;
 }
 
-
-
 extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
   __in   REFCLSID rclsid,
   __in   LPUNKNOWN pUnkOuter,
@@ -787,7 +786,6 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 
 	return rslt;
 }
-
 
 extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject( DWORD dwRegister )
 {	
