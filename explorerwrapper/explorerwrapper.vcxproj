@@ -50,7 +50,7 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion>14.40.33807</VCToolsVersion>
+    <VCToolsVersion>14.40.33521</VCToolsVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -164,6 +164,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <LanguageStandard>Default</LanguageStandard>
+      <LanguageStandard_C>Default</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -193,6 +194,7 @@
     <ClInclude Include="forwards.h" />
     <ClInclude Include="immersivefactory.h" />
     <ClInclude Include="immersiveshell.h" />
+    <ClInclude Include="pinnedlist.h" />
     <ClInclude Include="projection.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="startmenupin.h" />
@@ -228,6 +230,7 @@
     <ClCompile Include="minCRT.cpp">
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
     </ClCompile>
+    <ClCompile Include="pinnedlist.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="shell32_wrappers.cpp" />
     <ClCompile Include="startmenupin.cpp" />

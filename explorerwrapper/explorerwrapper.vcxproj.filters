@@ -66,6 +66,9 @@
     <ClInclude Include="resource.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="pinnedlist.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -117,6 +120,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="minCRT.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="pinnedlist.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>

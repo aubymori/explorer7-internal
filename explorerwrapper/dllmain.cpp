@@ -16,6 +16,7 @@
 #include "projection.h"
 #include <vector>
 #include <LMServer.h>
+#include "pinnedlist.h"
 //#include "Detours/detours.h"
 #include "resource.h"
 
@@ -726,6 +727,11 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		if (result == S_OK)
 			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 	}
+	if (rclsid == CLSID_TaskbarPin && result == E_NOINTERFACE)
+	{
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IPinnedList3, ppv);
+		*ppv = new CPinnedListWrapper((IPinnedList3*)*ppv);
+	}
 	if (result == S_OK && rclsid == CLSID_SysTray) //wrap stobject
 	{
 		dbgprintf(L"wrap stobject\n");
@@ -748,10 +754,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			if (info->sv101_version_major == 10)
 				dk = IID_IShutdownChoices10;
 
-			//if (patternFound)
-				result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
-			//else
-				//CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
