@@ -17,6 +17,7 @@
 #include <vector>
 #include <LMServer.h>
 #include "pinnedlist.h"
+#include "version.hpp"
 //#include "Detours/detours.h"
 #include "resource.h"
 
@@ -727,10 +728,16 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		if (result == S_OK)
 			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 	}
-	if (rclsid == CLSID_TaskbarPin && result == E_NOINTERFACE)
+	if (rclsid == CLSID_TaskbarPin && result == E_NOINTERFACE && riid == IID_IPinnedList2)
 	{
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IPinnedList3, ppv);
-		*ppv = new CPinnedListWrapper((IPinnedList3*)*ppv);
+		int build = GetBuild();
+
+		IID id = IID_IFlexibleTaskbarPinnedList;
+		if (build >= 17763)
+			id = IID_IPinnedList3;
+
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
+		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
 	}
 	if (result == S_OK && rclsid == CLSID_SysTray) //wrap stobject
 	{
@@ -740,25 +747,23 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
 	{
 		dbgprintf(L"wrap authui\n");
-		LPBYTE pByteBuffer = new BYTE[1024];
-		NetServerGetInfo(NULL, 101, &pByteBuffer);
-		LPSERVER_INFO_101 info = (LPSERVER_INFO_101)pByteBuffer;
+		int build = GetBuild();
 		if (*ppv)
 		{
 			dbgprintf(L"good\n");
-			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
+			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, build);
 		}
 		else
 		{
 			IID dk = IID_IShutdownChoices8;
-			if (info->sv101_version_major == 10)
+			if (build >= 10240)
 				dk = IID_IShutdownChoices10;
 
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
-				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
+				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, build);
 			}
 		}
 	}
