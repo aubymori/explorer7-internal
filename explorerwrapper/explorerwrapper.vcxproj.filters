@@ -69,6 +69,9 @@
     <ClInclude Include="pinnedlist.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="version.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

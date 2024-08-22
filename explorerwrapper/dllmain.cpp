@@ -17,7 +17,7 @@
 #include <vector>
 #include <LMServer.h>
 #include "pinnedlist.h"
-#include "version.hpp"
+#include "version.h"
 //#include "Detours/detours.h"
 #include "resource.h"
 
@@ -123,7 +123,6 @@ static BOOL CALLBACK FindSMCallback(HWND hwnd, LPARAM lParam)
 	}
 	return TRUE;
 }
-
 
 static HWND GetStartMenuWnd()
 {
