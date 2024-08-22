@@ -4,7 +4,7 @@
 CAuthUIWrapper::CAuthUIWrapper(IUnknown *authui, int build)
 {
 	m_cRef = 1;
-	if (build == 10)
+	if (build >= 10240)
 		m_authui10 = (IShutdownChoices10*)authui;
 	else
 		m_authui8 = (IShutdownChoices8*)authui;
@@ -24,19 +24,6 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::QueryInterface(REFIID riid,void **ppvO
 		return m_authui8->QueryInterface(riid, ppvObject);
 	if (m_authui10)
 		return m_authui10->QueryInterface(riid,ppvObject);
-	//if (riid == IID_IShutdownChoices7)
-	//{
-	//	dbgprintf(L"IID_IShutdownChoices7\n");
-	//	HRESULT ret = m_authui8->QueryInterface(IID_IShutdownChoices8, (PVOID*)&m_startmenuiconscache8);
-	//	if (ret == S_OK)
-	//	{
-	//		dbgprintf(L"S_OK\n");
-	//		*ppvObject = static_cast<IShutdownChoices7*>(this);
-	//		AddRef();
-	//	}
-	//	return ret;
-	//}
-	//return E_NOINTERFACE;
 }
 
 ULONG STDMETHODCALLTYPE CAuthUIWrapper::AddRef(void)
