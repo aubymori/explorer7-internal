@@ -178,7 +178,7 @@
       <Profile>false</Profile>
       <MapExports>true</MapExports>
       <TurnOffAssemblyGeneration>true</TurnOffAssemblyGeneration>
-      <AdditionalDependencies>Netapi32.lib;shlwapi.lib;uxtheme.lib;dwmapi.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Netapi32.lib;shlwapi.lib;uxtheme.lib;dwmapi.lib;comctl32.lib;libMinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>comctl32.dll;shlwapi.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
     <ProjectReference>
@@ -194,6 +194,7 @@
     <ClInclude Include="forwards.h" />
     <ClInclude Include="immersivefactory.h" />
     <ClInclude Include="immersiveshell.h" />
+    <ClInclude Include="MinHook.h" />
     <ClInclude Include="pinnedlist.h" />
     <ClInclude Include="projection.h" />
     <ClInclude Include="resource.h" />
@@ -201,10 +202,10 @@
     <ClInclude Include="startmenuresolver.h" />
     <ClInclude Include="systraywrapper.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="thememanager.h" />
     <ClInclude Include="trash.h" />
     <ClInclude Include="traynotify.h" />
     <ClInclude Include="userassist.h" />
-    <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="appresolvernotify.cpp" />
@@ -242,6 +243,7 @@
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
     </ClCompile>
     <ClCompile Include="systraywrapper.cpp" />
+    <ClCompile Include="thememanager.cpp" />
     <ClCompile Include="traynotify.cpp" />
     <ClCompile Include="userassist.cpp" />
     <ClCompile Include="explorer_wrappers.cpp" />

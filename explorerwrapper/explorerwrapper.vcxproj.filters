@@ -69,7 +69,10 @@
     <ClInclude Include="pinnedlist.h">
       <Filter>Header files</Filter>
     </ClInclude>
-    <ClInclude Include="version.h">
+    <ClInclude Include="thememanager.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="MinHook.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -126,6 +129,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="pinnedlist.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="thememanager.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>

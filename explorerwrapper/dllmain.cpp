@@ -17,9 +17,10 @@
 #include <vector>
 #include <LMServer.h>
 #include "pinnedlist.h"
-#include "version.h"
 //#include "Detours/detours.h"
 #include "resource.h"
+#include "thememanager.h"
+#include "MinHook.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -123,6 +124,7 @@ static BOOL CALLBACK FindSMCallback(HWND hwnd, LPARAM lParam)
 	}
 	return TRUE;
 }
+
 
 static HWND GetStartMenuWnd()
 {
@@ -521,6 +523,133 @@ void FixAuthUI()
 	}
 }
 
+struct pairs
+{
+	WCHAR* str;
+	HTHEME theme;
+};
+
+int sizeCounter = 0;
+pairs themes[256];
+
+
+int g_fDPIAware = 0;
+int g_nScreenDpi = 0;
+int g_fForcedDpi = 0;
+__int64 GetScreenDpi(void)
+{
+	int v0; // eax
+	HDC DC; // rax
+	HDC v3; // rbx
+
+	if (!g_fForcedDpi)
+	{
+		v0 = IsProcessDPIAware();
+		if (g_fDPIAware != v0 || !g_nScreenDpi)
+		{
+			g_fDPIAware = v0;
+			g_nScreenDpi = 96;
+			DC = GetDC(0LL);
+			v3 = DC;
+			if (DC)
+			{
+				g_nScreenDpi = GetDeviceCaps(DC, 88);
+				ReleaseDC(0LL, v3);
+			}
+		}
+	}
+	return (unsigned int)g_nScreenDpi;
+}
+
+//CThemeManager themeManager(L"C:\\Windows\\aero.msstyles");
+
+HTHEME(__stdcall* fOpenThemeData)(HWND hwnd, LPCWSTR pszClassList);
+HTHEME(__stdcall* fOpenThemeDataForDpi)(HWND hwnd, LPCWSTR pszClassList, UINT dpi);
+HTHEME(__stdcall* fOpenThemeDataEx)(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags);
+HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
+{
+	HTHEME theme = 0;
+	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
+
+	LPCWSTR pszClassListToUse = pszClassList;
+	//if (wcscmp(pszClassList, L"Pager") == 0)
+	//	pszClassListToUse = L"TrayNotifyVert::Button";
+
+	DWORD flags = 2;
+	if ((unsigned int)GetScreenDpi() != 96)
+		flags |= 1u;
+
+	if (LoadedFile )
+		theme = OpenThemeDataFromFile(LoadedFile,hwnd, pszClassListToUse, flags);
+	else
+		theme = fOpenThemeData(hwnd, pszClassList);
+
+	if (theme == nullptr)
+		dbgprintf(L"OPENTHEMEDATA FAILED %s", pszClassList);
+
+	return theme;
+}
+
+HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT dpi)
+{
+	HTHEME theme = 0;
+	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
+	LPCWSTR pszClassListToUse = pszClassList;
+	//if (wcscmp(pszClassList, L"Pager") == 0)
+	//	pszClassListToUse = L"TrayNotifyVert::Button";
+
+	DWORD flags = 2;
+	if (dpi != 96)
+		flags |= 1u;
+
+	if (LoadedFile )
+		theme = OpenThemeDataFromFile(LoadedFile, hwnd, pszClassListToUse, flags);
+	else
+		theme = fOpenThemeDataForDpi(hwnd, pszClassList,dpi);
+
+	if (theme == nullptr)
+		dbgprintf(L"OPENTHEMEDATAFORDPI FAILED %s", pszClassList);
+
+	return theme;
+}
+
+HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags)
+{
+	HTHEME theme = 0;
+	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
+	LPCWSTR pszClassListToUse = pszClassList;
+	//if (wcscmp(pszClassList, L"Pager") == 0)
+	//	pszClassListToUse = L"TrayNotifyVert::Button";
+
+	DWORD flags = 2;
+	if ((unsigned int)GetScreenDpi() != 96)
+		flags |= 1u;
+
+	if (LoadedFile )
+		theme = OpenThemeDataFromFile(LoadedFile, hwnd, pszClassListToUse, dwFlags | flags);
+	else
+		theme = fOpenThemeDataEx(hwnd, pszClassList,dwFlags);
+
+	if (theme == nullptr)
+		dbgprintf(L"OPENTHEMEDATAEX FAILED %s", pszClassList);
+
+	return theme;
+}
+
+HRESULT __stdcall CloseThemeDataNEW(HTHEME theme)
+{
+	return S_OK; //temp
+
+	//for (int i = 0; i < sizeCounter; ++i)
+	//{
+	//	auto pair = themes[i];
+	//	if (pair.theme == theme)
+	//		dbgprintf(L"%s is being Closed", pair.str);
+	//}
+	//
+	//return CloseThemeData(theme);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -536,6 +665,18 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL),"kernel32.dll",SetErrorMode,SetErrorModeNEW);
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
 	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",IsCompositionActive,IsCompositionActiveNEW);
+	ThemeManagerInitialize();
+	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
+	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
+	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
+	MH_Initialize();
+	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
+	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
+	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+	MH_EnableHook(MH_ALL_HOOKS);
+
+	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
+	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "CloseThemeData"), CloseThemeDataNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmIsCompositionEnabled,DwmIsCompositionEnabledNEW);
 	//adapt colorization api
 	DwmGetColorizationParametersOrig = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"dwmapi.dll"),(LPSTR)127);
@@ -727,16 +868,11 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		if (result == S_OK)
 			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 	}
-	if (rclsid == CLSID_TaskbarPin && result == E_NOINTERFACE && riid == IID_IPinnedList2)
+	//if (rclsid == CLSID_TaskbarPin && result == E_NOINTERFACE)
+	if ((riid == IID_IPinnedList2 || rclsid == CLSID_StartMenuPin) && result == E_NOINTERFACE)
 	{
-		int build = GetBuild();
-
-		IID id = IID_IFlexibleTaskbarPinnedList;
-		if (build >= 17763)
-			id = IID_IPinnedList3;
-
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IPinnedList3, ppv);
+		*ppv = new CPinnedListWrapper((IPinnedList3*)*ppv);
 	}
 	if (result == S_OK && rclsid == CLSID_SysTray) //wrap stobject
 	{
@@ -746,23 +882,25 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
 	{
 		dbgprintf(L"wrap authui\n");
-		int build = GetBuild();
+		LPBYTE pByteBuffer = new BYTE[1024];
+		NetServerGetInfo(NULL, 101, &pByteBuffer);
+		LPSERVER_INFO_101 info = (LPSERVER_INFO_101)pByteBuffer;
 		if (*ppv)
 		{
 			dbgprintf(L"good\n");
-			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, build);
+			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
 		}
 		else
 		{
 			IID dk = IID_IShutdownChoices8;
-			if (build >= 10240)
+			if (info->sv101_version_major == 10)
 				dk = IID_IShutdownChoices10;
 
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
-				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, build);
+				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
 			}
 		}
 	}
