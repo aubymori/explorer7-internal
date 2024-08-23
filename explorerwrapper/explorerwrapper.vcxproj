@@ -206,6 +206,7 @@
     <ClInclude Include="trash.h" />
     <ClInclude Include="traynotify.h" />
     <ClInclude Include="userassist.h" />
+    <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="appresolvernotify.cpp" />

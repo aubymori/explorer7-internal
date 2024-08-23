@@ -1,6 +1,7 @@
 #include "startmenuresolver.h"
 #include "startmenupin.h"
 #include "dbgprint.h"
+#include "pinnedlist.h"
 #pragma function(memset)
 
 extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
@@ -146,12 +147,12 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetPinnedItemsCount(int* pCount)
 {
 	dbgprintf(L"GetPinnedItemsCount");
 	*pCount = 0;
-	IPinnedList* startpinnedlist;
-	HRESULT rslt = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList, (PVOID*)&startpinnedlist);
+	IPinnedList2* pinList2 = 0;
+	HRESULT rslt = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&pinList2);
 	if (SUCCEEDED(rslt))
 	{
 		IEnumFullIDList* enumidlist;
-		rslt = startpinnedlist->EnumObjects(&enumidlist);
+		rslt = pinList2->EnumObjects(&enumidlist);
 		if (SUCCEEDED(rslt))
 		{
 			LPITEMIDLIST pidl;
@@ -164,7 +165,7 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetPinnedItemsCount(int* pCount)
 			dbgprintf(L"CStartMenuResolver::GetPinnedItemsCount = %d", *pCount);
 			enumidlist->Release();
 		}
-		startpinnedlist->Release();
+		pinList2->Release();
 	}
 	return rslt;
 }
@@ -177,11 +178,11 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetStartMenuMFUList(unsigned int l
 	*penumStart = (IEnumStartMenuItem*)startenum;
 	*penumStrings = (IEnumString*)new CEnumStartMenu;
 	//add pinned items
-	IPinnedList* startpinnedlist;
-	IPinnedList* taskbarpinnedlist;
-	HRESULT rslt = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList, (PVOID*)&startpinnedlist);
+	IPinnedList2* startpinnedlist;
+	IPinnedList2* taskbarpinnedlist;
+	HRESULT rslt = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&startpinnedlist);
 	if (FAILED(rslt)) return rslt;
-	rslt = Explorer_CoCreateInstance(CLSID_TaskbarPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList, (PVOID*)&taskbarpinnedlist);
+	rslt = Explorer_CoCreateInstance(CLSID_TaskbarPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&taskbarpinnedlist);
 	if (FAILED(rslt)) return rslt;
 	IEnumFullIDList* enumidlist;
 	rslt = startpinnedlist->EnumObjects(&enumidlist);

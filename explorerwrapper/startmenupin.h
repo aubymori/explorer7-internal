@@ -4,26 +4,12 @@
 #define INITGUID
 #include <guiddef.h>
 DEFINE_GUID(CLSID_StartMenuPin,0xA2A9545D, 0xA0C2, 0x42B4, 0x97,0x08,0xA0,0xB2,0xBA,0xDD,0x77,0xC8); //{A2A9545D-A0C2-42B4-9708-A0B2BADD77C8}
-DEFINE_GUID(IID_IPinnedList,0xBBD20037, 0xBC0E, 0x42F1, 0x91,0x3F,0xE2,0x93,0x6B,0xB0,0xEA,0x0C); //{BBD20037-BC0E-42F1-913F-E2936BB0EA0C}
 DEFINE_GUID(CLSID_TaskbarPin,0x90AA3A4E, 0x1CBA, 0x4233, 0xB8,0xBB,0x53,0x57,0x73,0xD4,0x84,0x49);
 
 #include <Windows.h>
 #include <ShlObj.h>
 #include <Shlwapi.h>
 
-
-MIDL_INTERFACE("BBD20037-BC0E-42F1-913F-E2936BB0EA0C")
-IPinnedList: public IUnknown
-{
-public:
-	virtual HRESULT STDMETHODCALLTYPE EnumObjects( IEnumFullIDList** enumerator ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Modify( LPITEMIDLIST, LPITEMIDLIST ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetChangeCount( ULONG* ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetPinnableInfo( /*...*/ ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE IsPinnable( /*...*/ ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Resolve( /*...*/ ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE IsPinned( LPITEMIDLIST ) = 0;
-};
 
 typedef HRESULT (WINAPI* CreateInstance_API)(PVOID,REFIID,PVOID*);
 	typedef struct { 

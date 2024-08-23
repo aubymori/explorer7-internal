@@ -15,7 +15,7 @@
 #include "immersivefactory.h"
 #include "projection.h"
 #include <vector>
-#include <LMServer.h>
+#include "version.h"
 #include "pinnedlist.h"
 //#include "Detours/detours.h"
 #include "resource.h"
@@ -636,20 +636,6 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 	return theme;
 }
 
-HRESULT __stdcall CloseThemeDataNEW(HTHEME theme)
-{
-	return S_OK; //temp
-
-	//for (int i = 0; i < sizeCounter; ++i)
-	//{
-	//	auto pair = themes[i];
-	//	if (pair.theme == theme)
-	//		dbgprintf(L"%s is being Closed", pair.str);
-	//}
-	//
-	//return CloseThemeData(theme);
-}
-
 void HookShell32();
 void HookAPIs()
 {
@@ -868,11 +854,15 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		if (result == S_OK)
 			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 	}
-	//if (rclsid == CLSID_TaskbarPin && result == E_NOINTERFACE)
-	if ((riid == IID_IPinnedList2 || rclsid == CLSID_StartMenuPin) && result == E_NOINTERFACE)
+	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result == E_NOINTERFACE)
 	{
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IPinnedList3, ppv);
-		*ppv = new CPinnedListWrapper((IPinnedList3*)*ppv);
+		int build = GetBuild();
+		IID id = IID_IFlexibleTaskbarPinnedList;
+		if (build >= 17763)
+			id = IID_IPinnedList3;
+
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
+		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
 	}
 	if (result == S_OK && rclsid == CLSID_SysTray) //wrap stobject
 	{
@@ -882,25 +872,23 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
 	{
 		dbgprintf(L"wrap authui\n");
-		LPBYTE pByteBuffer = new BYTE[1024];
-		NetServerGetInfo(NULL, 101, &pByteBuffer);
-		LPSERVER_INFO_101 info = (LPSERVER_INFO_101)pByteBuffer;
+		int build = GetBuild();
 		if (*ppv)
 		{
 			dbgprintf(L"good\n");
-			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
+			*ppv = new CAuthUIWrapper((IUnknown*)*ppv, build);
 		}
 		else
 		{
 			IID dk = IID_IShutdownChoices8;
-			if (info->sv101_version_major == 10)
+			if (build >= 10240)
 				dk = IID_IShutdownChoices10;
 
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
 			if (*ppv)
 			{
 				dbgprintf(L"good 2\n");
-				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, info->sv101_version_major);
+				*ppv = new CAuthUIWrapper((IUnknown*)*ppv, build);
 			}
 		}
 	}

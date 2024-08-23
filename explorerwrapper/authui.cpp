@@ -1,10 +1,10 @@
 #include "authui.h"
 #include "dbgprint.h"
 
-CAuthUIWrapper::CAuthUIWrapper(IUnknown *authui, int build)
+CAuthUIWrapper::CAuthUIWrapper(IUnknown* authui, int build)
 {
 	m_cRef = 1;
-	if (build == 10)
+	if (build >= 10240)
 		m_authui10 = (IShutdownChoices10*)authui;
 	else
 		m_authui8 = (IShutdownChoices8*)authui;
@@ -18,25 +18,12 @@ CAuthUIWrapper::~CAuthUIWrapper()
 		m_authui10->Release();
 }
 
-HRESULT STDMETHODCALLTYPE CAuthUIWrapper::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CAuthUIWrapper::QueryInterface(REFIID riid, void** ppvObject)
 {
 	if (m_authui8)
 		return m_authui8->QueryInterface(riid, ppvObject);
 	if (m_authui10)
-		return m_authui10->QueryInterface(riid,ppvObject);
-	//if (riid == IID_IShutdownChoices7)
-	//{
-	//	dbgprintf(L"IID_IShutdownChoices7\n");
-	//	HRESULT ret = m_authui8->QueryInterface(IID_IShutdownChoices8, (PVOID*)&m_startmenuiconscache8);
-	//	if (ret == S_OK)
-	//	{
-	//		dbgprintf(L"S_OK\n");
-	//		*ppvObject = static_cast<IShutdownChoices7*>(this);
-	//		AddRef();
-	//	}
-	//	return ret;
-	//}
-	//return E_NOINTERFACE;
+		return m_authui10->QueryInterface(riid, ppvObject);
 }
 
 ULONG STDMETHODCALLTYPE CAuthUIWrapper::AddRef(void)
@@ -78,7 +65,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::CreateListener(IUnknown** p1)
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::SetChoiceMask(ULONG p1)
 {
 	p1 = p1 & ~0x200000;
-	dbgprintf(L"SetChoiceMask %p",p1);
+	dbgprintf(L"SetChoiceMask %p", p1);
 	if (m_authui8)
 		return m_authui8->SetChoiceMask(p1);
 	if (m_authui10)
@@ -123,16 +110,16 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::UserHasShutdownRights(void)
 		return m_authui10->UserHasShutdownRights();
 }
 
-HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceName(ULONG p1,int p2,LPWSTR p3,UINT p4)
+HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceName(ULONG p1, int p2, LPWSTR p3, UINT p4)
 {
-	dbgprintf(L"GetChoiceName %d %d %s %d",p1,p2,p3,p4);
+	dbgprintf(L"GetChoiceName %d %d %s %d", p1, p2, p3, p4);
 	if (m_authui8)
 		return m_authui8->GetChoiceName(p1, p2, p3, p4);
 	if (m_authui10)
 		return m_authui10->GetChoiceName(p1, p2, p3, p4);
 }
 
-HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceDesc(ULONG p1,LPWSTR p2,UINT p3)
+HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceDesc(ULONG p1, LPWSTR p2, UINT p3)
 {
 	if (m_authui8)
 		return  m_authui8->GetChoiceDesc(p1, p2, p3);

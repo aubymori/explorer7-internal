@@ -72,7 +72,7 @@ class CPinnedListWrapper : public IPinnedList2
 {
 public:
 	//constructor
-	CPinnedListWrapper(IPinnedList3*);
+	CPinnedListWrapper(IUnknown*, int);
 	//destructor
 	~CPinnedListWrapper();
 	//IUnknown
@@ -93,6 +93,7 @@ public:
 	HRESULT STDMETHODCALLTYPE ItemChangeNotify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE);
 	HRESULT STDMETHODCALLTYPE UpdateForRemovedItemsAsNecessary(VOID);
 private:
-	IPinnedList3* m_pinnedList = 0;
+	IFlexibleTaskbarPinnedList* m_flexList = 0;
+	IPinnedList3* m_pinnedList3 = 0;
 };
 
