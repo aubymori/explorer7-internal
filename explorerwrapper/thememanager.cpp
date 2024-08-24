@@ -2,7 +2,7 @@
 #include "dbgprint.h"
 #include "pathcch.h"
 #include "version.h"
-#include "registry.h"
+//#include "registry.h"
 #include <Shlwapi.h>
 
 decltype(GetThemeDefaults) GetThemeDefaults = 0;
@@ -21,9 +21,15 @@ void ThemeManagerInitialize()
 
 	dbgprintf(L"GetThemeDefaults %x LoaderLoadTheme %x OpenThemeDataFromFile %x\n",GetThemeDefaults, LoaderLoadTheme, OpenThemeDataFromFile);
 
+	WCHAR CurrentDir[MAX_PATH];
+	GetCurrentDirectoryW(MAX_PATH, CurrentDir);
+
 	WCHAR themePath[MAX_PATH];
-	LSTATUS res = g_registry.QueryValue(L"Theme", (LPBYTE)themePath, sizeof(themePath));
-	dbgprintf(L"result: 0x%X, themePath: %s", res, themePath);
+	PathCombineW(themePath, CurrentDir, L"theme\\aero\\aero.msstyles");
+	dbgprintf(L"themePath: %s", themePath);
+
+	//LSTATUS res = g_registry.QueryValue(L"Theme", (LPBYTE)themePath, sizeof(themePath));
+	//dbgprintf(L"result: 0x%X, themePath: %s", res, themePath);
 	
 	auto hr = LoadThemeFile(themePath);
 	if (hr != S_OK)

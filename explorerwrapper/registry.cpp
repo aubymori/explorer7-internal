@@ -1,7 +1,7 @@
 #include "registry.h"
 #include "dbgprint.h"
 
-const LPWSTR c_szSubkey = L"SOFTWARE\\Explorer7";
+const LPWSTR c_szSubkey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
 
 void CRegistryManager::_OpenKeys()
 {
