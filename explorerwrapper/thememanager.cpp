@@ -1,13 +1,15 @@
 #include "thememanager.h"
 #include "dbgprint.h"
 #include "pathcch.h"
+#include "version.h"
+#include "registry.h"
 #include <Shlwapi.h>
 
 decltype(GetThemeDefaults) GetThemeDefaults = 0;
 decltype(LoaderLoadTheme) LoaderLoadTheme = 0;
 decltype(OpenThemeDataFromFile) OpenThemeDataFromFile = 0;
 
-CUxThemeFile* LoadedFile = 0;
+UXTHEMEFILE* g_loadedTheme = 0;
 
 void ThemeManagerInitialize()
 {
@@ -18,13 +20,10 @@ void ThemeManagerInitialize()
 	OpenThemeDataFromFile = (decltype(OpenThemeDataFromFile))GetProcAddress(hUxTheme, (LPCSTR)16);
 
 	dbgprintf(L"GetThemeDefaults %x LoaderLoadTheme %x OpenThemeDataFromFile %x\n",GetThemeDefaults, LoaderLoadTheme, OpenThemeDataFromFile);
-	
-	WCHAR CurrentDir[MAX_PATH];
-	GetCurrentDirectoryW(MAX_PATH,CurrentDir);
 
 	WCHAR themePath[MAX_PATH];
-	PathCombineW(themePath,CurrentDir,L"theme\\aero\\aero.msstyles");
-	dbgprintf(L"themePath: %s", themePath);
+	LSTATUS res = g_registry.QueryValue(L"Theme", (LPBYTE)themePath, sizeof(themePath));
+	dbgprintf(L"result: 0x%X, themePath: %s", res, themePath);
 	
 	auto hr = LoadThemeFile(themePath);
 	if (hr != S_OK)
@@ -35,22 +34,22 @@ HRESULT LoadThemeFile(wchar_t* Path)
 {
 	HRESULT hr = S_OK;
 
-	if (LoadedFile)
+	if (g_loadedTheme)
 	{
-		if (LoadedFile->sharableSectionView)
+		if (g_loadedTheme->sharableSectionView)
 		{
-			UnmapViewOfFile(LoadedFile->sharableSectionView);
+			UnmapViewOfFile(g_loadedTheme->sharableSectionView);
 		}
-		if (LoadedFile->nsSectionView)
+		if (g_loadedTheme->nsSectionView)
 		{
-			UnmapViewOfFile(LoadedFile->nsSectionView);
+			UnmapViewOfFile(g_loadedTheme->nsSectionView);
 		}
-		free(LoadedFile);
-		LoadedFile = 0;
+		free(g_loadedTheme);
+		g_loadedTheme = 0;
 	}
 
-	LoadedFile = (CUxThemeFile*)malloc(sizeof(CUxThemeFile));
-	ZeroMemory(LoadedFile, sizeof(CUxThemeFile));
+	g_loadedTheme = (UXTHEMEFILE*)malloc(sizeof(UXTHEMEFILE));
+	ZeroMemory(g_loadedTheme, sizeof(UXTHEMEFILE));
 
 	WCHAR szColor[MAX_PATH];
 	WCHAR szSize[MAX_PATH];
@@ -64,34 +63,27 @@ HRESULT LoadThemeFile(wchar_t* Path)
 	);
 	if (hr != S_OK)
 	{
-		if (LoadedFile)
+		if (g_loadedTheme)
 		{
-			if (LoadedFile->sharableSectionView)
+			if (g_loadedTheme->sharableSectionView)
 			{
-				UnmapViewOfFile(LoadedFile->sharableSectionView);
+				UnmapViewOfFile(g_loadedTheme->sharableSectionView);
 			}
-			if (LoadedFile->nsSectionView)
+			if (g_loadedTheme->nsSectionView)
 			{
-				UnmapViewOfFile(LoadedFile->nsSectionView);
+				UnmapViewOfFile(g_loadedTheme->nsSectionView);
 			}
-			free(LoadedFile);
-			LoadedFile = 0;
+			free(g_loadedTheme);
+			g_loadedTheme = 0;
 			dbgprintf(L"LoadTHemeFile failed 1");
 		}
 		return hr;
 	}
 
 	HANDLE hSharable, hNonSharable;
-
-	_OSVERSIONINFOW VersionInformation;
-
-	//LoaderLoad(0LL, 0LL, skinpath, v13, v12, &hFileMappingObject, 0LL, 0, &v16, 0LL, 0, 0LL, 0LL, 0, 0, 0)
-	VersionInformation.dwOSVersionInfoSize = 276;
-	memset(&VersionInformation.dwMajorVersion, 0, 0x110uLL);
-	GetVersionExW(&VersionInformation);
-	if (VersionInformation.dwBuildNumber < 20000
+	if (g_osVersion.BuildNumber() < 20000
 		? LoaderLoadTheme(0LL, 0LL, Path, szColor, szSize, &hSharable, 0LL, 0, &hNonSharable, 0LL, 0, 0LL, 0LL, 0, 0, 0)
-		: (unsigned int)LoaderLoadTheme(
+		: ((LoaderLoadTheme_t_win11)LoaderLoadTheme)(
 			0LL,
 			0LL,
 			Path,
@@ -106,32 +98,31 @@ HRESULT LoadThemeFile(wchar_t* Path)
 			0LL,
 			0LL,
 			0,
-			0,
 			0))
 	{
-		if (LoadedFile)
+		if (g_loadedTheme)
 		{
-			if (LoadedFile->sharableSectionView)
+			if (g_loadedTheme->sharableSectionView)
 			{
-				UnmapViewOfFile(LoadedFile->sharableSectionView);
+				UnmapViewOfFile(g_loadedTheme->sharableSectionView);
 			}
-			if (LoadedFile->nsSectionView)
+			if (g_loadedTheme->nsSectionView)
 			{
-				UnmapViewOfFile(LoadedFile->nsSectionView);
+				UnmapViewOfFile(g_loadedTheme->nsSectionView);
 			}
-			free(LoadedFile);
-			LoadedFile = 0;
+			free(g_loadedTheme);
+			g_loadedTheme = 0;
 			dbgprintf(L"LoadTHemeFile failed 2");
 		}
 		return hr;
 	}
 
-	memcpy(LoadedFile->header, "thmfile", 7);
-	memcpy(LoadedFile->end, "end", 3);
-	LoadedFile->sharableSectionView = MapViewOfFile(hSharable, 4, 0, 0, 0);
-	LoadedFile->hSharableSection = hSharable;
-	LoadedFile->nsSectionView = MapViewOfFile(hNonSharable, 4, 0, 0, 0);
-	LoadedFile->hNsSection = hNonSharable;
+	memcpy(g_loadedTheme->header, "thmfile", 7);
+	memcpy(g_loadedTheme->end, "end", 3);
+	g_loadedTheme->sharableSectionView = MapViewOfFile(hSharable, 4, 0, 0, 0);
+	g_loadedTheme->hSharableSection = hSharable;
+	g_loadedTheme->nsSectionView = MapViewOfFile(hNonSharable, 4, 0, 0, 0);
+	g_loadedTheme->hNsSection = hNonSharable;
 
 	return S_OK;
 }

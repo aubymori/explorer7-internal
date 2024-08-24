@@ -2,7 +2,7 @@
 #include <windows.h>
 #include <uxtheme.h>
 
-struct CUxThemeFile
+struct UXTHEMEFILE
 {
 	char header[7]; // must be "thmfile"
 	LPVOID sharableSectionView;
@@ -13,41 +13,59 @@ struct CUxThemeFile
 
 };
 
-extern HRESULT(WINAPI* GetThemeDefaults)(
+extern HRESULT(WINAPI *GetThemeDefaults)(
 	LPCWSTR pszThemeFileName,
 	LPWSTR  pszColorName,
 	DWORD   dwColorNameLen,
 	LPWSTR  pszSizeName,
 	DWORD   dwSizeNameLen
-	);
+);
 
-extern HRESULT(WINAPI* LoaderLoadTheme)(
+extern HRESULT(WINAPI *LoaderLoadTheme)(
 	HANDLE      hThemeFile,
 	HINSTANCE   hThemeLibrary,
 	LPCWSTR     pszThemeFileName,
 	LPCWSTR     pszColorParam,
 	LPCWSTR     pszSizeParam,
-	OUT HANDLE* hSharableSection,
+	OUT HANDLE *hSharableSection,
 	LPWSTR      pszSharableSectionName,
 	int         cchSharableSectionName,
-	OUT HANDLE* hNonsharableSection,
+	OUT HANDLE *hNonsharableSection,
 	LPWSTR      pszNonsharableSectionName,
 	int         cchNonsharableSectionName,
 	PVOID       pfnCustomLoadHandler,
-	OUT HANDLE* hReuseSection,
+	OUT HANDLE *hReuseSection,
 	int         a,
 	int         b,
 	BOOL        fEmulateGlobal
-	);
+);
 
-extern HTHEME(WINAPI* OpenThemeDataFromFile)(
-	CUxThemeFile* lpThemeFile,
-	HWND        hWnd,
-	LPCWSTR     pszClassList,
-	DWORD       dwFlags
-	);
+typedef HRESULT(WINAPI *LoaderLoadTheme_t_win11)(
+	HANDLE      hThemeFile,
+	HINSTANCE   hThemeLibrary,
+	LPCWSTR     pszThemeFileName,
+	LPCWSTR     pszColorParam,
+	LPCWSTR     pszSizeParam,
+	OUT HANDLE *hSharableSection,
+	LPWSTR      pszSharableSectionName,
+	int         cchSharableSectionName,
+	OUT HANDLE *hNonsharableSection,
+	LPWSTR      pszNonsharableSectionName,
+	int         cchNonsharableSectionName,
+	PVOID       pfnCustomLoadHandler,
+	OUT HANDLE *hReuseSection,
+	int         a,
+	int         b
+);
 
-extern CUxThemeFile* LoadedFile;
+extern HTHEME(WINAPI *OpenThemeDataFromFile)(
+	UXTHEMEFILE *lpThemeFile,
+	HWND         hWnd,
+	LPCWSTR      pszClassList,
+	DWORD        dwFlags
+);
+
+extern UXTHEMEFILE *g_loadedTheme;
 
 void ThemeManagerInitialize();
 HRESULT LoadThemeFile(wchar_t* Path);

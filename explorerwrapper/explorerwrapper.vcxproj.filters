@@ -75,6 +75,12 @@
     <ClInclude Include="MinHook.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="version.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="registry.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -132,6 +138,12 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="thememanager.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="version.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="registry.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>

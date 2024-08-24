@@ -197,6 +197,7 @@
     <ClInclude Include="MinHook.h" />
     <ClInclude Include="pinnedlist.h" />
     <ClInclude Include="projection.h" />
+    <ClInclude Include="registry.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="startmenupin.h" />
     <ClInclude Include="startmenuresolver.h" />
@@ -235,6 +236,7 @@
     </ClCompile>
     <ClCompile Include="pinnedlist.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="registry.cpp" />
     <ClCompile Include="shell32_wrappers.cpp" />
     <ClCompile Include="startmenupin.cpp" />
     <ClCompile Include="startmenuresolver.cpp">
@@ -248,6 +250,7 @@
     <ClCompile Include="traynotify.cpp" />
     <ClCompile Include="userassist.cpp" />
     <ClCompile Include="explorer_wrappers.cpp" />
+    <ClCompile Include="version.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wrapper.rc" />

@@ -41,6 +41,8 @@ HINSTANCE g_hInstance;
 DWORD dwRegisterNotify;
 HANDLE hEvent_DesktopVisible;
 
+DWORD g_dwTrayThreadId = 0;
+
 static WNDPROC g_prevTrayProc;
 typedef DWORD (WINAPI *SHPtrParamAPI)(PVOID);
 typedef PVOID (WINAPI *SHCreateDesktopAPI)(PVOID);
@@ -579,8 +581,8 @@ HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 	if ((unsigned int)GetScreenDpi() != 96)
 		flags |= 1u;
 
-	if (LoadedFile )
-		theme = OpenThemeDataFromFile(LoadedFile,hwnd, pszClassListToUse, flags);
+	if (g_loadedTheme && g_dwTrayThreadId == GetCurrentThreadId())
+		theme = OpenThemeDataFromFile(g_loadedTheme,hwnd, pszClassListToUse, flags);
 	else
 		theme = fOpenThemeData(hwnd, pszClassList);
 
@@ -602,8 +604,8 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 	if (dpi != 96)
 		flags |= 1u;
 
-	if (LoadedFile )
-		theme = OpenThemeDataFromFile(LoadedFile, hwnd, pszClassListToUse, flags);
+	if (g_loadedTheme && g_dwTrayThreadId == GetCurrentThreadId())
+		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassListToUse, flags);
 	else
 		theme = fOpenThemeDataForDpi(hwnd, pszClassList,dpi);
 
@@ -625,8 +627,8 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 	if ((unsigned int)GetScreenDpi() != 96)
 		flags |= 1u;
 
-	if (LoadedFile )
-		theme = OpenThemeDataFromFile(LoadedFile, hwnd, pszClassListToUse, dwFlags | flags);
+	if (g_loadedTheme && g_dwTrayThreadId == GetCurrentThreadId())
+		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassListToUse, dwFlags | flags);
 	else
 		theme = fOpenThemeDataEx(hwnd, pszClassList,dwFlags);
 
@@ -634,6 +636,37 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 		dbgprintf(L"OPENTHEMEDATAEX FAILED %s", pszClassList);
 
 	return theme;
+}
+
+LPTHREAD_START_ROUTINE CTray__SyncThreadProc_orig = nullptr;
+DWORD WINAPI CTray__SyncThreadProc_hook(LPVOID lpParameter)
+{
+	if (!g_dwTrayThreadId)
+	{
+		g_dwTrayThreadId = GetCurrentThreadId();
+		dbgprintf(L"set g_dwTrayThreadId to %u", g_dwTrayThreadId);
+	}
+
+	if (CTray__SyncThreadProc_orig)
+		return CTray__SyncThreadProc_orig(lpParameter);
+	return 0;
+}
+
+void HookTrayThread(void)
+{
+	CTray__SyncThreadProc_orig = (LPTHREAD_START_ROUTINE)FindPattern(
+		(uintptr_t)GetModuleHandle(NULL),
+		"48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 00 03 00 00 48 8B"
+	);
+
+	if (CTray__SyncThreadProc_orig)
+	{
+		MH_CreateHook(
+			(void *)CTray__SyncThreadProc_orig,
+			(void *)CTray__SyncThreadProc_hook,
+			(void **)&CTray__SyncThreadProc_orig
+		);
+	}
 }
 
 void HookShell32();
@@ -659,6 +692,7 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+	HookTrayThread();
 	MH_EnableHook(MH_ALL_HOOKS);
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
@@ -856,7 +890,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	}
 	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result == E_NOINTERFACE)
 	{
-		int build = GetBuild();
+		int build = g_osVersion.BuildNumber();
 		IID id = IID_IFlexibleTaskbarPinnedList;
 		if (build >= 17763)
 			id = IID_IPinnedList3;
@@ -872,7 +906,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
 	{
 		dbgprintf(L"wrap authui\n");
-		int build = GetBuild();
+		int build = g_osVersion.BuildNumber();
 		if (*ppv)
 		{
 			dbgprintf(L"good\n");
