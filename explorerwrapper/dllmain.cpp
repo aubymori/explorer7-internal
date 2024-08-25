@@ -22,13 +22,13 @@
 #include "thememanager.h"
 #include "MinHook.h"
 #include "taskscheduler.h"
+#include "registry.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
 #define _WIN_RS1 0 //Win10RS1-specific changes - currently unused
 #define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
 #define _WIN_VB 0 //Win10VB-specific changes - currently unused
-#define _DISABLE_COMPOSITION 0 //For debugging without disabling DWM
 
 //uncomment to force classic theme
 //#define FORCE_CLASSIC
@@ -43,6 +43,8 @@ DWORD dwRegisterNotify;
 HANDLE hEvent_DesktopVisible;
 
 DWORD g_dwTrayThreadId = 0;
+
+bool g_bDisableComposition = false;
 
 static WNDPROC g_prevTrayProc;
 typedef DWORD (WINAPI *SHPtrParamAPI)(PVOID);
@@ -346,14 +348,14 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 //Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
 BOOL WINAPI IsCompositionActiveNEW()
 {
-	if (_DISABLE_COMPOSITION) { return FALSE; }
+	if (g_bDisableComposition) { return FALSE; }
 
 	return IsCompositionActive();
 }
 
 HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 {
-	if (_DISABLE_COMPOSITION) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
+	if (g_bDisableComposition) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
 
 	return DwmIsCompositionEnabled(pfEnabled);
 }
@@ -717,7 +719,7 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 		anchorPoint, windowSize, flags,
 		excludeRect, popupWindowPosition
 	);
-	if (res && (flags & TPM_WORKAREA) != 0)
+	if (IsCompositionActiveNEW() && res && (flags & TPM_WORKAREA) != 0)
 	{
 		SIZE adjust = AdjustWindowRectForTaskbar(popupWindowPosition);
 		OffsetRect(popupWindowPosition, adjust.cx, adjust.cy);
@@ -789,6 +791,11 @@ void HookAPIs()
 	FixWin7TrayClock();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 	FixAuthUI();
+
+	// query disable comp value
+	DWORD dwDisableComposition = 0;
+	g_registry.QueryValue(L"DisableComposition", (LPBYTE)&dwDisableComposition, sizeof(DWORD));
+	g_bDisableComposition = (dwDisableComposition != 0);
 }
 
 HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
