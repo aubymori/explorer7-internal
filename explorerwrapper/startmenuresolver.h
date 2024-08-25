@@ -170,6 +170,7 @@ public:
 	HRESULT STDMETHODCALLTYPE GetAltName(PVOID*, DWORD*);
 private:
 	IAppResolver8* m_resolver8;
-	IStartMenuItemsCache10* m_startmenuiconscache8;
+	IStartMenuItemsCache8* m_startmenuiconscache8;
+	IStartMenuItemsCache10* m_startmenuiconscache10;
 	long m_cRef;
 };

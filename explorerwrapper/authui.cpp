@@ -43,7 +43,7 @@ ULONG STDMETHODCALLTYPE CAuthUIWrapper::Release(void)
 		m_authui10->Release();
 	if (InterlockedDecrement(&m_cRef) == 0)
 	{
-		delete this;
+		free((void*)this);
 		return 0;
 	}
 	return m_cRef;

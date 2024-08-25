@@ -21,6 +21,7 @@
 #include "resource.h"
 #include "thememanager.h"
 #include "MinHook.h"
+#include "taskscheduler.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -798,7 +799,9 @@ GetProcAddress_Hook(
 //Basically this allows explorer to actually work on builds >9200
 void AssFuckShunimpl()
 {
-	char* dllmainSHUNIMPL = (char*)FindPattern((uintptr_t)GetModuleHandle(L"shunimpl.dll"),"48 83 EC 28 83 FA 01");
+	uintptr_t shunImpl = (uintptr_t)GetModuleHandle(L"shunimpl.dll");
+	if (!shunImpl) return;
+	char* dllmainSHUNIMPL = (char*)FindPattern(shunImpl,"48 83 EC 28 83 FA 01");
 
 	if (dllmainSHUNIMPL)
 	{
@@ -897,6 +900,12 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
 		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+	}
+	if (riid == IID_IShellTaskScheduler7)
+	{
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+		dbgprintf(L"wrap IID_IShellTaskScheduler7\n");
+		*ppv = new CShellTaskSchedulerWrapper((IShellTaskScheduler7*)*ppv);
 	}
 	if (result == S_OK && rclsid == CLSID_SysTray) //wrap stobject
 	{

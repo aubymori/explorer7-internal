@@ -50,7 +50,6 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
-    <VCToolsVersion>14.40.33807</VCToolsVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -203,6 +202,7 @@
     <ClInclude Include="startmenuresolver.h" />
     <ClInclude Include="systraywrapper.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="taskscheduler.h" />
     <ClInclude Include="thememanager.h" />
     <ClInclude Include="trash.h" />
     <ClInclude Include="traynotify.h" />
@@ -246,6 +246,7 @@
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
     </ClCompile>
     <ClCompile Include="systraywrapper.cpp" />
+    <ClCompile Include="taskscheduler.cpp" />
     <ClCompile Include="thememanager.cpp" />
     <ClCompile Include="traynotify.cpp" />
     <ClCompile Include="userassist.cpp" />
