@@ -2,41 +2,56 @@
 #include "dbgprint.h"
 #include "pathcch.h"
 #include "version.h"
-//#include "registry.h"
+#include "registry.h"
 #include <Shlwapi.h>
+#include <strsafe.h>
 
 decltype(GetThemeDefaults) GetThemeDefaults = 0;
 decltype(LoaderLoadTheme) LoaderLoadTheme = 0;
 decltype(OpenThemeDataFromFile) OpenThemeDataFromFile = 0;
 
-UXTHEMEFILE* g_loadedTheme = 0;
+UXTHEMEFILE *g_loadedTheme = 0;
 
 void ThemeManagerInitialize()
 {
 	//dont bother error checking, if u dont got uxtheme, ur shit is prob already fucked and theres no saving u
-	HMODULE hUxTheme = GetModuleHandleW(L"uxtheme.dll"); 
+	HMODULE hUxTheme = GetModuleHandleW(L"uxtheme.dll");
 	GetThemeDefaults = (decltype(GetThemeDefaults))GetProcAddress(hUxTheme, (LPCSTR)7);
 	LoaderLoadTheme = (decltype(LoaderLoadTheme))GetProcAddress(hUxTheme, (LPCSTR)92);
 	OpenThemeDataFromFile = (decltype(OpenThemeDataFromFile))GetProcAddress(hUxTheme, (LPCSTR)16);
 
-	dbgprintf(L"GetThemeDefaults %x LoaderLoadTheme %x OpenThemeDataFromFile %x\n",GetThemeDefaults, LoaderLoadTheme, OpenThemeDataFromFile);
+	dbgprintf(L"GetThemeDefaults %x LoaderLoadTheme %x OpenThemeDataFromFile %x\n", GetThemeDefaults, LoaderLoadTheme, OpenThemeDataFromFile);
 
-	WCHAR CurrentDir[MAX_PATH];
-	GetCurrentDirectoryW(MAX_PATH, CurrentDir);
+	// get directory of explorer.exe (NOT the working directory)
+	WCHAR szExeDir[MAX_PATH];
+	GetModuleFileNameW(NULL, szExeDir, MAX_PATH);
+	WCHAR *backslash = StrRChrW(szExeDir, NULL, L'\\');
+	if (*backslash == L'\\')
+		*backslash = L'\0';
 
-	WCHAR themePath[MAX_PATH];
-	PathCombineW(themePath, CurrentDir, L"theme\\aero\\aero.msstyles");
-	dbgprintf(L"themePath: %s", themePath);
+	WCHAR szThemeName[MAX_PATH];
+	LSTATUS res = g_registry.QueryValue(L"Theme", (LPBYTE)szThemeName, sizeof(szThemeName));
+	if (!*szThemeName || ERROR_SUCCESS != res)
+		StringCchCopyW(szThemeName, MAX_PATH, L"aero");
 
-	//LSTATUS res = g_registry.QueryValue(L"Theme", (LPBYTE)themePath, sizeof(themePath));
-	//dbgprintf(L"result: 0x%X, themePath: %s", res, themePath);
-	
-	auto hr = LoadThemeFile(themePath);
+	dbgprintf(L"theme name: %s", szThemeName);
+
+	WCHAR szThemePath[MAX_PATH * 2];
+	wsprintfW(
+		szThemePath,
+		L"%s\\theme\\%s.msstyles",
+		szExeDir,
+		szThemeName
+	);
+
+	dbgprintf(L"theme path: %s", szThemePath);
+
+	auto hr = LoadThemeFile(szThemePath);
 	if (hr != S_OK)
-		dbgprintf(L"LOADTHEMEFILE FAILED %x\n",hr);
+		dbgprintf(L"LOADTHEMEFILE FAILED %x\n", hr);
 }
 
-HRESULT LoadThemeFile(wchar_t* Path)
+HRESULT LoadThemeFile(wchar_t *Path)
 {
 	HRESULT hr = S_OK;
 
@@ -54,7 +69,7 @@ HRESULT LoadThemeFile(wchar_t* Path)
 		g_loadedTheme = 0;
 	}
 
-	g_loadedTheme = (UXTHEMEFILE*)malloc(sizeof(UXTHEMEFILE));
+	g_loadedTheme = (UXTHEMEFILE *)malloc(sizeof(UXTHEMEFILE));
 	ZeroMemory(g_loadedTheme, sizeof(UXTHEMEFILE));
 
 	WCHAR szColor[MAX_PATH];
