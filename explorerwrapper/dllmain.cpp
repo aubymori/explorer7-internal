@@ -30,9 +30,6 @@
 #define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
 #define _WIN_VB 0 //Win10VB-specific changes - currently unused
 
-//uncomment to force classic theme
-//#define FORCE_CLASSIC
-
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
 HWND hwnd_taskbar;
@@ -44,6 +41,7 @@ HANDLE hEvent_DesktopVisible;
 
 DWORD g_dwTrayThreadId = 0;
 
+bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
 
 static WNDPROC g_prevTrayProc;
@@ -568,24 +566,36 @@ __int64 GetScreenDpi(void)
 
 //CThemeManager themeManager(L"C:\\Windows\\aero.msstyles");
 
+bool IsClassicTheme(void)
+{
+	return !IsThemeActive || g_bClassicTheme;
+}
+
+bool AllowThemes(void)
+{
+	return !IsClassicTheme();
+}
+
 HTHEME(__stdcall* fOpenThemeData)(HWND hwnd, LPCWSTR pszClassList);
 HTHEME(__stdcall* fOpenThemeDataForDpi)(HWND hwnd, LPCWSTR pszClassList, UINT dpi);
 HTHEME(__stdcall* fOpenThemeDataEx)(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags);
 HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 {
+	if (g_dwTrayThreadId != GetCurrentThreadId())
+		return fOpenThemeData(hwnd, pszClassList);
+
+	if (!AllowThemes())
+		return NULL;
+
 	HTHEME theme = 0;
 	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
-
-	LPCWSTR pszClassListToUse = pszClassList;
-	//if (wcscmp(pszClassList, L"Pager") == 0)
-	//	pszClassListToUse = L"TrayNotifyVert::Button";
 
 	DWORD flags = 2;
 	if ((unsigned int)GetScreenDpi() != 96)
 		flags |= 1u;
 
-	if (g_loadedTheme && g_dwTrayThreadId == GetCurrentThreadId())
-		theme = OpenThemeDataFromFile(g_loadedTheme,hwnd, pszClassListToUse, flags);
+	if (g_loadedTheme)
+		theme = OpenThemeDataFromFile(g_loadedTheme,hwnd, pszClassList, flags);
 	else
 		theme = fOpenThemeData(hwnd, pszClassList);
 
@@ -597,18 +607,21 @@ HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 
 HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT dpi)
 {
+	if (g_dwTrayThreadId != GetCurrentThreadId())
+		return fOpenThemeDataForDpi(hwnd, pszClassList, dpi);
+
+	if (!AllowThemes())
+		return NULL;
+
 	HTHEME theme = 0;
 	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
-	LPCWSTR pszClassListToUse = pszClassList;
-	//if (wcscmp(pszClassList, L"Pager") == 0)
-	//	pszClassListToUse = L"TrayNotifyVert::Button";
 
 	DWORD flags = 2;
 	if (dpi != 96)
 		flags |= 1u;
 
-	if (g_loadedTheme && g_dwTrayThreadId == GetCurrentThreadId())
-		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassListToUse, flags);
+	if (g_loadedTheme)
+		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, flags);
 	else
 		theme = fOpenThemeDataForDpi(hwnd, pszClassList,dpi);
 
@@ -620,18 +633,21 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 
 HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags)
 {
+	if (g_dwTrayThreadId != GetCurrentThreadId())
+		return fOpenThemeDataEx(hwnd, pszClassList, dwFlags);
+
+	if (!AllowThemes())
+		return NULL;
+
 	HTHEME theme = 0;
 	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
-	LPCWSTR pszClassListToUse = pszClassList;
-	//if (wcscmp(pszClassList, L"Pager") == 0)
-	//	pszClassListToUse = L"TrayNotifyVert::Button";
 
 	DWORD flags = 2;
 	if ((unsigned int)GetScreenDpi() != 96)
 		flags |= 1u;
 
-	if (g_loadedTheme && g_dwTrayThreadId == GetCurrentThreadId())
-		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassListToUse, dwFlags | flags);
+	if (g_loadedTheme)
+		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, dwFlags | flags);
 	else
 		theme = fOpenThemeDataEx(hwnd, pszClassList,dwFlags);
 
@@ -650,9 +666,7 @@ DWORD WINAPI CTray__SyncThreadProc_hook(LPVOID lpParameter)
 		dbgprintf(L"set g_dwTrayThreadId to %u", g_dwTrayThreadId);
 	}
 
-	if (CTray__SyncThreadProc_orig)
-		return CTray__SyncThreadProc_orig(lpParameter);
-	return 0;
+	return CTray__SyncThreadProc_orig(lpParameter);
 }
 
 void HookTrayThread(void)
@@ -796,6 +810,17 @@ void HookAPIs()
 	DWORD dwDisableComposition = 0;
 	g_registry.QueryValue(L"DisableComposition", (LPBYTE)&dwDisableComposition, sizeof(DWORD));
 	g_bDisableComposition = (dwDisableComposition != 0);
+
+	// query classic theme
+	DWORD dwClassicTheme = 0;
+	g_registry.QueryValue(L"ClassicTheme", (LPBYTE)&dwClassicTheme, sizeof(DWORD));
+	if (dwClassicTheme != 0)
+	{
+		dbgprintf(L"setting classic theme");
+		g_bDisableComposition = true; // classic theme never had comp, duh
+		g_bClassicTheme = true;
+		SetThemeAppProperties(NULL);
+	}
 }
 
 HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
@@ -889,9 +914,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	{
 		case DLL_PROCESS_ATTACH:
 			{
-#ifdef FORCE_CLASSIC
-				SetThemeAppProperties(0);
-#endif
 				AssFuckShunimpl();
 
 				dbgprintf(L"Dll Attach\n");
