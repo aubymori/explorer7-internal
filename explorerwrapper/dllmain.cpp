@@ -710,11 +710,8 @@ CTrayOverflow__PositionWindow_t CTrayOverflow__PositionWindow_orig = nullptr;
 void CTrayOverflow__PositionWindow_hook(void *pThis)
 {
 	CTrayOverflow__PositionWindow_orig(pThis);
-	/* This code should be safe to run on lower builds,
-	   but it's not necessary. */
 	HWND hWnd = *(HWND *)pThis;
-	if (g_osVersion.BuildNumber() >= 10240
-	&& hWnd)
+	if (hWnd)
 	{
 		RECT rc;
 		GetWindowRect(hWnd, &rc);
@@ -772,7 +769,8 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	HookTrayThread();
-	HookTrayOverflow();
+	if (g_osVersion.BuildNumber() >= 10240)
+		HookTrayOverflow();
 	MH_EnableHook(MH_ALL_HOOKS);
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
