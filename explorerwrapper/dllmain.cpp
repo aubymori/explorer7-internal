@@ -713,7 +713,6 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 	RECT* popupWindowPosition
 )
 {
-	//Wh_Log(L"CPWP %i", (flags & TPM_WORKAREA) != 0);
 	BOOL res = CalculatePopupWindowPosition(
 		anchorPoint, windowSize, flags,
 		excludeRect, popupWindowPosition
