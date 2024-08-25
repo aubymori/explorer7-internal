@@ -670,6 +670,82 @@ void HookTrayThread(void)
 	}
 }
 
+/* Adjust a window's position to be pushed away from the taskbar */
+SIZE AdjustWindowRectForTaskbar(RECT *lprc)
+{
+	HMONITOR hm = MonitorFromRect(lprc, MONITOR_DEFAULTTONEAREST);
+	HDC hDC = GetDC(NULL);
+	int offset = MulDiv(8, GetDeviceCaps(hDC, LOGPIXELSY), 96);
+	ReleaseDC(NULL, hDC);
+
+	MONITORINFO mi = { sizeof(MONITORINFO) };
+	GetMonitorInfoW(hm, &mi);
+
+	int dx = 0, dy = 0;
+	PLONG plrc = (PLONG)lprc;
+	PLONG plwrc = (PLONG)&mi.rcWork;
+	for (int i = 0; i < 4; i++)
+	{
+		int curOffset = plwrc[i] - plrc[i];
+		curOffset = (curOffset < 0) ? -curOffset : curOffset;
+
+		if (curOffset < offset)
+		{
+			int *set = (i % 2 == 0) ? &dx : &dy;
+			if (i > 1)
+			{
+				*set -= offset - curOffset;
+			}
+			else
+			{
+				*set += offset - curOffset;
+			}
+		}
+	}
+	return { dx, dy };
+}
+
+/* Make tray overflow float again on Windows 10. */
+typedef void (*CTrayOverflow__PositionWindow_t)(void *);
+CTrayOverflow__PositionWindow_t CTrayOverflow__PositionWindow_orig = nullptr;
+void CTrayOverflow__PositionWindow_hook(void *pThis)
+{
+	CTrayOverflow__PositionWindow_orig(pThis);
+	HWND hWnd = *(HWND *)pThis;
+	if (hWnd)
+	{
+		RECT rc;
+		GetWindowRect(hWnd, &rc);
+
+		SIZE adjust = AdjustWindowRectForTaskbar(&rc);
+		SetWindowPos(
+			hWnd,
+			NULL,
+			rc.left + adjust.cx,
+			rc.top + adjust.cy,
+			0, 0,
+			SWP_NOSIZE | SWP_NOZORDER
+		);
+	}
+}
+
+void HookTrayOverflow(void)
+{
+	CTrayOverflow__PositionWindow_orig = (CTrayOverflow__PositionWindow_t)FindPattern(
+		(uintptr_t)GetModuleHandle(NULL),
+		"4C 8B DC 49 89 5B 10 57 48 81 EC D0 00 00 00 48 8B 05 CE 28 06 00 48 33 C4 48 89 84 24 C8 00 00 00"
+	);
+
+	if (CTrayOverflow__PositionWindow_orig)
+	{
+		MH_CreateHook(
+			(void *)CTrayOverflow__PositionWindow_orig,
+			(void *)CTrayOverflow__PositionWindow_hook,
+			(void **)&CTrayOverflow__PositionWindow_orig
+		);
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -694,6 +770,8 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	HookTrayThread();
+	if (g_osVersion.BuildNumber() >= 10240)
+		HookTrayOverflow();
 	MH_EnableHook(MH_ALL_HOOKS);
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
