@@ -705,45 +705,25 @@ SIZE AdjustWindowRectForTaskbar(RECT *lprc)
 	return { dx, dy };
 }
 
-/* Make tray overflow float again on Windows 10. */
-typedef void (*CTrayOverflow__PositionWindow_t)(void *);
-CTrayOverflow__PositionWindow_t CTrayOverflow__PositionWindow_orig = nullptr;
-void CTrayOverflow__PositionWindow_hook(void *pThis)
+BOOL WINAPI CalculatePopupWindowPositionNEW(
+	const POINT* anchorPoint,
+	const SIZE* windowSize,
+	UINT         flags,
+	RECT* excludeRect,
+	RECT* popupWindowPosition
+)
 {
-	CTrayOverflow__PositionWindow_orig(pThis);
-	HWND hWnd = *(HWND *)pThis;
-	if (hWnd)
-	{
-		RECT rc;
-		GetWindowRect(hWnd, &rc);
-
-		SIZE adjust = AdjustWindowRectForTaskbar(&rc);
-		SetWindowPos(
-			hWnd,
-			NULL,
-			rc.left + adjust.cx,
-			rc.top + adjust.cy,
-			0, 0,
-			SWP_NOSIZE | SWP_NOZORDER
-		);
-	}
-}
-
-void HookTrayOverflow(void)
-{
-	CTrayOverflow__PositionWindow_orig = (CTrayOverflow__PositionWindow_t)FindPattern(
-		(uintptr_t)GetModuleHandle(NULL),
-		"4C 8B DC 49 89 5B 10 57 48 81 EC D0 00 00 00 48 8B 05 CE 28 06 00 48 33 C4 48 89 84 24 C8 00 00 00"
+	//Wh_Log(L"CPWP %i", (flags & TPM_WORKAREA) != 0);
+	BOOL res = CalculatePopupWindowPosition(
+		anchorPoint, windowSize, flags,
+		excludeRect, popupWindowPosition
 	);
-
-	if (CTrayOverflow__PositionWindow_orig)
+	if (res && (flags & TPM_WORKAREA) != 0)
 	{
-		MH_CreateHook(
-			(void *)CTrayOverflow__PositionWindow_orig,
-			(void *)CTrayOverflow__PositionWindow_hook,
-			(void **)&CTrayOverflow__PositionWindow_orig
-		);
+		SIZE adjust = AdjustWindowRectForTaskbar(popupWindowPosition);
+		OffsetRect(popupWindowPosition, adjust.cx, adjust.cy);
 	}
+	return res;
 }
 
 void HookShell32();
@@ -770,8 +750,6 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	HookTrayThread();
-	if (g_osVersion.BuildNumber() >= 10240)
-		HookTrayOverflow();
 	MH_EnableHook(MH_ALL_HOOKS);
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
@@ -797,6 +775,9 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",IsWindowVisible,IsWindowVisibleNEW);
 	//change show desktop btn
 	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",SetWindowTheme,SetWindowThemeNEW);
+	//overflow positioning if user is using TH1 or higher
+	if (g_osVersion.BuildNumber() >= 10240)
+		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
 	//fix classic start menu icon (pls fix)
 	/*HMODULE winbrand = LoadLibrary(L"winbrand.dll");
 	BrandingLoadImage = (BrandingLoadImage_t)GetProcAddress(winbrand, "BrandingLoadImage");
