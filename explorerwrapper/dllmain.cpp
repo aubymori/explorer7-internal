@@ -966,7 +966,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	else
 		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,riid,ppv);
 
-	if (rclsid == CLSID_StartMenuCacheAndAppResolver && result == E_NOINTERFACE)
+	if (rclsid == CLSID_StartMenuCacheAndAppResolver && result != S_OK)
 	{
 		dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
 		PVOID rslvr8 = NULL;
@@ -978,7 +978,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		if (result == S_OK)
 			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 	}
-	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result == E_NOINTERFACE)
+	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result != S_OK)
 	{
 		int build = g_osVersion.BuildNumber();
 		IID id = IID_IFlexibleTaskbarPinnedList;
