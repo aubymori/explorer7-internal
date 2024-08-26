@@ -324,13 +324,20 @@ GhostWindowFromHungWindow_t GhostWindowFromHungWindow = nullptr;
 //(Microsoft Text Input Host, Shell Experience Host, etc.)
 BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 {
+	if (!IsWindowVisible(hWnd))
+		return FALSE;
+
+	if (IsShellFrameWindow && GhostWindowFromHungWindow)
+	{
+		if (IsShellFrameWindow(hWnd) && !GhostWindowFromHungWindow(hWnd))
+			return TRUE;
+	}
+
 	if (IsShellManagedWindow)
 	{
 		if (IsShellManagedWindow(hWnd) && GetPropW(hWnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") == NULL)
 			return FALSE;
 	}
-	if (!IsWindowVisible(hWnd))
-		return FALSE;
 
 	return TRUE;
 }
