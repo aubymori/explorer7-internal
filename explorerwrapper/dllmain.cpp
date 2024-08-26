@@ -741,6 +741,28 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 	return res;
 }
 
+HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf
+{
+	HRESULT result = S_OK; 
+	if (*(DWORD*)(nscHost + 0xCC)) return result;
+
+	IShellItem* ppv;
+	if (!SHCreateItemFromParsingName(
+		L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}",
+		0LL,
+		GUID_43826d1e_e718_42ee_bc55_a1e261c37bfe,
+		(void**)&ppv))
+	{
+		INameSpaceTreeControl2* control = *(INameSpaceTreeControl2**)(nscHost + 0x70);
+		result = control->AppendRoot(ppv,96,3,0);
+		if (SUCCEEDED(result))
+			*(DWORD*)(nscHost + 0xCC) = 1;
+
+		ppv->Release();
+	}
+	return result;
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -760,10 +782,15 @@ void HookAPIs()
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
+
+	void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+
 	MH_Initialize();
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+	if (fillnsc && g_osVersion.BuildNumber() >= 14393)
+		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc));
 	HookTrayThread();
 	MH_EnableHook(MH_ALL_HOOKS);
 
