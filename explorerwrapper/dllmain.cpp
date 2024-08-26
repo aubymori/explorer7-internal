@@ -746,12 +746,19 @@ HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the f
 	HRESULT result = S_OK; 
 	if (*(DWORD*)(nscHost + 0xCC)) return result;
 
+	WCHAR fallbackPath[MAX_PATH];
+	ExpandEnvironmentStringsW(L"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs", fallbackPath, MAX_PATH);
+
 	IShellItem* ppv;
-	if (!SHCreateItemFromParsingName(
+	if (SHCreateItemFromParsingName(
 		L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}",
 		0LL,
-		GUID_43826d1e_e718_42ee_bc55_a1e261c37bfe,
-		(void**)&ppv))
+		IID_IShellItem,
+		(void**)&ppv) == S_OK || SHCreateItemFromParsingName(
+			fallbackPath,
+			0LL,
+			IID_IShellItem,
+			(void**)&ppv) == S_OK)
 	{
 		INameSpaceTreeControl2* control = *(INameSpaceTreeControl2**)(nscHost + 0x70);
 		result = control->AppendRoot(ppv,96,3,0);
