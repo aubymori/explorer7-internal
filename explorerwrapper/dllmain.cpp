@@ -1019,15 +1019,38 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 
 	if (rclsid == CLSID_StartMenuCacheAndAppResolver && result != S_OK)
 	{
-		dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
-		PVOID rslvr8 = NULL;
-		CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IAppResolver8,&rslvr8);
-		//create our object
+		if (riid == IID_IAppResolver7)
+		{
+			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
+			PVOID rslvr8 = NULL;
+			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IAppResolver8, &rslvr8);
+			//create our object
 
-		CStartMenuResolver* resolver7 = new CStartMenuResolver((IAppResolver8*)rslvr8);
-		result = resolver7->QueryInterface(riid,ppv);
-		if (result == S_OK)
-			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
+			CStartMenuResolver *resolver7 = new CStartMenuResolver((IAppResolver8 *)rslvr8);
+			result = resolver7->QueryInterface(riid, ppv);
+			if (result == S_OK)
+				dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
+		}
+		else if (riid == IID_IStartMenuItemsCache7)
+		{
+			int build = g_osVersion.BuildNumber();
+			IID iid = IID_IStartMenuItemsCache8;
+			if (build >= 10240)
+				iid = IID_IStartMenuItemsCache10;
+
+			void *newcache = nullptr;
+			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, iid, &newcache);
+
+			CStartMenuResolver *resolver7 = nullptr;
+			if (build >= 10240)
+				resolver7 = new CStartMenuResolver((IStartMenuItemsCache10 *)newcache);
+			else
+				resolver7 = new CStartMenuResolver((IStartMenuItemsCache8 *)newcache);
+
+			result = resolver7->QueryInterface(riid, ppv);
+			if (result == S_OK)
+				dbgprintf(L"Explorer_CoCreateInstance: Cache7 using IStartMenuItemsCache8/10 is OK!!\n");
+		}
 	}
 	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result != S_OK)
 	{

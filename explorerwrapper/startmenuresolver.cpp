@@ -17,17 +17,48 @@ CStartMenuResolver::CStartMenuResolver(IAppResolver8* newresolver)
 {
 	m_cRef = 0; //?
 	m_resolver8 = newresolver;
-	m_startmenuiconscache8 = NULL;
-	m_startmenuiconscache10 = NULL;
+	m_startmenuitemscache8 = nullptr;
+	m_startmenuitemscache10 = nullptr;
+}
+
+CStartMenuResolver::CStartMenuResolver(IStartMenuItemsCache8 *newcache)
+{
+	m_cRef = 0;
+	m_startmenuitemscache8 = newcache;
+	m_startmenuitemscache10 = nullptr;
+	CoCreateInstance(
+		CLSID_StartMenuCacheAndAppResolver,
+		nullptr,
+		CLSCTX_INPROC_SERVER,
+		IID_IAppResolver8,
+		(LPVOID *)&m_resolver8
+	);
+}
+
+CStartMenuResolver::CStartMenuResolver(IStartMenuItemsCache10 *newcache)
+{
+	m_cRef = 0;
+	m_startmenuitemscache10 = newcache;
+	m_startmenuitemscache8 = nullptr;
+	CoCreateInstance(
+		CLSID_StartMenuCacheAndAppResolver,
+		nullptr,
+		CLSCTX_INPROC_SERVER,
+		IID_IAppResolver8,
+		(LPVOID*)&m_resolver8
+	);
 }
 
 CStartMenuResolver::~CStartMenuResolver()
 {
-	m_resolver8->Release();
-	if (m_startmenuiconscache8 != NULL)
-		m_startmenuiconscache8->Release();
-	if (m_startmenuiconscache10 != NULL)
-		m_startmenuiconscache10->Release();
+	if (m_resolver8)
+		m_resolver8->Release();
+
+	if (m_startmenuitemscache8)
+		m_startmenuitemscache8->Release();
+
+	if (m_startmenuitemscache10)
+		m_startmenuitemscache10->Release();
 }
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::QueryInterface(REFIID riid, void** ppvObject)
@@ -42,20 +73,26 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::QueryInterface(REFIID riid, void**
 	if (riid == IID_IStartMenuItemsCache7)
 	{
 		dbgprintf(L"IID_IStartMenuItemsCache7\n");
-		//HRESULT ret = m_resolver8->QueryInterface(IID_IStartMenuItemsCache8,(PVOID*)&m_startmenuiconscache8);
-		HRESULT ret = m_resolver8->QueryInterface(IID_IStartMenuItemsCache8, (PVOID*)&m_startmenuiconscache8);
-		if (ret == S_OK)
+		HRESULT ret = E_NOINTERFACE;
+		if (m_startmenuitemscache8)
 		{
-			dbgprintf(L"S_OK\n");
-			*ppvObject = static_cast<IStartMenuItemsCache7*>(this);
-			AddRef();
+			ret = m_startmenuitemscache8->QueryInterface(IID_IStartMenuItemsCache8, (PVOID *)&m_startmenuitemscache8);
+			if (ret == S_OK)
+			{
+				dbgprintf(L"S_OK\n");
+				*ppvObject = static_cast<IStartMenuItemsCache7 *>(this);
+				AddRef();
+			}
 		}
-		else
+		else if (m_startmenuitemscache10)
 		{
-			ret = m_resolver8->QueryInterface(IID_IStartMenuItemsCache10, (PVOID*)&m_startmenuiconscache10);
-			dbgprintf(L"S_OK 2\n");
-			*ppvObject = static_cast<IStartMenuItemsCache7*>(this);
-			AddRef();
+			ret = m_startmenuitemscache10->QueryInterface(IID_IStartMenuItemsCache10, (PVOID*)&m_startmenuitemscache10);
+			if (ret == S_OK)
+			{
+				dbgprintf(L"S_OK 2\n");
+				*ppvObject = static_cast<IStartMenuItemsCache7 *>(this);
+				AddRef();
+			}
 		}
 		return ret;
 	}
@@ -142,10 +179,10 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromItemProperties
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::OnChangeNotify(unsigned int p1, long p2, PVOID* p3, PVOID* p4)
 {
 	HRESULT rslt;
-	if (m_startmenuiconscache8)
-		rslt = m_startmenuiconscache8->OnChangeNotify(p1, p2, p3, p4);
-	else if (m_startmenuiconscache10)
-		rslt = m_startmenuiconscache10->OnChangeNotify(p1, p2, p3, p4);
+	if (m_startmenuitemscache8)
+		rslt = m_startmenuitemscache8->OnChangeNotify(p1, p2, p3, p4);
+	else if (m_startmenuitemscache10)
+		rslt = m_startmenuitemscache10->OnChangeNotify(p1, p2, p3, p4);
 	dbgprintf(L"CStartMenuResolver::OnChangeNotify %p %p %p %p = %p", p1, p2, p3, p4, rslt);
 	return rslt;
 }
@@ -333,10 +370,10 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::RegisterSMNotify(IUnknown* p1)
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::RegisterARNotify(IUnknown* p1)
 {
 	dbgprintf(L"RegisterARNotify");
-	if (m_startmenuiconscache8)
-		return m_startmenuiconscache8->RegisterARNotify(new CAppResolverNotify8((IAppResolverNotify7*)p1));
-	else if (m_startmenuiconscache10)
-		return m_startmenuiconscache10->RegisterARNotify(new CAppResolverNotify8((IAppResolverNotify7*)p1));
+	if (m_startmenuitemscache8)
+		return m_startmenuitemscache8->RegisterARNotify(new CAppResolverNotify8((IAppResolverNotify7*)p1));
+	else if (m_startmenuitemscache10)
+		return m_startmenuitemscache10->RegisterARNotify(new CAppResolverNotify8((IAppResolverNotify7*)p1));
 
 	return E_ABORT;
 }

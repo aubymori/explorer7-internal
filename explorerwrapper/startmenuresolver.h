@@ -142,6 +142,8 @@ class CStartMenuResolver : public IAppResolver7, IStartMenuItemsCache7
 public:
 	//constructor
 	CStartMenuResolver(IAppResolver8* newresolver);
+	CStartMenuResolver(IStartMenuItemsCache8 *newcache);
+	CStartMenuResolver(IStartMenuItemsCache10 *newcache);
 	//destructor
 	~CStartMenuResolver();
 	//IUnknown
@@ -170,7 +172,7 @@ public:
 	HRESULT STDMETHODCALLTYPE GetAltName(PVOID*, DWORD*);
 private:
 	IAppResolver8* m_resolver8;
-	IStartMenuItemsCache8* m_startmenuiconscache8;
-	IStartMenuItemsCache10* m_startmenuiconscache10;
+	IStartMenuItemsCache8* m_startmenuitemscache8;
+	IStartMenuItemsCache10* m_startmenuitemscache10;
 	long m_cRef;
 };
