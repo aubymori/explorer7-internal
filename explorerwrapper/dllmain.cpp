@@ -993,6 +993,23 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	else
 		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,riid,ppv);
 
+	if (rclsid == CLSID_UserAssist)
+	{
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+		if (result != S_OK)
+		{
+			if (riid == IID_IUserAssist7)
+				result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IUserAssist10, ppv);
+			else if (riid == IID_IUserAssist72)
+				result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IUserAssist102, ppv);
+			else
+			{
+				dbgprintf(L"Warning, unknown useraassist riid!!!!!");
+				dbgprintf(L"Warning, unknown useraassist riid!!!!!");
+			}
+		}
+	}
+
 	if (rclsid == CLSID_StartMenuCacheAndAppResolver && result != S_OK)
 	{
 		dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");

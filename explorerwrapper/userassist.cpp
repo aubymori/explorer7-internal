@@ -2,10 +2,18 @@
 
 IUserAssist* g_UserAssist;
 
+extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
+	__in   REFCLSID rclsid,
+	__in   LPUNKNOWN pUnkOuter,
+	__in   DWORD dwClsContext,
+	__in   REFIID riid,
+	__out  LPVOID * ppv
+);
+
 HRESULT WINAPI UAQueryEntry(REFIID iid, LPWSTR parsingname, PUEMINFO uem)
 {	
 	if (!g_UserAssist) //bugbug shpindllofclsid?
-		CoCreateInstance(CLSID_UserAssist,NULL,CLSCTX_INPROC_SERVER || CLSCTX_INPROC_HANDLER || CLSCTX_NO_CODE_DOWNLOAD,IID_IUserAssist,(PVOID*)&g_UserAssist);
+		Explorer_CoCreateInstance(CLSID_UserAssist,NULL,CLSCTX_INPROC_SERVER || CLSCTX_INPROC_HANDLER || CLSCTX_NO_CODE_DOWNLOAD,IID_IUserAssist7,(PVOID*)&g_UserAssist);
 	if ( g_UserAssist )
 		return g_UserAssist->QueryEntry(iid,parsingname,uem);
 	else
