@@ -999,6 +999,8 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 )
 {
 	HRESULT result;
+	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+
 	if (rclsid == CLSID_SysTray) //create Metro before tray
 	{
 		dbgprintf(L"create Metro before tray\n");
@@ -1006,9 +1008,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		//CreateTwinUI();
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
-		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IRegTreeOptions8,ppv);	
-	else
-		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,riid,ppv);
+		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IRegTreeOptions8,ppv);
 
 	if (rclsid == CLSID_UserAssist && result != S_OK)
 	{
@@ -1041,14 +1041,14 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		{
 			int build = g_osVersion.BuildNumber();
 			IID iid = IID_IStartMenuItemsCache8;
-			if (build > 14393)
+			if (build >= 14393)
 				iid = IID_IStartMenuItemsCache10;
 
 			void *newcache = nullptr;
 			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, iid, &newcache);
 
 			CStartMenuResolver *resolver7 = nullptr;
-			if (build > 14393)
+			if (build >= 14393)
 				resolver7 = new CStartMenuResolver((IStartMenuItemsCache10 *)newcache);
 			else
 				resolver7 = new CStartMenuResolver((IStartMenuItemsCache8 *)newcache);
@@ -1062,9 +1062,8 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		int build = g_osVersion.BuildNumber();
 		IID id = IID_IPinnedList25;
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-
-		if (result != S_OK && build < 14393)
+		
+		if (build >= 14393 && build < 17763)
 			id = IID_IFlexibleTaskbarPinnedList;
 		else if (build >= 17763)
 			id = IID_IPinnedList3;
