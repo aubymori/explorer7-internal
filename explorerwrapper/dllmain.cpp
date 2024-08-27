@@ -1062,23 +1062,19 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 				dbgprintf(L"Explorer_CoCreateInstance: Cache7 using IStartMenuItemsCache8/10 is OK!!\n");
 		}
 	}
-	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2)
+	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result != S_OK)
 	{
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
-		if (result != S_OK)
-		{
-			int build = g_osVersion.BuildNumber();
-			IID id = IID_IPinnedList25;
-			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
+		int build = g_osVersion.BuildNumber();
+		IID id = IID_IPinnedList25;
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
 
-			if (result != S_OK && build < 14393)
-				id = IID_IFlexibleTaskbarPinnedList;
-			else if (build >= 17763)
-				id = IID_IPinnedList3;
+		if (result != S_OK && build < 14393)
+			id = IID_IFlexibleTaskbarPinnedList;
+		else if (build >= 17763)
+			id = IID_IPinnedList3;
 
-			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-			*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
-		}
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
+		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
 	}
 	if (riid == IID_IShellTaskScheduler7)
 	{
