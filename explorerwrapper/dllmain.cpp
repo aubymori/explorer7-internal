@@ -533,15 +533,6 @@ void FixAuthUI()
 	}
 }
 
-struct pairs
-{
-	WCHAR* str;
-	HTHEME theme;
-};
-
-int sizeCounter = 0;
-pairs themes[256];
-
 
 int g_fDPIAware = 0;
 int g_nScreenDpi = 0;
@@ -571,11 +562,9 @@ __int64 GetScreenDpi(void)
 	return (unsigned int)g_nScreenDpi;
 }
 
-//CThemeManager themeManager(L"C:\\Windows\\aero.msstyles");
-
 bool IsClassicTheme(void)
 {
-	return !IsThemeActive || g_bClassicTheme;
+	return !IsThemeActive() || g_bClassicTheme;
 }
 
 bool AllowThemes(void)
