@@ -737,6 +737,18 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 	return res;
 }
 
+bool dirExists(const WCHAR* dirName_in) //ripped from here https://stackoverflow.com/questions/8233842/how-to-check-if-directory-exist-using-c-and-winapi 
+{
+	DWORD ftyp = GetFileAttributesW(dirName_in);
+	if (ftyp == INVALID_FILE_ATTRIBUTES)
+		return false;
+
+	if (ftyp & FILE_ATTRIBUTE_DIRECTORY)
+		return true;
+
+	return false;
+}
+
 HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf
 {
 	HRESULT result = S_OK; 
@@ -745,12 +757,14 @@ HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the f
 	WCHAR fallbackPath[MAX_PATH];
 	ExpandEnvironmentStringsW(L"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs", fallbackPath, MAX_PATH);
 
+	WCHAR* sibAllProgs = L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}";
+
 	IShellItem* ppv;
-	if (SHCreateItemFromParsingName(
-		L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}",
+	if ((dirExists(sibAllProgs) && SHCreateItemFromParsingName(
+		sibAllProgs,
 		0LL,
 		IID_IShellItem,
-		(void**)&ppv) == S_OK || SHCreateItemFromParsingName(
+		(void**)&ppv) == S_OK) || SHCreateItemFromParsingName(
 			fallbackPath,
 			0LL,
 			IID_IShellItem,
@@ -1031,14 +1045,14 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		{
 			int build = g_osVersion.BuildNumber();
 			IID iid = IID_IStartMenuItemsCache8;
-			if (build >= 10240)
+			if (build > 14393)
 				iid = IID_IStartMenuItemsCache10;
 
 			void *newcache = nullptr;
 			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, iid, &newcache);
 
 			CStartMenuResolver *resolver7 = nullptr;
-			if (build >= 10240)
+			if (build > 14393)
 				resolver7 = new CStartMenuResolver((IStartMenuItemsCache10 *)newcache);
 			else
 				resolver7 = new CStartMenuResolver((IStartMenuItemsCache8 *)newcache);
@@ -1048,15 +1062,23 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 				dbgprintf(L"Explorer_CoCreateInstance: Cache7 using IStartMenuItemsCache8/10 is OK!!\n");
 		}
 	}
-	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result != S_OK)
+	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2)
 	{
-		int build = g_osVersion.BuildNumber();
-		IID id = IID_IFlexibleTaskbarPinnedList;
-		if (build >= 17763)
-			id = IID_IPinnedList3;
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+		if (result != S_OK)
+		{
+			int build = g_osVersion.BuildNumber();
+			IID id = IID_IPinnedList25;
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
 
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+			if (result != S_OK && build < 14393)
+				id = IID_IFlexibleTaskbarPinnedList;
+			else if (build >= 17763)
+				id = IID_IPinnedList3;
+
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
+			*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+		}
 	}
 	if (riid == IID_IShellTaskScheduler7)
 	{

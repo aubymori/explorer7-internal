@@ -4,9 +4,10 @@
 #include <DocObj.h>
 #include <ShlObj.h>
 
-enum PLMC { PLMC_EXPLORER = 4 };
+enum PLMC : unsigned int { PLMC_EXPLORER = 4 };
 DEFINE_GUID(CLSID_TaskbandPin, 0x90AA3A4E, 0x1CBA, 0x4233, 0xB8, 0xBB, 0x53, 0x57, 0x73, 0xD4, 0x84, 0x49);
 DEFINE_GUID(IID_IPinnedList2, 0xBBD20037, 0xBC0E, 0x42F1, 0x91, 0x3F, 0xE2, 0x93, 0x6B, 0xB0, 0xEA, 0x0C);
+DEFINE_GUID(IID_IPinnedList25, 0x446BC432, 0x57E9, 0x4B72, 0x8E, 0x0F1, 0x0AF, 0x27, 0x11, 0x3D, 0x0CF, 0x9C);
 DEFINE_GUID(IID_IFlexibleTaskbarPinnedList, 0x60274fa2, 0x611f, 0x4b8a, 0xa2, 0x93, 0xf2, 0x7b, 0xf1, 0x03, 0xd1, 0x48);
 DEFINE_GUID(IID_IPinnedList3, 0x0dd79ae2, 0xd156, 0x45d4, 0x9e, 0xeb, 0x3b, 0x54, 0x97, 0x69, 0xe9, 0x40);
 
@@ -23,6 +24,23 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE GetPinnableInfo(IDataObject*, int, IShellItem2**, IShellItem**, PWSTR*, INT*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE IsPinnable(IDataObject*, int) = 0;
 	virtual HRESULT STDMETHODCALLTYPE Resolve(HWND, ULONG, PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE IsPinned(PCIDLIST_ABSOLUTE) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetPinnedItem(PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetAppIDForPinnedItem(PCIDLIST_ABSOLUTE, PWSTR*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE ItemChangeNotify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE) = 0;
+	virtual HRESULT STDMETHODCALLTYPE UpdateForRemovedItemsAsNecessary(VOID) = 0;
+};
+
+MIDL_INTERFACE("446bc432-57e9-4b72-8ef1-af27113dcf9c")
+IPinnedList25: public IUnknown
+{
+public:
+	virtual HRESULT STDMETHODCALLTYPE EnumObjects(IEnumFullIDList**) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetPinnableInfo(IDataObject*, int, IShellItem2**, IShellItem**, PWSTR*, INT*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE IsPinnable(IDataObject*, int) = 0;
+	virtual HRESULT STDMETHODCALLTYPE Resolve(HWND, ULONG, PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE Modify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetChangeCount(ULONG*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE IsPinned(PCIDLIST_ABSOLUTE) = 0;
 	virtual HRESULT STDMETHODCALLTYPE GetPinnedItem(PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE GetAppIDForPinnedItem(PCIDLIST_ABSOLUTE, PWSTR*) = 0;
@@ -98,5 +116,6 @@ public:
 private:
 	IFlexibleTaskbarPinnedList* m_flexList = 0;
 	IPinnedList3* m_pinnedList3 = 0;
+	IPinnedList25* m_pinnedList25 = 0;
 };
 
