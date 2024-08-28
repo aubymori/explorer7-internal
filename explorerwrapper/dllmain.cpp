@@ -328,6 +328,11 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 	if (!IsWindowVisible(hWnd))
 		return FALSE;
 
+	BOOL bCloaked;
+	DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, &bCloaked, sizeof(BOOL));
+	if (bCloaked)
+		return FALSE;
+
 	if (IsShellFrameWindow && GhostWindowFromHungWindow)
 	{
 		if (IsShellFrameWindow(hWnd) && !GhostWindowFromHungWindow(hWnd))
