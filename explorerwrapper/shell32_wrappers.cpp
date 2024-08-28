@@ -26,13 +26,6 @@ LSTATUS WINAPI SHGetValueNEW(
 	return SHGetValueW(hkey,pszSubKey,pszValue,pdwType,pvData,pcbData);
 }
 
-__int64(__fastcall* SHAboutInfoWorker)(unsigned __int16*, unsigned int);
-__int64 __fastcall SHAboutInfoWNEW(unsigned __int16* a1, unsigned int a2)
-{
-	dbgprintf(L"SHAboutInfoWorker\n");
-	return SHAboutInfoWorker(a1, a2);
-}
-
 bool(__fastcall* IsSearchEnabled)();
 extern "C" bool WINAPI IsSearchEnabledNEW()
 {
@@ -90,17 +83,13 @@ void HookShell32()
 
 	SHGetValueWSHCore = GetProcAddress(LoadLibrary(L"shcore.dll"),"SHGetValueW");
 
-	dbgprintf(L"4\n");
-	SHAboutInfoWorker = (decltype(SHAboutInfoWorker))GetProcAddress(LoadLibrary(L"shlwapi.dll"),"SHAboutInfoWorker");
 	dbgprintf(L"5\n");
 	//auto ordinal902 = GetProcAddress(LoadLibrary(L"shell32.dll"),(LPSTR)902);
-	ChangeImportedAddress(LoadLibrary(L"shell32.dll"),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.dll"), "SHAboutInfo"), SHAboutInfoWNEW);
+	//ChangeImportedAddress(LoadLibrary(L"shell32.dll"),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.dll"), "SHAboutInfo"), SHAboutInfoWNEW);
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)902), IsSearchEnabledNEW);
-	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);
-	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "SHEvaluateSystemCommandTemplate"), SHEvaluateSystemCommandTemplateNEW);
-	//ChangeExportedAddress_ORDINAL(GetModuleHandle(L"shell32.DLL"), 902, "wrp64.#699");
-	dbgprintf(L"6\n");
 
-	//auto ordinal161 = GetProcAddress(LoadLibrary(L"shell32.dll"), (LPSTR)161);
-	//ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "shlwapi.DLL", ordinal161, SHAboutInfoWNEW);
+	//todo: evaluate if this is needed
+	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);
+
+	dbgprintf(L"6\n");
 }

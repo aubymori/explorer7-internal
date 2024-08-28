@@ -819,6 +819,7 @@ void HookAPIs()
 	DwmpActivateLivePreview = (decltype(DwmpActivateLivePreview))GetProcAddress(GetModuleHandle(L"dwmapi.dll"),(LPSTR)113);
 	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll", DwmpActivateLivePreview, DwmpActivateLivePreviewNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmGetColorizationParametersOrig,DwmGetColorizationParametersNEW);
+
 	//8RTM - composition
 	//Ittr: Restore active DWM "colorization" to previews, taskbar and start menu (how this renders is theme-dependent)
 	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"),"SetWindowCompositionAttribute");
@@ -1009,6 +1010,12 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
 		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IRegTreeOptions8,ppv);
+
+	if (riid == IID_IAuthUILogonSound7 && result != S_OK)
+	{
+		dbgprintf(L"Wrap authuilogonsound7\n");
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IAuthUILogonSound10, ppv);
+	}
 
 	if (rclsid == CLSID_UserAssist && result != S_OK)
 	{
