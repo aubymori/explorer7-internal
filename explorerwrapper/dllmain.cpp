@@ -17,6 +17,7 @@
 #include <vector>
 #include "version.h"
 #include "pinnedlist.h"
+#include "destinationlist.h"
 //#include "Detours/detours.h"
 #include "resource.h"
 #include "thememanager.h"
@@ -1070,6 +1071,13 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
 		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+	}
+
+	if (riid == IID_AutoDestList)
+	{
+		dbgprintf(L"USE 10 AUTODESTLIST!!!!\n");
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_AutoDestList10, ppv);
+		*ppv = new CAutoDestWrapper((IAutoDestinationList10*)*ppv);
 	}
 	if (riid == IID_IShellTaskScheduler7)
 	{

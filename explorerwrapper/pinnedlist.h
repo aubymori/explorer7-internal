@@ -92,10 +92,9 @@ public:
 class CPinnedListWrapper : public IPinnedList2
 {
 public:
-	//constructor
 	CPinnedListWrapper(IUnknown*, int);
-	//destructor
 	~CPinnedListWrapper();
+
 	//IUnknown
 	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
 	ULONG STDMETHODCALLTYPE AddRef(void);
