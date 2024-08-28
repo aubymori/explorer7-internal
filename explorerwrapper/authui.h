@@ -61,10 +61,9 @@ public:
 class CAuthUIWrapper: public IShutdownChoices7
 {
 public:
-	//constructor
 	CAuthUIWrapper(IUnknown*, int build);
-	//destructor
 	~CAuthUIWrapper();
+
 	//IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
     ULONG STDMETHODCALLTYPE AddRef(void);    

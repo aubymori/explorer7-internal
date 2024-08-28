@@ -585,8 +585,6 @@ HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 		return NULL;
 
 	HTHEME theme = 0;
-	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
-
 	DWORD flags = 2;
 	if ((unsigned int)GetScreenDpi() != 96)
 		flags |= 1u;
@@ -611,8 +609,6 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 		return NULL;
 
 	HTHEME theme = 0;
-	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
-
 	DWORD flags = 2;
 	if (dpi != 96)
 		flags |= 1u;
@@ -637,8 +633,6 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 		return NULL;
 
 	HTHEME theme = 0;
-	dbgprintf(L"OPENTHEMEDATA %s", pszClassList);
-
 	DWORD flags = 2;
 	if ((unsigned int)GetScreenDpi() != 96)
 		flags |= 1u;
@@ -1078,6 +1072,12 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"USE 10 AUTODESTLIST!!!!\n");
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_AutoDestList10, ppv);
 		*ppv = new CAutoDestWrapper((IAutoDestinationList10*)*ppv);
+	}
+	if (riid == IID_CustomDestList)
+	{
+		dbgprintf(L"CUSTOMDESTLIST!!!!\n");
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_CustomDestList10, ppv);
+		*ppv = new CCustomDestWrapper((IInternalCustomDestList10*)*ppv);
 	}
 	if (riid == IID_IShellTaskScheduler7)
 	{

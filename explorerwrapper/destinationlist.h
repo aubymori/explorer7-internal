@@ -11,6 +11,8 @@ DEFINE_GUID(IID_AutoDestList10,
 	0xE9C5EF8D, 0xFD41, 0x4F72, 0xBA, 0x87, 0xEB, 0x03, 0xBA, 0xD5, 0x81, 0x7C);
 
 DEFINE_GUID(IID_CustomDestList, 0x03f1eed2, 0x8676, 0x430b, 0xab, 0xe1, 0x76, 0x5c, 0x1d, 0x8f, 0xe1, 0x47);
+DEFINE_GUID(IID_CustomDestList10, 0x507101cd, 0xf6ad, 0x46c8, 0x8e, 0x20, 0xee, 0xb9, 0xe6, 0xba, 0xc4, 0x7f);
+
 
 MIDL_INTERFACE("bc10dce3-62f2-4bc6-af37-db46ed7873c4")
 IAutoDestinationList: public IUnknown
@@ -56,6 +58,36 @@ IAutoDestinationList10: public IUnknown
 	virtual HRESULT STDMETHODCALLTYPE UpdateCachedItems(IObjectCollection*, int*) = 0;
 };
 
+MIDL_INTERFACE("03f1eed2-8676-430b-abe1-765c1d8fe147")
+IInternalCustomDestList : public IUnknown
+{
+	virtual HRESULT STDMETHODCALLTYPE SetMinItems(UINT) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetApplicationID(LPCWSTR) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetSlotCount(UINT*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetCategoryCount(UINT*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetCategory(UINT, int, PVOID) = 0;
+	virtual HRESULT STDMETHODCALLTYPE DeleteCategory(UINT, int) = 0;
+	virtual HRESULT STDMETHODCALLTYPE EnumerateCategoryDestinations(UINT, REFIID, void**) = 0;
+	virtual HRESULT STDMETHODCALLTYPE RemoveDestination(IUnknown*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE ResolveDestination(HWND, ULONG, IShellItem*, REFIID, void**) = 0;
+};
+
+MIDL_INTERFACE("507101cd-f6ad-46c8-8e20-eeb9e6bac47f")
+IInternalCustomDestList10 : public IUnknown
+{
+	virtual HRESULT STDMETHODCALLTYPE SetMinItems(UINT) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetApplicationID(LPCWSTR) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetSlotCount(UINT*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetCategoryCount(UINT*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetCategory(UINT, int, PVOID) = 0;
+	virtual HRESULT STDMETHODCALLTYPE DeleteCategory(UINT, int) = 0;
+	virtual HRESULT STDMETHODCALLTYPE EnumerateCategoryDestinations(UINT, REFIID, void**) = 0;
+	virtual HRESULT STDMETHODCALLTYPE RemoveDestination(IUnknown*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE ResolveDestination(HWND, ULONG, IShellItem*, REFIID, void**) = 0;
+	virtual HRESULT STDMETHODCALLTYPE HasListEx(int*, int*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE ClearRemovedDestinations() = 0;
+};
+
 class CAutoDestWrapper : public IAutoDestinationList
 {
 public:
@@ -82,4 +114,32 @@ public:
 
 private:
 	IAutoDestinationList10* m_dest10 = 0;
+	long m_cRef;
+};
+
+class CCustomDestWrapper : IInternalCustomDestList
+{
+public:
+	CCustomDestWrapper(IInternalCustomDestList10*);
+	~CCustomDestWrapper();
+
+	//IUnknown
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
+	ULONG STDMETHODCALLTYPE AddRef(void);
+	ULONG STDMETHODCALLTYPE Release(void);
+
+	//IInternalCustomDestList
+	HRESULT STDMETHODCALLTYPE SetMinItems(UINT);
+	HRESULT STDMETHODCALLTYPE SetApplicationID(LPCWSTR);
+	HRESULT STDMETHODCALLTYPE GetSlotCount(UINT*);
+	HRESULT STDMETHODCALLTYPE GetCategoryCount(UINT*);
+	HRESULT STDMETHODCALLTYPE GetCategory(UINT, int, PVOID);
+	HRESULT STDMETHODCALLTYPE DeleteCategory(UINT, int);
+	HRESULT STDMETHODCALLTYPE EnumerateCategoryDestinations(UINT, REFIID, void**);
+	HRESULT STDMETHODCALLTYPE RemoveDestination(IUnknown*);
+	HRESULT STDMETHODCALLTYPE ResolveDestination(HWND, ULONG, IShellItem*, REFIID, void**);
+
+private:
+	IInternalCustomDestList10* m_custDest10 = 0;
+	long m_cRef;
 };
