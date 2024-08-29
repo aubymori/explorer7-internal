@@ -780,6 +780,25 @@ HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the f
 	return result;
 }
 
+HRESULT(__fastcall* ByUsageUI_ContextMenuInvokeItem)(void* _this,
+	void* a2,
+	int a3,
+	void* a4,
+	void* a5,
+	const unsigned __int16* pszStr1);
+
+HRESULT __fastcall ByUsageUI_ContextMenuInvokeItem_Hook(void* _this,
+	void* a2,
+	int a3,
+	void* a4,
+	void* a5,
+	const unsigned __int16* pszStr1)
+{
+	//HACKHACK, FOR SOME REASON IT WORKS IF THEYRE SWAPPED
+	g_bSwapModifyPointers = true;
+	return ByUsageUI_ContextMenuInvokeItem(_this,a2,a3,a4,a5,pszStr1);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -802,10 +821,17 @@ void HookAPIs()
 
 	void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 
+	//kill me
+	ByUsageUI_ContextMenuInvokeItem = (decltype(ByUsageUI_ContextMenuInvokeItem))(FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 54 41 55 48 83 EC 30 48 8B 7C 24 78 48 8B EA 48 8D B1 A8 02 00 00"));
+
 	MH_Initialize();
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+	if (ByUsageUI_ContextMenuInvokeItem)
+		MH_CreateHook(static_cast<LPVOID>(ByUsageUI_ContextMenuInvokeItem), ByUsageUI_ContextMenuInvokeItem_Hook, reinterpret_cast<LPVOID*>(&ByUsageUI_ContextMenuInvokeItem));
+	else
+		dbgprintf(L"ByUsageUI_ContextMenuInvokeItem NOT FOUND\n");
 	if (fillnsc && g_osVersion.BuildNumber() >= 14393)
 		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc));
 	HookTrayThread();

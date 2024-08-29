@@ -1,6 +1,8 @@
 #include "pinnedlist.h"
 #include "dbgprint.h"
 
+bool g_bSwapModifyPointers = false;
+
 CPinnedListWrapper::CPinnedListWrapper(IUnknown* flex, int build)
 {
 	if (build >= 10240 && build < 14393)
@@ -33,7 +35,7 @@ CPinnedListWrapper::~CPinnedListWrapper()
 HRESULT __stdcall CPinnedListWrapper::QueryInterface(REFIID riid, void** ppvObject)
 {
 	if (m_pinnedList25)
-		m_pinnedList25->QueryInterface(riid, ppvObject);
+		return m_pinnedList25->QueryInterface(riid, ppvObject);
 	if (m_flexList)
 		return m_flexList->QueryInterface(riid, ppvObject);
 	if (m_pinnedList3)
@@ -43,7 +45,7 @@ HRESULT __stdcall CPinnedListWrapper::QueryInterface(REFIID riid, void** ppvObje
 ULONG __stdcall CPinnedListWrapper::AddRef(void)
 {
 	if (m_pinnedList25)
-		m_pinnedList25->AddRef();
+		return m_pinnedList25->AddRef();
 	if (m_flexList)
 		return m_flexList->AddRef();
 	if (m_pinnedList3)
@@ -63,7 +65,7 @@ ULONG __stdcall CPinnedListWrapper::Release(void)
 		free((void*)this);
 	return cref;
 }
-
+//.text:00007FF6BEB24439 explorer.exe:$94439 #93A39
 HRESULT __stdcall CPinnedListWrapper::EnumObjects(IEnumFullIDList** p1)
 {
 	if (m_pinnedList25)
@@ -81,7 +83,15 @@ HRESULT __stdcall CPinnedListWrapper::Modify(PCIDLIST_ABSOLUTE p1, PCIDLIST_ABSO
 	if (m_flexList)
 		return m_flexList->Modify(p1, p2);
 	if (m_pinnedList3)
-		return m_pinnedList3->Modify(p1, p2, PLMC_EXPLORER);
+	{
+		dbgprintf(L"Modify %x %x",p1,p2);
+		if (g_bSwapModifyPointers)
+		{
+			g_bSwapModifyPointers = false;
+			return m_pinnedList3->Modify(p2, p1, (PLMC)0x18);
+		}
+		return m_pinnedList3->Modify(p1, p2, (PLMC)0x18);
+	}
 }
 
 HRESULT __stdcall CPinnedListWrapper::GetChangeCount(ULONG* p1)
