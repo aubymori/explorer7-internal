@@ -749,6 +749,14 @@ bool dirExists(const WCHAR* dirName_in) //ripped from here https://stackoverflow
 	return false;
 }
 
+MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
+INameSpaceTreeControlValuesPrivate : IUnknown
+{
+public:
+	virtual void stub() = 0;
+	virtual void SetIndentValue(int indent) = 0;
+};
+
 HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf
 {
 	HRESULT result = S_OK; 
@@ -771,6 +779,16 @@ HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the f
 			(void**)&ppv) == S_OK)
 	{
 		INameSpaceTreeControl2* control = *(INameSpaceTreeControl2**)(nscHost + 0x70);
+
+		//ideally we would want to queryinterface to get these, but im too lazy to get the guids for these, and i doubt these offsets would change
+		IVisualProperties* visualProps = (IVisualProperties*)(__int64(control) + 0x20);
+		INameSpaceTreeControlValuesPrivate* privatec = (INameSpaceTreeControlValuesPrivate*)(__int64(control) + 0x50);
+		privatec->SetIndentValue(13);
+		int itemheight = 0;
+		visualProps->GetItemHeight(&itemheight);
+		itemheight += 1;
+		visualProps->SetItemHeight(itemheight);
+
 		result = control->AppendRoot(ppv,96,3,0);
 		if (SUCCEEDED(result))
 			*(DWORD*)(nscHost + 0xCC) = 1;
@@ -1089,7 +1107,13 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		dbgprintf(L"CUSTOMDESTLIST!!!!\n");
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_CustomDestList10, ppv);
-		*ppv = new CCustomDestWrapper((IInternalCustomDestList10*)*ppv);
+		if (result != S_OK)
+		{
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_CustomDestList1507, ppv);
+			*ppv = new CCustomDestWrapper((IInternalCustomDestList10*)*ppv);
+		}
+		else
+			*ppv = new CCustomDestWrapper((IInternalCustomDestList10*)*ppv);
 	}
 	if (riid == IID_IShellTaskScheduler7)
 	{

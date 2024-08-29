@@ -96,25 +96,43 @@ CCustomDestWrapper::CCustomDestWrapper(IInternalCustomDestList10* custDest)
 	m_custDest10 = custDest;
 }
 
+CCustomDestWrapper::CCustomDestWrapper(IInternalCustomDestList1507* custDest)
+{
+	m_cRef = 1;
+	m_custDest1507 = custDest;
+}
+
 CCustomDestWrapper::~CCustomDestWrapper()
 {
-	m_custDest10->Release();
+	if (m_custDest10)
+		m_custDest10->Release();
+	if (m_custDest1507)
+		m_custDest1507->Release();
 }
 
 HRESULT __stdcall CCustomDestWrapper::QueryInterface(REFIID riid, void** ppvObject)
 {
-	return m_custDest10->QueryInterface(riid, ppvObject);
+	if (m_custDest10)
+		return m_custDest10->QueryInterface(riid, ppvObject);
+	if (m_custDest1507)
+		return m_custDest1507->QueryInterface(riid, ppvObject);
 }
 
 ULONG __stdcall CCustomDestWrapper::AddRef(void)
 {
-	m_custDest10->AddRef();
+	if (m_custDest10)
+		m_custDest10->AddRef(); 
+	if (m_custDest1507)
+		m_custDest1507->AddRef();
 	return InterlockedIncrement(&m_cRef);
 }
 
 ULONG __stdcall CCustomDestWrapper::Release(void)
 {
-	m_custDest10->Release();
+	if (m_custDest10)
+		m_custDest10->Release();
+	if (m_custDest1507)
+		m_custDest1507->Release();
 	if (InterlockedDecrement(&m_cRef) == 0)
 	{
 		free((void*)this);
@@ -125,45 +143,72 @@ ULONG __stdcall CCustomDestWrapper::Release(void)
 
 HRESULT __stdcall CCustomDestWrapper::SetMinItems(UINT p1)
 {
-	return m_custDest10->SetMinItems(p1);
+	if (m_custDest10)
+		return m_custDest10->SetMinItems(p1);
+	if (m_custDest1507)
+		return m_custDest1507->SetMinItems(p1);
 }
 
 HRESULT __stdcall CCustomDestWrapper::SetApplicationID(LPCWSTR p1)
 {
-	return m_custDest10->SetApplicationID(p1);
+	if (m_custDest10)
+		return m_custDest10->SetApplicationID(p1);
+	if (m_custDest1507)
+		return m_custDest1507->SetApplicationID(p1);
 }
 
 HRESULT __stdcall CCustomDestWrapper::GetSlotCount(UINT* p1)
 {
-	return m_custDest10->GetSlotCount(p1);
+	if (m_custDest10)
+		return m_custDest10->GetSlotCount(p1);
+	if (m_custDest1507)
+		return m_custDest1507->GetSlotCount(p1);
 }
 
 HRESULT __stdcall CCustomDestWrapper::GetCategoryCount(UINT* p1)
 {
-	return m_custDest10->GetCategoryCount(p1);
+	if (m_custDest10)
+		return m_custDest10->GetCategoryCount(p1);
+	if (m_custDest1507)
+		return m_custDest1507->GetCategoryCount(p1);
 }
 
 HRESULT __stdcall CCustomDestWrapper::GetCategory(UINT p1, int p2, PVOID p3)
 {
-	return m_custDest10->GetCategory(p1, p2, p3);
+	if (m_custDest10)
+		return m_custDest10->GetCategory(p1, p2, p3);
+	if (m_custDest1507)
+		return m_custDest1507->GetCategory(p1, p2, p3);
 }
 
 HRESULT __stdcall CCustomDestWrapper::DeleteCategory(UINT p1, int p2)
 {
-	return m_custDest10->DeleteCategory(p1, p2);
+	if (m_custDest10)
+		return m_custDest10->DeleteCategory(p1, p2);
+	if (m_custDest1507)
+		return m_custDest1507->DeleteCategory(p1, p2);
 }
 
 HRESULT __stdcall CCustomDestWrapper::EnumerateCategoryDestinations(UINT p1, REFIID p2, void** p3)
 {
-	return m_custDest10->EnumerateCategoryDestinations(p1, p2, p3);
+	if (m_custDest10)
+		return m_custDest10->EnumerateCategoryDestinations(p1, p2, p3);
+	if (m_custDest1507)
+		return m_custDest1507->EnumerateCategoryDestinations(p1, p2, p3);
 }
 
 HRESULT __stdcall CCustomDestWrapper::RemoveDestination(IUnknown* p1)
 {
-	return m_custDest10->RemoveDestination(p1);
+	if (m_custDest10)
+		return m_custDest10->RemoveDestination(p1);
+	if (m_custDest1507)
+		return m_custDest1507->RemoveDestination(p1);
 }
 
 HRESULT __stdcall CCustomDestWrapper::ResolveDestination(HWND p1, ULONG p2, IShellItem* p3, REFIID p4, void** p5)
 {
-	return m_custDest10->ResolveDestination(p1, p2, p3, p4, p5);
+	if (m_custDest10)
+		return m_custDest10->ResolveDestination(p1, p2, p3, p4, p5);
+	if (m_custDest1507)
+		return m_custDest1507->ResolveDestination(p1, p2, p3, p4, p5);
 }
