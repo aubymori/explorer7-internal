@@ -61,7 +61,7 @@ public:
 	virtual void GetPinnedAppSQMEventID() = 0;
 };
 
-class CStartMenuPin: public IStartMenuShellExtInit/*, public IContextMenuShort*/
+class CStartMenuPin /* : public IStartMenuShellExtInit*//*, public IContextMenuShort*/
 {
 public:
 	//constructor

@@ -1,9 +1,11 @@
 #include "startmenupin.h"
 #include "dbgprint.h"
+#include "version.h"
 
 CreateInstance_API CreateStartMenuPinInstance;
 PSTARTPINVTBL origStartPinVtbl;
-PSTARTPINVTBL newStartPinVtbl;
+bool bFinished = false;
+//PSTARTPINVTBL newStartPinVtbl;
 
 HMODULE h_shell32;
 
@@ -100,9 +102,10 @@ DWORD __thiscall CStartMenuPin::IsRestricted()
 	return SHRestricted(REST_NOSMPINNEDLIST);
 }
 
+HRESULT(__thiscall*fGetMenuStringID)(void*,DWORD*);
 HRESULT __thiscall CStartMenuPin::GetMenuStringID(DWORD* w)
 {
-	origStartPinVtbl->GetMenuStringID(this,w);
+	fGetMenuStringID(this,w);
 	(*w)-=5;
 	return S_OK;
 }
@@ -137,6 +140,25 @@ LRESULT __thiscall CStartMenuPin::SetRemovedChangeCount(DWORD value)
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesRemovedChanges",&value);
 }
 
+static void* DetourVtable(void* vtable, int offset, void* FunctionPtr)
+{
+	uintptr_t* og = (uintptr_t*)((uintptr_t)vtable + offset);
+
+	DWORD dwProtection;
+	VirtualProtect(og, 8, PAGE_EXECUTE_READWRITE, &dwProtection);
+
+	uintptr_t originalfunction = *og;
+	*og = (uintptr_t)FunctionPtr;
+
+	VirtualProtect(og, 8, dwProtection, NULL);
+
+	return (void*)originalfunction;
+}
+
+template <class T>
+static inline void* GetMemberFuncPtr(T Func) { return reinterpret_cast<void*&>(Func); }
+#define MEMBER_FUNC(a) GetMemberFuncPtr(&a)
+
 #pragma function(memcpy)
 HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 {
@@ -145,41 +167,42 @@ HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 	StringFromGUID2(riid,iid,40);
 	IUnknown* pinobj;
 	HRESULT rslt = CreateStartMenuPinInstance(dummy,IID_IShellExtInit,(PVOID*)&pinobj);
-	if ( SUCCEEDED(rslt) )
+	if ( SUCCEEDED(rslt) && !bFinished)
 	{
+		int SetChangeCountIndex = 4;
+		int OpenPinRegStreamIndex = 5;
+		int OpenLinksRegStreamIndex = 6;
+		int GetPinStreamVersionIndex = 8;
+		int SetPinStreamVersionIndex = 9;
+		int GetBackupSubDirNameIndex = 12;
+		int IsRestrictedIndex = 14;
+		int GetMenuStringIDIndex = 16;
+		int GetHelpTextIndex = 17;
+		int GetVerbIndex = 19;
+		int GetChangeCountIndex = 18;
+		int GetRemovedChangeCountIndex = 22;
+		int SetRemovedChangeCountIndex = 21;
+
 		PSTARTPINOBJ startobj = (PSTARTPINOBJ)pinobj;
-		dbgprintf(L"CreateStartMenuPin pStartPinVtbl %p",startobj->pStartPinVtbl);
-		//init vtbl hijack
-		if (!newStartPinVtbl)
-		{
-			CStartMenuPin* stmenu = new CStartMenuPin;
-			PSTARTPINOBJ ourobj = (PSTARTPINOBJ)static_cast<IStartMenuShellExtInit*>(stmenu);
-			PSTARTPINVTBL ourvtbl = ourobj->pStartPinVtbl;
-			delete stmenu;
+		dbgprintf(L"CreateStartMenuPin pStartPinVtbl %p %p setchangecount %p",startobj,startobj->pStartPinVtbl, startobj->pStartPinVtbl->SetChangeCount);
+		DetourVtable(startobj->pStartPinVtbl, SetChangeCountIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::SetChangeCount));
+		DetourVtable(startobj->pStartPinVtbl, OpenPinRegStreamIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::OpenPinRegStream));
+		DetourVtable(startobj->pStartPinVtbl, OpenLinksRegStreamIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::OpenLinksRegStream));
+		DetourVtable(startobj->pStartPinVtbl, GetPinStreamVersionIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetPinStreamVersion));
+		DetourVtable(startobj->pStartPinVtbl, SetPinStreamVersionIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::SetPinStreamVersion));
+		DetourVtable(startobj->pStartPinVtbl, GetBackupSubDirNameIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetBackupSubDirName));
+		DetourVtable(startobj->pStartPinVtbl, IsRestrictedIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::IsRestricted));
+		fGetMenuStringID = (decltype(fGetMenuStringID))DetourVtable(startobj->pStartPinVtbl, GetMenuStringIDIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetMenuStringID));
+		DetourVtable(startobj->pStartPinVtbl, GetHelpTextIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetHelpText));
+		DetourVtable(startobj->pStartPinVtbl, GetVerbIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetVerb));
+		DetourVtable(startobj->pStartPinVtbl, GetChangeCountIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetChangeCount));
+		DetourVtable(startobj->pStartPinVtbl, GetRemovedChangeCountIndex * sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::GetRemovedChangeCount));
+		DetourVtable(startobj->pStartPinVtbl, SetRemovedChangeCountIndex *sizeof(uintptr_t), MEMBER_FUNC(CStartMenuPin::SetRemovedChangeCount));
 
-			newStartPinVtbl = (PSTARTPINVTBL)malloc(sizeof(STARTPINVTBL));
-			memcpy(newStartPinVtbl,startobj->pStartPinVtbl,sizeof(STARTPINVTBL));
-			newStartPinVtbl->SetChangeCount = ourvtbl->SetChangeCount;
-			newStartPinVtbl->OpenPinRegStream = ourvtbl->OpenPinRegStream;
-			newStartPinVtbl->OpenLinksRegStream = ourvtbl->OpenLinksRegStream;
-			newStartPinVtbl->GetPinStreamVersion = ourvtbl->GetPinStreamVersion;
-			newStartPinVtbl->SetPinStreamVersion = ourvtbl->SetPinStreamVersion;
-			newStartPinVtbl->GetBackupSubDirName = ourvtbl->GetBackupSubDirName;
-			newStartPinVtbl->IsRestricted = ourvtbl->IsRestricted;
-			newStartPinVtbl->GetChangeCount = ourvtbl->GetChangeCount;
-			newStartPinVtbl->SetRemovedChangeCount = ourvtbl->SetRemovedChangeCount;
-			newStartPinVtbl->GetRemovedChangeCount = ourvtbl->GetRemovedChangeCount;		
-			newStartPinVtbl->GetVerb = ourvtbl->GetVerb;
-			newStartPinVtbl->GetMenuStringID = ourvtbl->GetMenuStringID;
-			newStartPinVtbl->GetHelpText = ourvtbl->GetHelpText;
-
-			origStartPinVtbl = startobj->pStartPinVtbl;
-		}
-		startobj->pStartPinVtbl = newStartPinVtbl;
-		//return asked interface
-		rslt = pinobj->QueryInterface(riid,ppv);
-		pinobj->Release();
+		bFinished = true;
 	}
+	rslt = pinobj->QueryInterface(riid, ppv);
+	pinobj->Release();
 	return rslt;
 }
 

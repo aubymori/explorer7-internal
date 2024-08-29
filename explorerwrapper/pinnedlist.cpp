@@ -87,12 +87,6 @@ HRESULT __stdcall CPinnedListWrapper::Modify(PCIDLIST_ABSOLUTE p1, PCIDLIST_ABSO
 	{
 		dbgprintf(L"Modify %x %x",p1,p2);
 
-		//We pray to god this offset works for all versions where ipinnedlist3 is used
-		//also, why the fuck is the vtable ptr to fucking IShellExtInit corrupted by its queryinterface
-		//we gotta figure what bitchass motherfucker is reading it and replacing its ptr
-		if (m_build < 26100)
-			*(void**)(__int64(m_pinnedList3) - 24) = (void*)( (*(uintptr_t*)(__int64(m_pinnedList3))) + 0x158);
-
 		return m_pinnedList3->Modify(p1, p2, (PLMC)18);
 	}
 }
