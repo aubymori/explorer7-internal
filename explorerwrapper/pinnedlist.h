@@ -75,20 +75,20 @@ MIDL_INTERFACE("0DD79AE2-D156-45D4-9EEB-3B549769E940")
 IPinnedList3 : public IUnknown
 {
 public:
-	virtual HRESULT __fastcall EnumObjects(IEnumFullIDList**) = 0;
-	virtual HRESULT __fastcall GetPinnableInfo(IDataObject*, int, IShellItem2**, IShellItem**, PWSTR*, INT*) = 0;
-	virtual HRESULT __fastcall IsPinnable(IDataObject*, int) = 0;
-	virtual HRESULT __fastcall Resolve(HWND, ULONG, PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
-	virtual HRESULT __fastcall Unadvise(ULONG) = 0;
-	virtual HRESULT __fastcall GetChangeCount(ULONG*) = 0;
-	virtual HRESULT __fastcall IsPinned(PCIDLIST_ABSOLUTE) = 0;
-	virtual HRESULT __fastcall GetPinnedItem(PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
-	virtual HRESULT __fastcall GetAppIDForPinnedItem(PCIDLIST_ABSOLUTE, PWSTR*) = 0;
-	virtual HRESULT __fastcall ItemChangeNotify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE) = 0;
-	virtual HRESULT __fastcall UpdateForRemovedItemsAsNecessary(VOID) = 0;
-	virtual HRESULT __fastcall PinShellLink(PWSTR, IShellLinkW*) = 0;
-	virtual HRESULT __fastcall GetPinnedItemForAppID(PWSTR, PCIDLIST_ABSOLUTE) = 0;
-	virtual HRESULT __fastcall Modify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE, PLMC) = 0;
+	virtual HRESULT STDMETHODCALLTYPE EnumObjects(IEnumFullIDList**) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetPinnableInfo(IDataObject*, int, IShellItem2**, IShellItem**, PWSTR*, INT*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE IsPinnable(IDataObject*, int) = 0;
+	virtual HRESULT STDMETHODCALLTYPE Resolve(HWND, ULONG, PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE Unadvise(ULONG) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetChangeCount(ULONG*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE IsPinned(PCIDLIST_ABSOLUTE) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetPinnedItem(PCIDLIST_ABSOLUTE, PIDLIST_ABSOLUTE*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetAppIDForPinnedItem(PCIDLIST_ABSOLUTE, PWSTR*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE ItemChangeNotify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE) = 0;
+	virtual HRESULT STDMETHODCALLTYPE UpdateForRemovedItemsAsNecessary(VOID) = 0;
+	virtual HRESULT STDMETHODCALLTYPE PinShellLink(PWSTR, IShellLinkW*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE GetPinnedItemForAppID(PWSTR, PCIDLIST_ABSOLUTE) = 0;
+	virtual HRESULT STDMETHODCALLTYPE Modify(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE, PLMC) = 0;
 };
 
 class CPinnedListWrapper : public IPinnedList2
