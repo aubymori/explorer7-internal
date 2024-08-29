@@ -780,15 +780,6 @@ HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the f
 	return result;
 }
 
-HRESULT(__fastcall* ByUsageUI_ContextMenuDeleteItem)(void* _this, void* a2);
-
-HRESULT __fastcall ByUsageUI_ContextMenuDeleteItem_Hook(void* _this, void* a2)
-{
-	//HACKHACK, FOR SOME REASON IT WORKS IF THEYRE SWAPPED
-	g_bSwapModifyPointers = true;
-	return ByUsageUI_ContextMenuDeleteItem(_this,a2);
-}
-
 void HookShell32();
 void HookAPIs()
 {
@@ -811,17 +802,10 @@ void HookAPIs()
 
 	void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 
-	//kill me
-	ByUsageUI_ContextMenuDeleteItem = (decltype(ByUsageUI_ContextMenuDeleteItem))(FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 55 56 57 48 81 EC 80 02 00 00 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 70 02 00 00 48 8B 02"));
-
 	MH_Initialize();
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
-	if (ByUsageUI_ContextMenuDeleteItem)
-		MH_CreateHook(static_cast<LPVOID>(ByUsageUI_ContextMenuDeleteItem), ByUsageUI_ContextMenuDeleteItem_Hook, reinterpret_cast<LPVOID*>(&ByUsageUI_ContextMenuDeleteItem));
-	else
-		dbgprintf(L"ByUsageUI_ContextMenuDeleteItem NOT FOUND\n");
 	if (fillnsc && g_osVersion.BuildNumber() >= 14393)
 		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc));
 	HookTrayThread();
