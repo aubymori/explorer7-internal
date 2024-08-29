@@ -24,6 +24,7 @@
 #include "MinHook.h"
 #include "taskscheduler.h"
 #include "registry.h"
+#include "nsctree.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -737,67 +738,6 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 	return res;
 }
 
-bool dirExists(const WCHAR* dirName_in) //ripped from here https://stackoverflow.com/questions/8233842/how-to-check-if-directory-exist-using-c-and-winapi 
-{
-	DWORD ftyp = GetFileAttributesW(dirName_in);
-	if (ftyp == INVALID_FILE_ATTRIBUTES)
-		return false;
-
-	if (ftyp & FILE_ATTRIBUTE_DIRECTORY)
-		return true;
-
-	return false;
-}
-
-MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
-INameSpaceTreeControlValuesPrivate : IUnknown
-{
-public:
-	virtual void stub() = 0;
-	virtual void SetIndentValue(int indent) = 0;
-};
-
-HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf
-{
-	HRESULT result = S_OK; 
-	if (*(DWORD*)(nscHost + 0xCC)) return result;
-
-	WCHAR fallbackPath[MAX_PATH];
-	ExpandEnvironmentStringsW(L"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs", fallbackPath, MAX_PATH);
-
-	WCHAR* sibAllProgs = L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}";
-
-	IShellItem* ppv;
-	if ((dirExists(sibAllProgs) && SHCreateItemFromParsingName(
-		sibAllProgs,
-		0LL,
-		IID_IShellItem,
-		(void**)&ppv) == S_OK) || SHCreateItemFromParsingName(
-			fallbackPath,
-			0LL,
-			IID_IShellItem,
-			(void**)&ppv) == S_OK)
-	{
-		INameSpaceTreeControl2* control = *(INameSpaceTreeControl2**)(nscHost + 0x70);
-
-		//ideally we would want to queryinterface to get these, but im too lazy to get the guids for these, and i doubt these offsets would change
-		IVisualProperties* visualProps = (IVisualProperties*)(__int64(control) + 0x20);
-		INameSpaceTreeControlValuesPrivate* privatec = (INameSpaceTreeControlValuesPrivate*)(__int64(control) + 0x50);
-		privatec->SetIndentValue(13);
-		int itemheight = 0;
-		visualProps->GetItemHeight(&itemheight);
-		itemheight += 1;
-		visualProps->SetItemHeight(itemheight);
-
-		result = control->AppendRoot(ppv,96,3,0);
-		if (SUCCEEDED(result))
-			*(DWORD*)(nscHost + 0xCC) = 1;
-
-		ppv->Release();
-	}
-	return result;
-}
-
 void HookShell32();
 void HookAPIs()
 {
@@ -825,7 +765,7 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	if (fillnsc && g_osVersion.BuildNumber() >= 14393)
-		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc));
+		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc)); //this hook is in nsctree.h now
 	HookTrayThread();
 	MH_EnableHook(MH_ALL_HOOKS);
 
@@ -1107,10 +1047,10 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		dbgprintf(L"CUSTOMDESTLIST!!!!\n");
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_CustomDestList10, ppv);
-		if (result != S_OK)
+		if (result != S_OK || !*ppv)
 		{
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_CustomDestList1507, ppv);
-			*ppv = new CCustomDestWrapper((IInternalCustomDestList10*)*ppv);
+			*ppv = new CCustomDestWrapper((IInternalCustomDestList1507*)*ppv);
 		}
 		else
 			*ppv = new CCustomDestWrapper((IInternalCustomDestList10*)*ppv);

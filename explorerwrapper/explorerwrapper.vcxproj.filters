@@ -87,6 +87,9 @@
     <ClInclude Include="destinationlist.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="nsctree.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
