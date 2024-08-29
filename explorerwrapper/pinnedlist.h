@@ -118,5 +118,6 @@ private:
 	IFlexibleTaskbarPinnedList* m_flexList = 0;
 	IPinnedList3* m_pinnedList3 = 0;
 	IPinnedList25* m_pinnedList25 = 0;
+	int m_build = 0;
 };
 
