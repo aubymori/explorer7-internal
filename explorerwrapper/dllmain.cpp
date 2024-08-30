@@ -152,6 +152,8 @@ static HWND GetTaskListThumbWnd()
 LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (uMsg == 0x56D) return 0;
+	if (uMsg == WM_THEMECHANGED) //reinit thememanager on themechanged, so that inactive msstyles is updated
+		ThemeManagerInitialize();
 	if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_WINDOWPOSCHANGED)
 	{
 		RemoveProp(hwnd,L"TaskbarMonitor");

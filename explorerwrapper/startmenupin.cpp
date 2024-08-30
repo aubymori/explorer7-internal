@@ -10,8 +10,8 @@ bool bFinished = false;
 HMODULE h_shell32;
 
 const LPWSTR sz_StartPage2 = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartPage2";
-const LPSTR sz_StartPin = "startpin";
-const LPSTR sz_StartUnpin = "startunpin";
+const LPWSTR sz_StartPin = L"startpin";
+const LPWSTR sz_StartUnpin = L"startunpin";
 
 int WINAPI Shell32_LoadString( HINSTANCE hInstance, UINT uID, LPWSTR lpBuffer, int nBufferMax )
 {
@@ -64,25 +64,25 @@ void CStartMenuPin::Unimpl2(){};
 void CStartMenuPin::SendPinRearrangeSQM(){};
 void CStartMenuPin::GetPinnedAppSQMEventID(){};
 
-LRESULT __thiscall CStartMenuPin::SetChangeCount(DWORD value)
+LRESULT CStartMenuPin::SetChangeCount(ULONG value)
 {
 	dbgprintf(L"SetChangeCount %i",value);
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesChanges",&value);
 }
 
-IStream* __thiscall CStartMenuPin::OpenPinRegStream(DWORD grfMode)
+IStream* CStartMenuPin::OpenPinRegStream(ULONG grfMode)
 {
 	dbgprintf(L"OpenPinRegStream %i", grfMode);
 	return SHOpenRegStream2W(HKEY_CURRENT_USER,sz_StartPage2,L"Favorites",grfMode);
 }
 
-IStream* __thiscall CStartMenuPin::OpenLinksRegStream(DWORD grfMode)
+IStream* CStartMenuPin::OpenLinksRegStream(ULONG grfMode)
 {
 	dbgprintf(L"OpenLinksRegStream %i", grfMode);
 	return SHOpenRegStream2W(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesResolve",grfMode);
 }
 
-DWORD __thiscall CStartMenuPin::GetPinStreamVersion()
+LRESULT CStartMenuPin::GetPinStreamVersion()
 {
 	DWORD value = 0;
 	RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesVersion",&value);
@@ -90,27 +90,27 @@ DWORD __thiscall CStartMenuPin::GetPinStreamVersion()
 	return value;
 }
 
-LRESULT __thiscall CStartMenuPin::SetPinStreamVersion(DWORD value)
+LRESULT CStartMenuPin::SetPinStreamVersion(ULONG value)
 {
 	dbgprintf(L"SetPinStreamVersion %i", value);
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesVersion",&value);
 }
 
-HRESULT __thiscall CStartMenuPin::GetBackupSubDirName(LPWSTR szOut, int cbLen)
+LRESULT CStartMenuPin::GetBackupSubDirName(LPWSTR szOut, UINT cbLen)
 {
 	dbgprintf(L"GetBackupSubDirName");
 	lstrcpyn(szOut,L"StartMenu",cbLen);
 	return S_OK; //...right?
 }
 
-DWORD __thiscall CStartMenuPin::IsRestricted()
+DWORD CStartMenuPin::IsRestricted()
 {
 	dbgprintf(L"IsRestricted");
 	return SHRestricted(REST_NOSMPINNEDLIST);
 }
 
-HRESULT(__thiscall*fGetMenuStringID)(void*,DWORD*);
-HRESULT __thiscall CStartMenuPin::GetMenuStringID(DWORD* w)
+LRESULT(__fastcall*fGetMenuStringID)(void*, UINT*);
+LRESULT CStartMenuPin::GetMenuStringID(UINT* w)
 {
 	dbgprintf(L"w %i", *w);
 	fGetMenuStringID(this,w);
@@ -118,12 +118,12 @@ HRESULT __thiscall CStartMenuPin::GetMenuStringID(DWORD* w)
 	return S_OK;
 }
 
-int __thiscall CStartMenuPin::GetHelpText(int id, LPWSTR buf, int nCharMax)
+int CStartMenuPin::GetHelpText(unsigned __int64 id, LPWSTR buf, UINT nCharMax)
 {	
 	return Shell32_LoadString(h_shell32,id+0x1508,buf,nCharMax);	
 }
 
-LPSTR __thiscall CStartMenuPin::GetVerb(int op)
+WCHAR* CStartMenuPin::GetVerb(UINT op)
 {
 	dbgprintf(L"getverb %i", op);
 	if (op == 0) return sz_StartPin;
@@ -131,14 +131,14 @@ LPSTR __thiscall CStartMenuPin::GetVerb(int op)
 	return NULL;
 }
 
-LRESULT __thiscall CStartMenuPin::GetChangeCount(DWORD* pdwVal)
+LRESULT CStartMenuPin::GetChangeCount(ULONG* pdwVal)
 {
 	dbgprintf(L"GetChangeCount ");
 	*pdwVal = 0;
 	return RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesChanges",pdwVal);
 }
 
-DWORD __thiscall CStartMenuPin::GetRemovedChangeCount()
+__int64 CStartMenuPin::GetRemovedChangeCount()
 {
 	dbgprintf(L"GetRemovedChangeCount ");
 	DWORD value = 0;
@@ -146,7 +146,7 @@ DWORD __thiscall CStartMenuPin::GetRemovedChangeCount()
 	return value;
 }
 
-LRESULT __thiscall CStartMenuPin::SetRemovedChangeCount(DWORD value)
+LRESULT CStartMenuPin::SetRemovedChangeCount(ULONG value)
 {
 	dbgprintf(L"SetRemovedChangeCount %i",value);
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesRemovedChanges",&value);

@@ -129,16 +129,17 @@ ULONG __stdcall CCustomDestWrapper::AddRef(void)
 
 ULONG __stdcall CCustomDestWrapper::Release(void)
 {
+	ULONG cRef = 0;
 	if (m_custDest10)
-		m_custDest10->Release();
+		cRef = m_custDest10->Release();
 	if (m_custDest1507)
-		m_custDest1507->Release();
-	if (InterlockedDecrement(&m_cRef) == 0)
+		cRef = m_custDest1507->Release();
+	if (InterlockedDecrement(&m_cRef) == 0 || cRef == 0)
 	{
 		free((void*)this);
 		return 0;
 	}
-	return m_cRef;
+	return cRef;
 }
 
 HRESULT __stdcall CCustomDestWrapper::SetMinItems(UINT p1)
