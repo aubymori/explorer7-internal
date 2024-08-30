@@ -1,7 +1,6 @@
 #pragma once
-#include <Guiddef.h>
-#include <windows.h>
-#include <ShlObj.h>
+#define INITGUID
+#include "framework.h"
 
 DEFINE_GUID(CLSID_AutomaticDestinationList, 
 	0x0F0AE1542, 0x0F497, 0x484B, 0xA1, 0x75, 0xA2, 0x0D, 0xB0, 0x91, 0x44, 0xBA);

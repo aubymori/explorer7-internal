@@ -1,5 +1,4 @@
-#include <Windows.h>
-#include <string.h>
+#include "framework.h"
 #pragma warning(disable:4273)
 #pragma function(memcpy)
 #pragma function(memset)

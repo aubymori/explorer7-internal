@@ -2,14 +2,10 @@
 #define _STARTMENUPIN_H
 
 #define INITGUID
-#include <guiddef.h>
+#include "framework.h"
+
 DEFINE_GUID(CLSID_StartMenuPin,0xA2A9545D, 0xA0C2, 0x42B4, 0x97,0x08,0xA0,0xB2,0xBA,0xDD,0x77,0xC8); //{A2A9545D-A0C2-42B4-9708-A0B2BADD77C8}
 DEFINE_GUID(CLSID_TaskbarPin,0x90AA3A4E, 0x1CBA, 0x4233, 0xB8,0xBB,0x53,0x57,0x73,0xD4,0x84,0x49);
-
-#include <Windows.h>
-#include <ShlObj.h>
-#include <Shlwapi.h>
-
 
 typedef HRESULT (WINAPI* CreateInstance_API)(PVOID,REFIID,PVOID*);
 	typedef struct { 

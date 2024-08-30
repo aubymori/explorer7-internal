@@ -1,5 +1,5 @@
 #pragma once
-#include <windows.h>
+#include "framework.h"
 
 UINT (__fastcall*fGetDpiForWindow)(HWND hwnd);
 DPI_AWARENESS_CONTEXT (__fastcall*fGetWindowDpiAwarenessContext)(HWND hwnd);

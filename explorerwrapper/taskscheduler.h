@@ -1,8 +1,6 @@
 #pragma once
-#include <Guiddef.h>
-#include <windows.h>
-#include <DocObj.h>
-#include <ShlObj.h>
+#define INITGUID
+#include "framework.h"
 
 DEFINE_GUID(IID_IShellTaskScheduler7, 0x6CCB7BE0, 0x6807, 0x11D0, 0x0B8, 0x10, 0x0, 0x0C0, 0x4F, 0x0D7, 0x6, 0x0EC); //{6CCB7BE0-6807-11D0-B810-00C04FD706EC}
 DEFINE_GUID(IID_IShellTaskSchedulerSettings7, 0x4BC6CE0A, 0x2B39, 0x4F63, 0x89, 0x0C1, 0x3B, 0x0EA, 0x0A7, 0x0BD, 0x0E0, 0x2A); //_GUID_4bc6ce0a_2b39_4f63_89c1_3beaa7bde02a

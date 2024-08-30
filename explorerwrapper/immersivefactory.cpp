@@ -1,5 +1,4 @@
 #include "immersivefactory.h"
-
 #include "dbgprint.h"
 
 static DWORD dwRegisterImmersive;

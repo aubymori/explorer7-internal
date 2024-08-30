@@ -1,5 +1,6 @@
 #pragma once
-#include <Windows.h>
+#include "framework.h"
+
 extern "C" void * _ReturnAddress(void);
 #pragma intrinsic(_ReturnAddress)
 

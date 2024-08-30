@@ -1,7 +1,4 @@
-#include <Windows.h>
-#include <shlwapi.h>
-#include <Shobjidl.h>
-#include <Uxtheme.h>
+#include "framework.h"
 #include "forwards.h"
 #include "startmenuresolver.h"
 #include "systraywrapper.h"
@@ -9,16 +6,12 @@
 #include "immersiveshell.h"
 #include "traynotify.h"
 #include "authui.h"
-#include <commoncontrols.h>
-#include <dwmapi.h>
 #include "startmenupin.h"
 #include "immersivefactory.h"
 #include "projection.h"
-#include <vector>
 #include "version.h"
 #include "pinnedlist.h"
 #include "destinationlist.h"
-//#include "Detours/detours.h"
 #include "resource.h"
 #include "thememanager.h"
 #include "MinHook.h"
@@ -442,9 +435,6 @@ void ChangeImportedPattern(void* dllPattern, const char* newBytes, bool isGuid) 
 
 void FixWin7TrayClock()
 {
-	//The bytes for the old and since-replaced Windows 7 tray clock IID
-	char* iidw7TrayClock = "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9";
-
 	//Load and patch explorer EXE with the new IID used since Windows 8.1
 	char bytes[] = { 0x8A, 0xCA, 0x5F, 0x7A, 0xB1, 0x76, 0xC8, 0x44, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F };
 	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(NULL), "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9"), bytes, true);
@@ -912,8 +902,7 @@ void AssFuckShunimpl()
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
-                       LPVOID lpReserved
-					 )
+                       LPVOID lpReserved)
 {
 	switch (ul_reason_for_call)
 	{

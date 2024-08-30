@@ -1,6 +1,6 @@
 #pragma once
 #define INITGUID
-#include <guiddef.h>
+#include "framework.h"
 
 DEFINE_GUID(CLSID_ImmersiveShell,0xc2f03a33, 0x21f5, 0x47fa, 0xb4,0xbb,0x15,0x63,0x62,0xa2,0xf2,0x39); //c2f03a33_21f5_47fa_b4bb_156362a2f239
 DEFINE_GUID(IID_ImmersiveShellProvider,0x6D5140C1, 0x7436, 0x11CE, 0x80,0x34,0x00,0xaa,0x00,0x60,0x09,0xfa);
@@ -19,10 +19,6 @@ DEFINE_GUID(CLSID_PushNotificationPlatformCF,0x4655840e, 0xAB1A, 0x49D0, 0xA4,0x
 DEFINE_GUID(CLSID_PushNotificationPlatform,0x0C9281F9, 0x6DA1, 0x4006, 0x87,0x29,0xDE,0x6E,0x6B,0x61,0x58,0x1C);
 
 
-// []
-
-#include <windows.h>
-
 class CImmersiveFactory : public IClassFactory
 {
 public:
@@ -30,6 +26,7 @@ public:
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
     ULONG STDMETHODCALLTYPE AddRef( void);    
     ULONG STDMETHODCALLTYPE Release( void);
+
 	//IClassFactory
 	HRESULT STDMETHODCALLTYPE CreateInstance( IUnknown * pUnkOuter, REFIID riid, void ** ppvObject );
 	HRESULT STDMETHODCALLTYPE LockServer( BOOL fLock );
@@ -38,12 +35,13 @@ public:
 class CImmersiveProvider : public IServiceProvider
 {
 public:
-	//constructor
 	CImmersiveProvider();
+
 	//IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
     ULONG STDMETHODCALLTYPE AddRef( void);    
     ULONG STDMETHODCALLTYPE Release( void);
+
 	//IServiceProvider
 	HRESULT STDMETHODCALLTYPE QueryService( REFGUID guidService, REFIID riid, void **ppv );
 private:
@@ -71,12 +69,13 @@ public:
 class CImmersiveMonitorManager : public IImmersiveMonitorManager
 {
 public:
-	//constructor
 	CImmersiveMonitorManager();
+
 	//IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
     ULONG STDMETHODCALLTYPE AddRef( void);    
     ULONG STDMETHODCALLTYPE Release( void);
+
 	//IImmersiveMonitorManager
 	HRESULT STDMETHODCALLTYPE GetCount(UINT*);
 	HRESULT STDMETHODCALLTYPE GetConnectedCount(UINT*);
@@ -113,12 +112,13 @@ public:
 class CImmersiveLayout : public IImmersiveLayout
 {
 public:
-	//constructor
 	CImmersiveLayout(HMONITOR hMonitor);
+
 	//IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
     ULONG STDMETHODCALLTYPE AddRef( void);    
     ULONG STDMETHODCALLTYPE Release( void);
+
 	//IImmersiveMonitorManager
 	HRESULT STDMETHODCALLTYPE RegisterLayoutClient(UINT,IUnknown*,ULONG*);
 	HRESULT STDMETHODCALLTYPE UnregisterLayoutClient(ULONG);
@@ -146,12 +146,13 @@ public:
 class CImmersiveMode : public IImmersiveMode
 {
 public:
-	//constructor
 	CImmersiveMode();
+
 	//IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
     ULONG STDMETHODCALLTYPE AddRef( void);    
     ULONG STDMETHODCALLTYPE Release( void);
+
 	//IImmersiveMonitorManager
 	HRESULT STDMETHODCALLTYPE GetMode(DWORD*);
 	HRESULT STDMETHODCALLTYPE SetMode(DWORD);

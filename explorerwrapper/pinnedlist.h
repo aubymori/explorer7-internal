@@ -1,8 +1,5 @@
 #pragma once
-#include <Guiddef.h>
-#include <windows.h>
-#include <DocObj.h>
-#include <ShlObj.h>
+#include "framework.h"
 
 enum PLMC : unsigned int { PLMC_EXPLORER = 4 };
 DEFINE_GUID(CLSID_TaskbandPin, 0x90AA3A4E, 0x1CBA, 0x4233, 0xB8, 0xBB, 0x53, 0x57, 0x73, 0xD4, 0x84, 0x49);
@@ -12,9 +9,6 @@ DEFINE_GUID(IID_IFlexibleTaskbarPinnedList, 0x60274fa2, 0x611f, 0x4b8a, 0xa2, 0x
 DEFINE_GUID(IID_IPinnedList3, 0x0dd79ae2, 0xd156, 0x45d4, 0x9e, 0xeb, 0x3b, 0x54, 0x97, 0x69, 0xe9, 0x40);
 
 extern bool g_bSwapModifyPointers;
-
-//TEMP
-DEFINE_GUID(GUID_43826d1e_e718_42ee_bc55_a1e261c37bfe, 0x43826D1E, 0x0E718, 0x42EE, 0x0BC, 0x55, 0x0A1, 0x0E2, 0x61, 0x0C3, 0x7B, 0x0FE);
 
 MIDL_INTERFACE("BBD20037-BC0E-42F1-913F-E2936BB0EA0C")
 IPinnedList2: public IUnknown

@@ -3,8 +3,6 @@
 #include "pathcch.h"
 #include "version.h"
 #include "registry.h"
-#include <Shlwapi.h>
-#include <strsafe.h>
 
 decltype(GetThemeDefaults) GetThemeDefaults = 0;
 decltype(LoaderLoadTheme) LoaderLoadTheme = 0;

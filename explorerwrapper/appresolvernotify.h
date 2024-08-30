@@ -1,5 +1,5 @@
 #pragma once
-#include <windows.h>
+#include "framework.h"
 
 MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IAppResolverNotify7: public IUnknown

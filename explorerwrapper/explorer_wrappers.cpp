@@ -1,6 +1,4 @@
-#include <Windows.h>
-#include <Shobjidl.h>
-#include <shlwapi.h>
+#include "framework.h"
 
 extern "C" DWORD WINAPI SHGetSignature(DWORD p1, DWORD p2, DWORD p3)
 {

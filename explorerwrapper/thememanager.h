@@ -1,6 +1,5 @@
 #pragma once
-#include <windows.h>
-#include <uxtheme.h>
+#include "framework.h"
 
 struct UXTHEMEFILE
 {

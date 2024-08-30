@@ -1,6 +1,5 @@
 #include "systraywrapper.h"
 #include "dbgprint.h"
-#include <propvarutil.h>
 
 CSysTrayWrapper::CSysTrayWrapper(IOleCommandTarget *stobject8)
 {

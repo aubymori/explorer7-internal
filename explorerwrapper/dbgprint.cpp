@@ -1,5 +1,4 @@
-#include <windows.h>
-#include <stdarg.h>
+#include "dbgprint.h"
 
 void dbgvprintf(LPCWSTR format, void* _argp)
 {

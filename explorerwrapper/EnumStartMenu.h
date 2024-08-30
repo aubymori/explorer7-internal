@@ -1,7 +1,5 @@
 #pragma once
-#include <Windows.h>
-#include <ShlObj.h>
-#include <objidl.h>
+#include "framework.h"
 #include "startmenupin.h"
 #include "userassist.h"
 
