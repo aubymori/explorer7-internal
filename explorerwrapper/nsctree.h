@@ -1,6 +1,9 @@
 #pragma once
 #include <windows.h>
-#include <winuser.h>
+
+UINT (__fastcall*fGetDpiForWindow)(HWND hwnd);
+DPI_AWARENESS_CONTEXT (__fastcall*fGetWindowDpiAwarenessContext)(HWND hwnd);
+BOOL (__fastcall*fAreDpiAwarenessContextsEqual)(DPI_AWARENESS_CONTEXT A, DPI_AWARENESS_CONTEXT B);
 
 static void __fastcall SHComputeDPI(HWND a1, int* a2, int* a3)
 {
@@ -10,9 +13,9 @@ static void __fastcall SHComputeDPI(HWND a1, int* a2, int* a3)
 	int DeviceCaps; // ebx
 	int v11; // esi
 
-	if (a1 && (v7 = GetWindowDpiAwarenessContext(a1), AreDpiAwarenessContextsEqual(v7, (DPI_AWARENESS_CONTEXT)-4LL)))
+	if (a1 && (v7 = fGetWindowDpiAwarenessContext(a1), fAreDpiAwarenessContextsEqual(v7, (DPI_AWARENESS_CONTEXT)-4LL)))
 	{
-		DeviceCaps = GetDpiForWindow(a1);
+		DeviceCaps = fGetDpiForWindow(a1);
 		v11 = DeviceCaps;
 	}
 	else
@@ -69,9 +72,9 @@ static void __fastcall CNscTree_ScaleAndSetRowHeight(__int64 a1)
 
 	v1 = *(DWORD*)(a1 + 0x1C8);
 	v2 = *(HWND*)(a1 + 0x188);
-	if (v2 && (v5 = GetWindowDpiAwarenessContext(v2), AreDpiAwarenessContextsEqual(v5, (DPI_AWARENESS_CONTEXT)-4LL)))
+	if (v2 && (v5 = fGetWindowDpiAwarenessContext(v2), fAreDpiAwarenessContextsEqual(v5, (DPI_AWARENESS_CONTEXT)-4LL)))
 	{
-		DeviceCaps = GetDpiForWindow(v2);
+		DeviceCaps = fGetDpiForWindow(v2);
 	}
 	else
 	{
@@ -123,6 +126,12 @@ static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplemen
 {
 	HRESULT result = S_OK;
 	if (*(DWORD*)(nscHost + 0xCC)) return result;
+
+	HMODULE modUser32 = GetModuleHandleW(L"User32.dll");
+
+	fGetDpiForWindow = (decltype(fGetDpiForWindow))GetProcAddress(modUser32,"GetDpiForWindow");
+	fGetWindowDpiAwarenessContext = (decltype(fGetWindowDpiAwarenessContext))GetProcAddress(modUser32,"GetWindowDpiAwarenessContext");
+	fAreDpiAwarenessContextsEqual = (decltype(fAreDpiAwarenessContextsEqual))GetProcAddress(modUser32,"AreDpiAwarenessContextsEqual");
 
 	WCHAR fallbackPath[MAX_PATH];
 	ExpandEnvironmentStringsW(L"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs", fallbackPath, MAX_PATH);
