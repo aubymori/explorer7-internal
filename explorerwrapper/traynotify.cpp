@@ -153,8 +153,8 @@ ULONG STDMETHODCALLTYPE CTrayNotifyWrapper::Release(void)
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1,ULONG* p2)
 {
-	//*p2 = 0;
-	return m_notify7->RegisterCallback(p1);
+	*p2 = 0;
+	return S_OK;
 	//return m_notify7->RegisterCallback(p1);
 }
 
