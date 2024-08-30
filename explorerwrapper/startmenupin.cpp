@@ -66,19 +66,19 @@ void CStartMenuPin::GetPinnedAppSQMEventID(){};
 
 LRESULT CStartMenuPin::SetChangeCount(ULONG value)
 {
-	dbgprintf(L"SetChangeCount %i",value);
+	//dbgprintf(L"SetChangeCount %i",value);
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesChanges",&value);
 }
 
 IStream* CStartMenuPin::OpenPinRegStream(ULONG grfMode)
 {
-	dbgprintf(L"OpenPinRegStream %i", grfMode);
+	//dbgprintf(L"OpenPinRegStream %i", grfMode);
 	return SHOpenRegStream2W(HKEY_CURRENT_USER,sz_StartPage2,L"Favorites",grfMode);
 }
 
 IStream* CStartMenuPin::OpenLinksRegStream(ULONG grfMode)
 {
-	dbgprintf(L"OpenLinksRegStream %i", grfMode);
+	//dbgprintf(L"OpenLinksRegStream %i", grfMode);
 	return SHOpenRegStream2W(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesResolve",grfMode);
 }
 
@@ -86,33 +86,33 @@ LRESULT CStartMenuPin::GetPinStreamVersion()
 {
 	DWORD value = 0;
 	RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesVersion",&value);
-	dbgprintf(L"GetPinStreamVersion %i", value);
+	//dbgprintf(L"GetPinStreamVersion %i", value);
 	return value;
 }
 
 LRESULT CStartMenuPin::SetPinStreamVersion(ULONG value)
 {
-	dbgprintf(L"SetPinStreamVersion %i", value);
+	//dbgprintf(L"SetPinStreamVersion %i", value);
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesVersion",&value);
 }
 
 LRESULT CStartMenuPin::GetBackupSubDirName(LPWSTR szOut, UINT cbLen)
 {
-	dbgprintf(L"GetBackupSubDirName");
+	//dbgprintf(L"GetBackupSubDirName");
 	lstrcpyn(szOut,L"StartMenu",cbLen);
 	return S_OK; //...right?
 }
 
 DWORD CStartMenuPin::IsRestricted()
 {
-	dbgprintf(L"IsRestricted");
+	//dbgprintf(L"IsRestricted");
 	return SHRestricted(REST_NOSMPINNEDLIST);
 }
 
 LRESULT(__fastcall*fGetMenuStringID)(void*, UINT*);
 LRESULT CStartMenuPin::GetMenuStringID(UINT* w)
 {
-	dbgprintf(L"w %i", *w);
+	//dbgprintf(L"w %i", *w);
 	fGetMenuStringID(this,w);
 	(*w)-=5;
 	return S_OK;
@@ -125,7 +125,7 @@ int CStartMenuPin::GetHelpText(unsigned __int64 id, LPWSTR buf, UINT nCharMax)
 
 WCHAR* CStartMenuPin::GetVerb(UINT op)
 {
-	dbgprintf(L"getverb %i", op);
+	//dbgprintf(L"getverb %i", op);
 	if (op == 0) return sz_StartPin;
 	if (op == 1) return sz_StartUnpin;
 	return NULL;
@@ -133,14 +133,14 @@ WCHAR* CStartMenuPin::GetVerb(UINT op)
 
 LRESULT CStartMenuPin::GetChangeCount(ULONG* pdwVal)
 {
-	dbgprintf(L"GetChangeCount ");
+	//dbgprintf(L"GetChangeCount ");
 	*pdwVal = 0;
 	return RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesChanges",pdwVal);
 }
 
 __int64 CStartMenuPin::GetRemovedChangeCount()
 {
-	dbgprintf(L"GetRemovedChangeCount ");
+	//dbgprintf(L"GetRemovedChangeCount ");
 	DWORD value = 0;
 	RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesRemovedChanges",&value);
 	return value;
@@ -148,7 +148,7 @@ __int64 CStartMenuPin::GetRemovedChangeCount()
 
 LRESULT CStartMenuPin::SetRemovedChangeCount(ULONG value)
 {
-	dbgprintf(L"SetRemovedChangeCount %i",value);
+	//dbgprintf(L"SetRemovedChangeCount %i",value);
 	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesRemovedChanges",&value);
 }
 
@@ -175,8 +175,6 @@ static inline void* GetMemberFuncPtr(T Func) { return reinterpret_cast<void*&>(F
 HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 {
 	dbgprintf(L"StartMenuPin: NewCreateStartMenuPinInstance");
-	WCHAR iid[40];
-	StringFromGUID2(riid,iid,40);
 	IUnknown* pinobj;
 	HRESULT rslt = CreateStartMenuPinInstance(dummy,IID_IShellExtInit,(PVOID*)&pinobj);
 	if ( SUCCEEDED(rslt) && !bFinished)

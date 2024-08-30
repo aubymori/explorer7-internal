@@ -1106,9 +1106,9 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
 		//register immersive shell fake too
-		RegisterFakeImmersive();
+		//RegisterFakeImmersive();
 		//and projection
-		RegisterProjection();
+		//RegisterProjection();
 	}
 
 	HRESULT rslt = CoRegisterClassObject(rclsid,pUnk,dwClsContext,flags,lpdwRegister);
@@ -1123,8 +1123,8 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject( DWORD dwRegister )
 {	
 	if (dwRegister == dwRegisterNotify)
 	{
-		UnregisterFakeImmersive();
-		UnregisterProjection();
+		//UnregisterFakeImmersive();
+		//UnregisterProjection();
 	}
 	return CoRevokeClassObject(dwRegister);
 }
