@@ -24,6 +24,7 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE SetPreference(PVOID*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE EnableAutoTray(int) = 0;
 	virtual HRESULT STDMETHODCALLTYPE DoAction(PVOID*,int) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetWindowingEnvironmentConfig(IUnknown*) = 0;
 };
 
 class CTrayNotifyFactory : public IClassFactory
@@ -62,6 +63,7 @@ public:
 	HRESULT STDMETHODCALLTYPE SetPreference(PVOID*);
 	HRESULT STDMETHODCALLTYPE EnableAutoTray(int);
 	HRESULT STDMETHODCALLTYPE DoAction(PVOID*,int);
+	HRESULT STDMETHODCALLTYPE SetWindowingEnvironmentConfig(IUnknown*);
 private:
 	ITrayNotify7* m_notify7;
 	long m_cRef;

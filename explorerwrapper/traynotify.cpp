@@ -75,7 +75,8 @@ ULONG STDMETHODCALLTYPE CTrayNotifyFactory::Release(void)
 {
 	if (InterlockedDecrement(&m_cRef) == 0)
 	{
-		delete this;
+		m_origfactory->Release();
+		free((void*)this);
 		return 0;
 	}
 	return m_cRef;
@@ -97,7 +98,7 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::CreateInstance( IUnknown * pUnkOut
 		}
 		return ret;
 	}
-	return S_OK; //BUGBUG BUGBUG BUGBUG BUGBUG BUGBUG
+	return E_FAIL; //BUGBUG BUGBUG BUGBUG BUGBUG BUGBUG
 }
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::LockServer( BOOL fLock )
@@ -152,12 +153,14 @@ ULONG STDMETHODCALLTYPE CTrayNotifyWrapper::Release(void)
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1,ULONG* p2)
 {
-	return m_notify7->RegisterCallback(p1);
+	*p2 = 0;
+	return S_OK;
+	//return m_notify7->RegisterCallback(p1);
 }
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::UnregisterCallback(ULONG)
 {
-	return S_OK;
+	return E_NOTIMPL;
 }
 	
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::SetPreference(PVOID* p1)
@@ -172,5 +175,12 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::EnableAutoTray(int p1)
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::DoAction(PVOID*,int)
 {
+	dbgprintf(L"DOACTION");
+	return E_NOTIMPL;
+}
+
+HRESULT __stdcall CTrayNotifyWrapper::SetWindowingEnvironmentConfig(IUnknown*)
+{
+	dbgprintf(L"SetWindowingEnvironmentConfig");
 	return E_NOTIMPL;
 }
