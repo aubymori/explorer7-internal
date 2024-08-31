@@ -35,29 +35,31 @@ public:
 	virtual void AddRef() = 0;
 	virtual void Release() = 0;
 	virtual void Initialize() = 0;
-	virtual LRESULT __thiscall SetChangeCount(DWORD value) = 0;
-	virtual IStream* __thiscall OpenPinRegStream(DWORD grfMode) = 0;
-	virtual IStream* __thiscall OpenLinksRegStream(DWORD grfMode) = 0;
+	virtual LRESULT SetChangeCount(DWORD value) = 0;
+	virtual IStream* OpenPinRegStream(DWORD grfMode) = 0;
+	virtual IStream* OpenLinksRegStream(DWORD grfMode) = 0;
 	virtual void NotifyPinListChange() = 0;
-	virtual DWORD __thiscall GetPinStreamVersion() = 0;
-	virtual LRESULT __thiscall SetPinStreamVersion(DWORD value) = 0;
+	virtual LRESULT GetPinStreamVersion() = 0;
+	virtual LRESULT SetPinStreamVersion(DWORD value) = 0;
 	virtual void Unimpl1() = 0;
 	virtual void UpgradeItem() = 0;
-	virtual HRESULT __thiscall GetBackupSubDirName(LPWSTR szOut, int cbLen) = 0;
+	virtual LRESULT GetBackupSubDirName(LPWSTR szOut, UINT cbLen) = 0;
 	virtual void IsAcceptableTarget() = 0;
-	virtual DWORD __thiscall IsRestricted() = 0;
+	virtual DWORD IsRestricted() = 0;
 	virtual void Unimpl2() = 0;
-	virtual HRESULT __thiscall GetMenuStringID(DWORD* w) = 0;
-	virtual int __thiscall GetHelpText(int,LPWSTR,int) = 0;
-	virtual LRESULT __thiscall GetChangeCount(DWORD* pdwVal) = 0;
-	virtual LPSTR __thiscall GetVerb(int op) = 0;
+	virtual LRESULT GetMenuStringID(UINT* w) = 0;
+	virtual int GetHelpText(unsigned __int64, LPWSTR, UINT) = 0;
+	virtual LRESULT GetChangeCount(DWORD* pdwVal) = 0;
+	virtual wchar_t* GetVerb(UINT op) = 0;
 	virtual void SendPinRearrangeSQM() = 0;
-	virtual LRESULT __thiscall SetRemovedChangeCount(DWORD value);
-	virtual DWORD __thiscall GetRemovedChangeCount() = 0;
+	virtual LRESULT SetRemovedChangeCount(DWORD value) = 0;
+	virtual LRESULT GetRemovedChangeCount() = 0;
 	virtual void GetPinnedAppSQMEventID() = 0;
+	virtual void AppliesTo() = 0;
+	virtual void v_GetPinListMutexName() = 0;
 };
 
-class CStartMenuPin /* : public IStartMenuShellExtInit*//*, public IContextMenuShort*/
+class CStartMenuPin  : public IStartMenuShellExtInit/*, public IContextMenuShort*/
 {
 public:
 	//constructor
@@ -88,6 +90,8 @@ public:
 	LRESULT SetRemovedChangeCount(ULONG value);
 	LRESULT GetRemovedChangeCount();
 	void GetPinnedAppSQMEventID();
+	void AppliesTo();
+	void v_GetPinListMutexName();
 	/*HRESULT STDMETHODCALLTYPE QueryContextMenu( HMENU hmenu, UINT indexMenu, UINT idCmdFirst, UINT idCmdLast, UINT uFlags);*/
 };
 
@@ -118,7 +122,9 @@ typedef struct {
 	PVOID SendPinRearrangeSQM;
 	PVOID SetRemovedChangeCount;
 	PVOID GetRemovedChangeCount;
-	PVOID GetPinnedAppSQMEventID;
+	PVOID GetPinnedAppSQMEventID; //on 10 it is IsDirty, but names shouldn't matter
+	PVOID AppliesTo; //this and the one below dont exist on 8.1
+	PVOID v_GetPinListMutexName;
 } STARTPINVTBL, *PSTARTPINVTBL; 
 
 typedef struct {

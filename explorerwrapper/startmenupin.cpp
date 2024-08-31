@@ -13,43 +13,43 @@ const LPWSTR sz_StartPage2 = L"Software\\Microsoft\\Windows\\CurrentVersion\\Exp
 const LPWSTR sz_StartPin = L"startpin";
 const LPWSTR sz_StartUnpin = L"startunpin";
 
-int WINAPI Shell32_LoadString( HINSTANCE hInstance, UINT uID, LPWSTR lpBuffer, int nBufferMax )
+int WINAPI Shell32_LoadString(HINSTANCE hInstance, UINT uID, LPWSTR lpBuffer, int nBufferMax)
 {
 	int result;
-	if ( hInstance == h_shell32 && ( uID == 0x1505 || uID == 0x1506 || uID == 0x1508 || uID == 0x1509 ) )
+	if (hInstance == h_shell32 && (uID == 0x1505 || uID == 0x1506 || uID == 0x1508 || uID == 0x1509))
 	{
 		//try loading shell32.dll.mui
 		WCHAR locales[100];
 		ULONG clangs;
 		ULONG cblocales = 100;
-		GetUserPreferredUILanguages(MUI_LANGUAGE_NAME,&clangs,locales,&cblocales);
+		GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &clangs, locales, &cblocales);
 		WCHAR muipath[MAX_PATH];
-		GetModuleFileName(NULL,muipath,MAX_PATH);
+		GetModuleFileName(NULL, muipath, MAX_PATH);
 		PathRemoveFileSpec(muipath);
 		PathAddBackslash(muipath);
-		PathAppend(muipath,locales);
+		PathAppend(muipath, locales);
 		PathAddBackslash(muipath);
-		PathAppend(muipath,L"shell32.dll.mui");		
-		hInstance = LoadLibraryEx(muipath,0,LOAD_LIBRARY_AS_DATAFILE);
-		int result = LoadStringW(hInstance,uID,lpBuffer,nBufferMax);
+		PathAppend(muipath, L"shell32.dll.mui");
+		hInstance = LoadLibraryEx(muipath, 0, LOAD_LIBRARY_AS_DATAFILE);
+		int result = LoadStringW(hInstance, uID, lpBuffer, nBufferMax);
 		FreeLibrary(hInstance);
 		if (result == 0) //fallback - load from us
-			result = LoadStringW(g_hInstance,uID,lpBuffer,nBufferMax);
+			result = LoadStringW(g_hInstance, uID, lpBuffer, nBufferMax);
 	}
 	else
-		result = LoadStringW(hInstance,uID,lpBuffer,nBufferMax);
+		result = LoadStringW(hInstance, uID, lpBuffer, nBufferMax);
 	return result;
 }
 
 static LRESULT RegGetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
 {
 	DWORD sz = 4;
-	return SHRegGetValueW(key,subkey,value,SRRF_RT_REG_DWORD,NULL,dwVal,&sz);
+	return SHRegGetValueW(key, subkey, value, SRRF_RT_REG_DWORD, NULL, dwVal, &sz);
 }
 
 static LRESULT RegSetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
 {
-	return SHSetValueW(key,subkey,value,REG_DWORD,dwVal,4);
+	return SHSetValueW(key, subkey, value, REG_DWORD, dwVal, 4);
 }
 
 void CStartMenuPin::QueryInterface(){};
@@ -63,29 +63,31 @@ void CStartMenuPin::IsAcceptableTarget(){};
 void CStartMenuPin::Unimpl2(){};
 void CStartMenuPin::SendPinRearrangeSQM(){};
 void CStartMenuPin::GetPinnedAppSQMEventID(){};
+void CStartMenuPin::AppliesTo(){};
+void CStartMenuPin::v_GetPinListMutexName() {};
 
 LRESULT CStartMenuPin::SetChangeCount(ULONG value)
 {
 	//dbgprintf(L"SetChangeCount %i",value);
-	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesChanges",&value);
+	return RegSetDWORD(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesChanges", &value);
 }
 
 IStream* CStartMenuPin::OpenPinRegStream(ULONG grfMode)
 {
 	//dbgprintf(L"OpenPinRegStream %i", grfMode);
-	return SHOpenRegStream2W(HKEY_CURRENT_USER,sz_StartPage2,L"Favorites",grfMode);
+	return SHOpenRegStream2W(HKEY_CURRENT_USER, sz_StartPage2, L"Favorites", grfMode);
 }
 
 IStream* CStartMenuPin::OpenLinksRegStream(ULONG grfMode)
 {
 	//dbgprintf(L"OpenLinksRegStream %i", grfMode);
-	return SHOpenRegStream2W(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesResolve",grfMode);
+	return SHOpenRegStream2W(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesResolve", grfMode);
 }
 
 LRESULT CStartMenuPin::GetPinStreamVersion()
 {
 	DWORD value = 0;
-	RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesVersion",&value);
+	RegGetDWORD(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesVersion", &value);
 	//dbgprintf(L"GetPinStreamVersion %i", value);
 	return value;
 }
@@ -93,13 +95,13 @@ LRESULT CStartMenuPin::GetPinStreamVersion()
 LRESULT CStartMenuPin::SetPinStreamVersion(ULONG value)
 {
 	//dbgprintf(L"SetPinStreamVersion %i", value);
-	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesVersion",&value);
+	return RegSetDWORD(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesVersion", &value);
 }
 
 LRESULT CStartMenuPin::GetBackupSubDirName(LPWSTR szOut, UINT cbLen)
 {
 	//dbgprintf(L"GetBackupSubDirName");
-	lstrcpyn(szOut,L"StartMenu",cbLen);
+	lstrcpyn(szOut, L"StartMenu", cbLen);
 	return S_OK; //...right?
 }
 
@@ -109,18 +111,18 @@ DWORD CStartMenuPin::IsRestricted()
 	return SHRestricted(REST_NOSMPINNEDLIST);
 }
 
-LRESULT(__fastcall*fGetMenuStringID)(void*, UINT*);
+LRESULT(__fastcall* fGetMenuStringID)(void*, UINT*);
 LRESULT CStartMenuPin::GetMenuStringID(UINT* w)
 {
 	//dbgprintf(L"w %i", *w);
-	fGetMenuStringID(this,w);
-	(*w)-=5;
+	fGetMenuStringID(this, w);
+	(*w) -= 5;
 	return S_OK;
 }
 
 int CStartMenuPin::GetHelpText(unsigned __int64 id, LPWSTR buf, UINT nCharMax)
-{	
-	return Shell32_LoadString(h_shell32,id+0x1508,buf,nCharMax);	
+{
+	return Shell32_LoadString(h_shell32, id + 0x1508, buf, nCharMax);
 }
 
 WCHAR* CStartMenuPin::GetVerb(UINT op)
@@ -135,21 +137,21 @@ LRESULT CStartMenuPin::GetChangeCount(ULONG* pdwVal)
 {
 	//dbgprintf(L"GetChangeCount ");
 	*pdwVal = 0;
-	return RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesChanges",pdwVal);
+	return RegGetDWORD(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesChanges", pdwVal);
 }
 
 __int64 CStartMenuPin::GetRemovedChangeCount()
 {
 	//dbgprintf(L"GetRemovedChangeCount ");
 	DWORD value = 0;
-	RegGetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesRemovedChanges",&value);
+	RegGetDWORD(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesRemovedChanges", &value);
 	return value;
 }
 
 LRESULT CStartMenuPin::SetRemovedChangeCount(ULONG value)
 {
 	//dbgprintf(L"SetRemovedChangeCount %i",value);
-	return RegSetDWORD(HKEY_CURRENT_USER,sz_StartPage2,L"FavoritesRemovedChanges",&value);
+	return RegSetDWORD(HKEY_CURRENT_USER, sz_StartPage2, L"FavoritesRemovedChanges", &value);
 }
 
 static void* DetourVtable(void* vtable, int offset, void* FunctionPtr)
@@ -177,7 +179,7 @@ HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 	dbgprintf(L"StartMenuPin: NewCreateStartMenuPinInstance");
 	IUnknown* pinobj;
 	HRESULT rslt = CreateStartMenuPinInstance(dummy,IID_IShellExtInit,(PVOID*)&pinobj);
-	if ( SUCCEEDED(rslt) && !bFinished)
+	if ( SUCCEEDED(rslt))
 	{
 		int SetChangeCountIndex = 4 * sizeof(uintptr_t);
 		int OpenPinRegStreamIndex = 5 * sizeof(uintptr_t);
@@ -188,28 +190,38 @@ HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 		int IsRestrictedIndex = 14 * sizeof(uintptr_t);
 		int GetMenuStringIDIndex = 16 * sizeof(uintptr_t);
 		int GetHelpTextIndex = 17 * sizeof(uintptr_t);
-		int GetVerbIndex = 19 * sizeof(uintptr_t);
 		int GetChangeCountIndex = 18 * sizeof(uintptr_t);
-		int GetRemovedChangeCountIndex = 22 * sizeof(uintptr_t);
+		int GetVerbIndex = 19 * sizeof(uintptr_t);
 		int SetRemovedChangeCountIndex = 21 * sizeof(uintptr_t);
+		int GetRemovedChangeCountIndex = 22 * sizeof(uintptr_t);
 
 		PSTARTPINOBJ startobj = (PSTARTPINOBJ)pinobj;
+		PSTARTPINVTBL ogTable = startobj->pStartPinVtbl;
 		dbgprintf(L"CreateStartMenuPin pStartPinVtbl %p %p setchangecount %p",startobj,startobj->pStartPinVtbl, startobj->pStartPinVtbl->SetChangeCount);
-		DetourVtable(startobj->pStartPinVtbl, SetChangeCountIndex, MEMBER_FUNC(CStartMenuPin::SetChangeCount));
-		DetourVtable(startobj->pStartPinVtbl, OpenPinRegStreamIndex, MEMBER_FUNC(CStartMenuPin::OpenPinRegStream));
-		DetourVtable(startobj->pStartPinVtbl, OpenLinksRegStreamIndex, MEMBER_FUNC(CStartMenuPin::OpenLinksRegStream));
-		DetourVtable(startobj->pStartPinVtbl, GetPinStreamVersionIndex, MEMBER_FUNC(CStartMenuPin::GetPinStreamVersion));
-		DetourVtable(startobj->pStartPinVtbl, SetPinStreamVersionIndex, MEMBER_FUNC(CStartMenuPin::SetPinStreamVersion));
-		DetourVtable(startobj->pStartPinVtbl, GetBackupSubDirNameIndex, MEMBER_FUNC(CStartMenuPin::GetBackupSubDirName));
-		DetourVtable(startobj->pStartPinVtbl, IsRestrictedIndex, MEMBER_FUNC(CStartMenuPin::IsRestricted));
-		fGetMenuStringID = (decltype(fGetMenuStringID))DetourVtable(startobj->pStartPinVtbl, GetMenuStringIDIndex, MEMBER_FUNC(CStartMenuPin::GetMenuStringID));
-		DetourVtable(startobj->pStartPinVtbl, GetHelpTextIndex, MEMBER_FUNC(CStartMenuPin::GetHelpText));
-		DetourVtable(startobj->pStartPinVtbl, GetVerbIndex, MEMBER_FUNC(CStartMenuPin::GetVerb));
-		DetourVtable(startobj->pStartPinVtbl, GetChangeCountIndex, MEMBER_FUNC(CStartMenuPin::GetChangeCount));
-		DetourVtable(startobj->pStartPinVtbl, GetRemovedChangeCountIndex, MEMBER_FUNC(CStartMenuPin::GetRemovedChangeCount));
-		DetourVtable(startobj->pStartPinVtbl, SetRemovedChangeCountIndex, MEMBER_FUNC(CStartMenuPin::SetRemovedChangeCount));
+		static CStartMenuPin* HackHack = new CStartMenuPin();
+		startobj->pStartPinVtbl = *(PSTARTPINVTBL*)(HackHack);
 
-		bFinished = true;
+		fGetMenuStringID = decltype(fGetMenuStringID)(ogTable->GetMenuStringID);
+		if (!bFinished) //only needs to be done once
+		{
+			DetourVtable(startobj->pStartPinVtbl, 0 * 8, ogTable->QueryInterface);
+			DetourVtable(startobj->pStartPinVtbl, 1 * 8, ogTable->AddRef);
+			DetourVtable(startobj->pStartPinVtbl, 2 * 8, ogTable->Release);
+			DetourVtable(startobj->pStartPinVtbl, 3 * 8, ogTable->Initialize);
+			DetourVtable(startobj->pStartPinVtbl, 7 * 8, ogTable->NotifyPinListChange);
+			DetourVtable(startobj->pStartPinVtbl, 10 * 8, ogTable->Unimpl1);
+			DetourVtable(startobj->pStartPinVtbl, 11 * 8, ogTable->UpgradeItem);
+			DetourVtable(startobj->pStartPinVtbl, 13 * 8, ogTable->IsAcceptableTarget);
+			DetourVtable(startobj->pStartPinVtbl, 15 * 8, ogTable->Unimpl2);
+			DetourVtable(startobj->pStartPinVtbl, 20 * 8, ogTable->SendPinRearrangeSQM);
+			DetourVtable(startobj->pStartPinVtbl, 23 * 8, ogTable->GetPinnedAppSQMEventID);
+			if (g_osVersion.BuildNumber() >= 17763)
+			{
+				DetourVtable(startobj->pStartPinVtbl, 24 * 8, ogTable->AppliesTo);
+				DetourVtable(startobj->pStartPinVtbl, 25 * 8, ogTable->v_GetPinListMutexName);
+			}
+			bFinished = true;
+		}
 	}
 	rslt = pinobj->QueryInterface(riid, ppv);
 	pinobj->Release();
