@@ -34,6 +34,7 @@ jobs:
       with:
         arch: amd64
     - name: build minhook
+      shell: cmd
       run: |
         cd .\minhook\build\VC17\
         msbuild MinHookVC17.sln /p:Configuration=Release /p:Platform=x64
