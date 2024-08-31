@@ -183,6 +183,9 @@
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
+    <PreBuildEvent>
+      <Command>if exist ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib copy /Y ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib $(ProjectDir)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="appresolvernotify.h" />
