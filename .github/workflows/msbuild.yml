@@ -33,19 +33,18 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1.13.0
       with:
         arch: amd64
-    - name: build minhook
+    - name: Build minhook
       shell: cmd
       run: |
         cd .\minhook\build\VC17\
         msbuild MinHookVC17.sln /p:Configuration=Release /p:Platform=x64
         copy /Y .\lib\Release\libMinHook.x64.lib ..\..\..\explorerwrapper\
-    - name: compile
+    - name: Compile explorerwrapper
       run: | 
         msbuild explorerwrapper.sln /p:Configuration=Release /p:Platform=x64
-    - name: upload executable
+    - name: Upload dll
       uses: actions/upload-artifact@v4.4.0
       with:
-        name: windows
+        name: wrp64
         path: |
-          .\Release\wrp64.dll
-          .\Release\wrp64.pdb
+          .\Release\
