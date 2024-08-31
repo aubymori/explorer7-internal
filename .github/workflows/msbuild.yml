@@ -33,7 +33,7 @@ jobs:
         arch: amd64
     - name: compile
       run: | 
-        msbuild explorerwrapper.sln
+        msbuild explorerwrapper.sln /p:Configuration=Release /p:Platform=x64
     - name: upload executable
       uses: actions/upload-artifact@v2
       with:
