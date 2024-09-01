@@ -1,6 +1,8 @@
-#include "framework.h"
+#include <Windows.h>
+#include <Shlwapi.h>
 #include "autoplay.h"
 #include "dbgprint.h"
+#include <ShlObj.h>
 
 typedef PVOID (WINAPI *ResolveDelayLoadedAPIAPI)(PVOID ParentModuleBase, PVOID DelayloadDescriptor, PVOID FailureDllHook, PVOID FailureSystemHook,PIMAGE_THUNK_DATA ThunkAddress,ULONG Flags);
 static ResolveDelayLoadedAPIAPI ResolveDelayLoadedAPI;
@@ -27,25 +29,9 @@ LSTATUS WINAPI SHGetValueNEW(
 bool(__fastcall* IsSearchEnabled)();
 extern "C" bool WINAPI IsSearchEnabledNEW()
 {
-	// SHUNIMPL.#473
+	//dbgprintf(L"IsSearchEnabledNEW\n");
 	return 1;
 }
-
-bool(__fastcall* GetSqmableFileName)(int, WORD*);
-extern "C" bool WINAPI GetSqmableFileNameNEW(int a1, WORD* a2)
-{
-	// SHUNIMPL.#476
-	*a2 = 0;
-	return 0;
-}
-
-bool(__fastcall* ClearStartMenuItem)();
-extern "C" bool WINAPI ClearStartMenuItemNEW()
-{
-	// SHUNIMPL.#475
-	return 0;
-}
-
 
 PVOID WINAPI ResolveDelayLoadedAPINEW(PVOID ParentModuleBase, PVOID DelayloadDescriptor, PVOID FailureDllHook, PVOID FailureSystemHook,PIMAGE_THUNK_DATA ThunkAddress,ULONG Flags)
 {
@@ -98,9 +84,9 @@ void HookShell32()
 	SHGetValueWSHCore = GetProcAddress(LoadLibrary(L"shcore.dll"),"SHGetValueW");
 
 	dbgprintf(L"5\n");
-	ChangeImportedAddressORDINAL(GetModuleHandle(0), "shell32.DLL", 890, ClearStartMenuItemNEW);
-	ChangeImportedAddressORDINAL(GetModuleHandle(0), "shell32.DLL",892, GetSqmableFileNameNEW);
-	ChangeImportedAddressORDINAL(GetModuleHandle(0),"shell32.DLL", 902, IsSearchEnabledNEW);
+	//auto ordinal902 = GetProcAddress(LoadLibrary(L"shell32.dll"),(LPSTR)902);
+	//ChangeImportedAddress(LoadLibrary(L"shell32.dll"),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.dll"), "SHAboutInfo"), SHAboutInfoWNEW);
+	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)902), IsSearchEnabledNEW);
 
 	//todo: evaluate if this is needed
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);

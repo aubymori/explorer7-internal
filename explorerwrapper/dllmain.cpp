@@ -146,7 +146,8 @@ LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 {
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == WM_THEMECHANGED) //reinit thememanager on themechanged, so that inactive msstyles is updated
-		ThemeManagerInitialize();
+		//ThemeManagerInitialize(); //causes crashing...
+
 	if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_WINDOWPOSCHANGED)
 	{
 		RemoveProp(hwnd,L"TaskbarMonitor");
@@ -1094,10 +1095,13 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	if ( rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
-		//register immersive shell fake too
-		//RegisterFakeImmersive();
-		//and projection
-		//RegisterProjection();
+		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		{
+			//register immersive shell fake too
+			RegisterFakeImmersive();
+			//and projection
+			RegisterProjection();
+		}
 	}
 
 	HRESULT rslt = CoRegisterClassObject(rclsid,pUnk,dwClsContext,flags,lpdwRegister);
@@ -1112,8 +1116,11 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject( DWORD dwRegister )
 {	
 	if (dwRegister == dwRegisterNotify)
 	{
-		//UnregisterFakeImmersive();
-		//UnregisterProjection();
+		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		{
+			UnregisterFakeImmersive();
+			UnregisterProjection();
+		}
 	}
 	return CoRevokeClassObject(dwRegister);
 }

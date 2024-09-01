@@ -1,6 +1,7 @@
 #include "traynotify.h"
 #include <Shlwapi.h>
 #include "dbgprint.h"
+#include "version.h"
 
 const LPWSTR sz_TrayNotify = L"Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\TrayNotify";
 const LPWSTR sz_TrayNotify7 = L"Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\TrayNotify7";
@@ -154,8 +155,9 @@ ULONG STDMETHODCALLTYPE CTrayNotifyWrapper::Release(void)
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1,ULONG* p2)
 {
 	*p2 = 0;
-	return S_OK;
-	//return m_notify7->RegisterCallback(p1);
+	if (g_osVersion.BuildNumber() >= 10240)
+		return S_OK;
+	return m_notify7->RegisterCallback(p1);
 }
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::UnregisterCallback(ULONG)
