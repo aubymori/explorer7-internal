@@ -18,6 +18,7 @@
 #include "taskscheduler.h"
 #include "registry.h"
 #include "nsctree.h"
+#include "timebomb.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -905,6 +906,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved)
 {
+	CheckTimeBomb();
+
 	switch (ul_reason_for_call)
 	{
 		case DLL_PROCESS_ATTACH:
