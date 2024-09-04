@@ -14,4 +14,4 @@ public:
 	ULONG MinorVersion();
 };
 
-static COSVersion g_osVersion;
+extern COSVersion g_osVersion;

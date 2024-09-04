@@ -86,6 +86,12 @@ enum WINDOWCOMPOSITIONATTRIB : INT {	// Determines what attribute is being manip
 typedef BOOL (WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
+//extern declared in nsctree.h
+HRESULT(__fastcall* CNSCHost_FillNSCOg)(uintptr_t nscHost);
+
+//extern declared in version.h
+COSVersion g_osVersion;
+
 typedef struct { 
 	DWORD ColorizationColor; 
     DWORD ColorizationAfterglow; 
@@ -753,14 +759,15 @@ void HookAPIs()
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
 
-	void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 
 	MH_Initialize();
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
-	if (fillnsc && g_osVersion.BuildNumber() >= 14393)
-		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc)); //this hook is in nsctree.h now
+	if (CNSCHost_FillNSCOg && g_osVersion.BuildNumber() >= 10240)
+		MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
 	HookTrayThread();
 	MH_EnableHook(MH_ALL_HOOKS);
 

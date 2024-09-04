@@ -122,48 +122,69 @@ public:
 	virtual void SetIndentValue(int indent) = 0;
 };
 
+extern HRESULT(__fastcall* CNSCHost_FillNSCOg)(uintptr_t nscHost);
 static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf
 {
+	const int indentValue = 13;
+	const int itemHeight = 19;
+
 	HRESULT result = S_OK;
-	if (*(DWORD*)(nscHost + 0xCC)) return result;
 
-	HMODULE modUser32 = GetModuleHandleW(L"User32.dll");
-
-	fGetDpiForWindow = (decltype(fGetDpiForWindow))GetProcAddress(modUser32,"GetDpiForWindow");
-	fGetWindowDpiAwarenessContext = (decltype(fGetWindowDpiAwarenessContext))GetProcAddress(modUser32,"GetWindowDpiAwarenessContext");
-	fAreDpiAwarenessContextsEqual = (decltype(fAreDpiAwarenessContextsEqual))GetProcAddress(modUser32,"AreDpiAwarenessContextsEqual");
-
-	WCHAR fallbackPath[MAX_PATH];
-	ExpandEnvironmentStringsW(L"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs", fallbackPath, MAX_PATH);
-
-	WCHAR* sibAllProgs = L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}";
-
-	IShellItem* ppv;
-	if ((dirExists(sibAllProgs) && SHCreateItemFromParsingName(
-		sibAllProgs,
-		0LL,
-		IID_IShellItem,
-		(void**)&ppv) == S_OK) || SHCreateItemFromParsingName(
-			fallbackPath,
-			0LL,
-			IID_IShellItem,
-			(void**)&ppv) == S_OK)
+	if (g_osVersion.BuildNumber() < 14393)
 	{
+		result = CNSCHost_FillNSCOg(nscHost);
 		INameSpaceTreeControl2* control = *(INameSpaceTreeControl2**)(nscHost + 0x70);
 
 		//ideally we would want to queryinterface to get these, but im too lazy to get the guids for these, and i doubt these offsets would change
 		IVisualProperties* visualProps = (IVisualProperties*)(__int64(control) + 0x20);
 		INameSpaceTreeControlValuesPrivate* privatec = (INameSpaceTreeControlValuesPrivate*)(__int64(control) + 0x50);
-		//privatec->SetIndentValue(13);
-		CNscTree_SetIndentValue((uintptr_t)privatec, 13);
-		CNscTree_SetItemHeight((uintptr_t)visualProps, 19);
-		//visualProps->SetItemHeight(19);
-
-		result = control->AppendRoot(ppv, 96, 3, 0);
-		if (SUCCEEDED(result))
-			*(DWORD*)(nscHost + 0xCC) = 1;
-
-		ppv->Release();
+		privatec->SetIndentValue(indentValue);
+		visualProps->SetItemHeight(itemHeight);
 	}
+	else
+	{
+		if (*(DWORD*)(nscHost + 0xCC)) return result;
+
+		HMODULE modUser32 = GetModuleHandleW(L"User32.dll");
+
+		fGetDpiForWindow = (decltype(fGetDpiForWindow))GetProcAddress(modUser32, "GetDpiForWindow");
+		fGetWindowDpiAwarenessContext = (decltype(fGetWindowDpiAwarenessContext))GetProcAddress(modUser32, "GetWindowDpiAwarenessContext");
+		fAreDpiAwarenessContextsEqual = (decltype(fAreDpiAwarenessContextsEqual))GetProcAddress(modUser32, "AreDpiAwarenessContextsEqual");
+
+		WCHAR fallbackPath[MAX_PATH];
+		ExpandEnvironmentStringsW(L"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs", fallbackPath, MAX_PATH);
+
+		WCHAR* sibAllProgs = L"shell:::{865e5e76-ad83-4dca-a109-50dc2113ce9b}";
+
+		IShellItem* ppv;
+		if ((dirExists(sibAllProgs) && SHCreateItemFromParsingName(
+			sibAllProgs,
+			0LL,
+			IID_IShellItem,
+			(void**)&ppv) == S_OK) || SHCreateItemFromParsingName(
+				fallbackPath,
+				0LL,
+				IID_IShellItem,
+				(void**)&ppv) == S_OK)
+		{
+			INameSpaceTreeControl2* control = *(INameSpaceTreeControl2**)(nscHost + 0x70);
+
+			//ideally we would want to queryinterface to get these, but im too lazy to get the guids for these, and i doubt these offsets would change
+			IVisualProperties* visualProps = (IVisualProperties*)(__int64(control) + 0x20);
+			INameSpaceTreeControlValuesPrivate* privatec = (INameSpaceTreeControlValuesPrivate*)(__int64(control) + 0x50);
+			//privatec->SetIndentValue(13);
+			CNscTree_SetIndentValue((uintptr_t)privatec, indentValue);
+			CNscTree_SetItemHeight((uintptr_t)visualProps, itemHeight);
+			//visualProps->SetItemHeight(19);
+
+			result = control->AppendRoot(ppv, 96, 3, 0);
+			if (SUCCEEDED(result))
+				*(DWORD*)(nscHost + 0xCC) = 1;
+
+			ppv->Release();
+		}
+	}
+
+	
 	return result;
 }
