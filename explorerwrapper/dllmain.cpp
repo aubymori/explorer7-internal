@@ -19,6 +19,7 @@
 #include "registry.h"
 #include "nsctree.h"
 #include "timebomb.h"
+#include "cregtree.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -962,7 +963,11 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		//CreateTwinUI();
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
-		result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,IID_IRegTreeOptions8,ppv);
+	{
+		
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IRegTreeOptions8, ppv);
+		*ppv = new CRegTreeOptionsWrapper((IRegTreeOptions8*)*ppv);
+	}
 
 	if (riid == IID_IAuthUILogonSound7 && result != S_OK)
 	{

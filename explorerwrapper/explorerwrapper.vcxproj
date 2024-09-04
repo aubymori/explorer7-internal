@@ -191,6 +191,7 @@
     <ClInclude Include="appresolvernotify.h" />
     <ClInclude Include="authui.h" />
     <ClInclude Include="autoplay.h" />
+    <ClInclude Include="cregtree.h" />
     <ClInclude Include="dbgprint.h" />
     <ClInclude Include="destinationlist.h" />
     <ClInclude Include="EnumStartMenu.h" />
@@ -219,6 +220,7 @@
     <ClCompile Include="appresolvernotify.cpp" />
     <ClCompile Include="authui.cpp" />
     <ClCompile Include="autoplay.cpp" />
+    <ClCompile Include="cregtree.cpp" />
     <ClCompile Include="dbgprint.cpp" />
     <ClCompile Include="destinationlist.cpp" />
     <ClCompile Include="dllmain.cpp">
