@@ -758,7 +758,7 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
-	if (fillnsc && g_osVersion.BuildNumber() >= 10074)
+	if (fillnsc && g_osVersion.BuildNumber() >= 14393)
 		MH_CreateHook(static_cast<LPVOID>(fillnsc), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&fillnsc)); //this hook is in nsctree.h now
 	HookTrayThread();
 	MH_EnableHook(MH_ALL_HOOKS);
