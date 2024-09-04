@@ -159,14 +159,11 @@ static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplemen
 		CNscTree_SetItemHeight((uintptr_t)visualProps, 19);
 		//visualProps->SetItemHeight(19);
 
-		if (g_osVersion.BuildNumber() >= 14393)
-		{
-			result = control->AppendRoot(ppv, 96, 3, 0);
-			if (SUCCEEDED(result))
-				*(DWORD*)(nscHost + 0xCC) = 1;
+		result = control->AppendRoot(ppv, 96, 3, 0);
+		if (SUCCEEDED(result))
+			*(DWORD*)(nscHost + 0xCC) = 1;
 
-			ppv->Release();
-		}
+		ppv->Release();
 	}
 	return result;
 }
