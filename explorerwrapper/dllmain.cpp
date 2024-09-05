@@ -466,10 +466,10 @@ void FixAuthUI()
 {
 	// Newer explorer versions use this
 	// CLogoffPane::_InitShutdownObjects
-	const char* bytes = "48 8B 8E 98 00 00 00 48 8B 56 40 45 33 C0 48 8B 01 FF 50 18 "
-						"48 8B 8E 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
+	const char* bytes = "48 8B ?? 98 00 00 00 48 8B ?? 40 45 33 C0 48 8B 01 FF 50 18 "
+						"48 8B ?? 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
 						"85 C0 ?? ?? "
-						"48 8B 8E 98 00 00 00 48 8D 96 A0 00 00 00 48 8B 01 FF 50 20";
+						"48 8B ?? 98 00 00 00 48 8D ?? A0 00 00 00 48 8B 01 FF 50 20";
 
 	// Older explorer versions use this
 	// CLogoffPane::_OnCreate
