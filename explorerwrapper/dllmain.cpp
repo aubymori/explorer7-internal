@@ -1,3 +1,4 @@
+#define INITGUID
 #include "framework.h"
 #include "forwards.h"
 #include "startmenuresolver.h"
@@ -53,6 +54,11 @@ typedef HWND (WINAPI *CreateWindowInBandAPI)(DWORD,LPWSTR,PVOID,PVOID,PVOID,PVOI
 static CreateWindowInBandAPI CreateWindowInBandOrig;
 typedef BOOL (WINAPI *GetWindowBandAPI)(HWND,DWORD*);
 static GetWindowBandAPI GetWindowBandOrig;
+
+// 7 {4376df10-a662-420b-b30d-958881461ef9}
+// 8 {7A5FCA8A-76B1-44C8-A97C-E7173CCA5F4F}
+DEFINE_GUID(IID_TrayClock7, 0x4376df10, 0xa662, 0x420b, 0xb3, 0x0d, 0x95, 0x88, 0x81, 0x46, 0x1e, 0xf9);
+DEFINE_GUID(IID_TrayClock8, 0x7A5FCA8A, 0x76B1, 0x44C8, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F);
 
 struct WINCOMPATTRDATA
 {
@@ -442,13 +448,6 @@ void ChangeImportedPattern(void* dllPattern, const char* newBytes, bool isGuid) 
 	}
 }
 
-void FixWin7TrayClock()
-{
-	//Load and patch explorer EXE with the new IID used since Windows 8.1
-	char bytes[] = { 0x8A, 0xCA, 0x5F, 0x7A, 0xB1, 0x76, 0xC8, 0x44, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F };
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(NULL), "10 DF 76 43 62 A6 0B 42 B3 0D 95 88 81 46 1E F9"), bytes, true);
-}
-
 //Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
 //Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
 void ShowWin32Menus()
@@ -807,7 +806,6 @@ void HookAPIs()
 	StartMenuPin_PatchShell32();
 	//shell32 - patch delayload shit
 	HookShell32();
-	FixWin7TrayClock();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 	FixAuthUI();
 
@@ -1073,7 +1071,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"wrap stobject\n");
 		*ppv = new CSysTrayWrapper((IOleCommandTarget*)*ppv);
 	}
-	if (rclsid == CLSID_AuthUIShutdownChoices) //wrap authui
+	if (rclsid == CLSID_AuthUIShutdownChoices && result != S_OK) //wrap authui
 	{
 		dbgprintf(L"wrap authui\n");
 		int build = g_osVersion.BuildNumber();
@@ -1096,6 +1094,9 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			}
 		}
 	}
+	if (riid == IID_TrayClock7 && result != S_OK)
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_TrayClock8, ppv);
+
 	return result;
 }
 
