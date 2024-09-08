@@ -3,6 +3,8 @@
 #include "autoplay.h"
 #include "dbgprint.h"
 #include <ShlObj.h>
+#include <cstdint>
+#include "version.h"
 
 typedef PVOID (WINAPI *ResolveDelayLoadedAPIAPI)(PVOID ParentModuleBase, PVOID DelayloadDescriptor, PVOID FailureDllHook, PVOID FailureSystemHook,PIMAGE_THUNK_DATA ThunkAddress,ULONG Flags);
 static ResolveDelayLoadedAPIAPI ResolveDelayLoadedAPI;
@@ -90,6 +92,20 @@ void HookShell32()
 
 	//todo: evaluate if this is needed
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);
+
+	uintptr_t Cunt = FindPattern((uintptr_t)LoadLibrary(L"shell32.dll"), "41 8B E9 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
+	if (Cunt && g_osVersion.BuildNumber() >= 19045)
+	{
+		dbgprintf(L"Cunt %i", Cunt);
+		Cunt += 19;
+		uint8_t* bytes = (uint8_t*)(Cunt + 5 + *reinterpret_cast<int32_t*>(Cunt + 1));
+		DWORD old;
+		VirtualProtect(bytes, 3, PAGE_EXECUTE_READWRITE, &old);
+		bytes[0] = 0xB0;
+		bytes[1] = 0x00;
+		bytes[2] = 0xC3;
+		VirtualProtect(bytes, 3, old, 0);
+	}
 
 	dbgprintf(L"6\n");
 }
