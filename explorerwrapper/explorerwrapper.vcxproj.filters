@@ -93,6 +93,9 @@
     <ClInclude Include="timebomb.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="cregtree.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -162,6 +165,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="destinationlist.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="cregtree.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>
