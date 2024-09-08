@@ -33,6 +33,7 @@ HWND hwnd_desktop;
 HWND hwnd_taskbar;
 HWND hwnd_startmenu;
 HWND hwnd_taskthumb;
+HWND hwnd_taskman;
 HINSTANCE g_hInstance;
 DWORD dwRegisterNotify;
 HANDLE hEvent_DesktopVisible;
@@ -52,8 +53,20 @@ static SHCreateDesktopAPI SHDesktopMessageLoop; //TEST
 
 typedef HWND (WINAPI *CreateWindowInBandAPI)(DWORD,LPWSTR,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,DWORD);
 static CreateWindowInBandAPI CreateWindowInBandOrig;
+
+typedef HWND(WINAPI* CreateWindowInBandExAPI)(DWORD, LPWSTR, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, DWORD, DWORD);
+static CreateWindowInBandExAPI CreateWindowInBandExOrig;
+
 typedef BOOL (WINAPI *GetWindowBandAPI)(HWND,DWORD*);
 static GetWindowBandAPI GetWindowBandOrig;
+
+typedef HWND(WINAPI* SetWindowBandApi)(HWND hwnd, HWND hwndInsertAfter, DWORD dwBand);
+static SetWindowBandApi SetWindowBandApiOrg;
+
+typedef BOOL(WINAPI* RegisterHotKeyApi)(HWND hwnd, int id, UINT fsMod, UINT vk);
+static RegisterHotKeyApi RegisterHotKeyApiOrg;
+
+
 
 // 7 {4376df10-a662-420b-b30d-958881461ef9}
 // 8 {7A5FCA8A-76B1-44C8-A97C-E7173CCA5F4F}
@@ -156,6 +169,9 @@ static HWND GetTaskListThumbWnd()
 	return hwnd_taskthumb;
 }
 
+static IImmersiveShellHookService* ShellHookService;
+static UINT shellhook = 0;
+
 LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (uMsg == 0x56D) return 0;
@@ -177,6 +193,74 @@ LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 			SetEvent(hEvent_DesktopVisible);
 		return 0;
 	}
+
+
+	// UWP stuff
+	if (uMsg == WM_CREATE)
+	{
+		shellhook = RegisterWindowMessageW(L"SHELLHOOK");
+		if (!shellhook)
+		{
+			printf("failed to register shellhook\n");
+		}
+
+	}
+	else if (uMsg == WM_DESTROY)
+	{
+		DeregisterShellHookWindow(hwnd);
+	}
+	else
+	{
+		if (uMsg == shellhook || uMsg == WM_HOTKEY)
+		{
+			if (ShellHookService)
+			{
+				BOOL handle = TRUE;
+				if ((UINT)wParam == 12)
+				{
+					ShellHookService->SetTargetWindowForSerialization((HWND)lParam);
+				}
+				else if ((UINT)wParam == 0x32)
+				{
+					printf("not handling this\n");
+					handle = FALSE;
+				}
+				if (handle)
+				{
+					ShellHookService->PostShellHookMessage(wParam, lParam);
+				}
+			}
+			else
+			{
+				GUID guidImmersiveShell;
+				CLSIDFromString(L"{c2f03a33-21f5-47fa-b4bb-156362a2f239}", &guidImmersiveShell);
+
+				GUID SID_ImmersiveShellHookService;
+				CLSIDFromString(L"{4624bd39-5fc3-44a8-a809-163a836e9031}", &SID_ImmersiveShellHookService);
+
+				GUID SID_Unknown;
+				CLSIDFromString(L"{914d9b3a-5e53-4e14-bbba-46062acb35a4}", &SID_Unknown);
+
+				IServiceProvider* ImmersiveShell;
+				if (CoCreateInstance(guidImmersiveShell, 0, 0x404u, IID_IServiceProvider, (LPVOID*)&ImmersiveShell) >= 0)
+				{
+					printf("created COM immersive shell thingy\n");
+
+					if (FAILED(ImmersiveShell->QueryService(SID_ImmersiveShellHookService, SID_Unknown, (void**)&ShellHookService)))
+					{
+						printf("failed to get service instance of SID_ImmersiveShellHookService\n");
+					}
+				}
+				else
+				{
+					HRESULT hr = GetLastError();
+					printf("failed to create immersive shell class: %x\n", hr);
+				}
+			}
+		}
+	}
+
+
 	return CallWindowProc(g_prevTrayProc,hwnd,uMsg,wParam,lParam);	
 }
 
@@ -362,7 +446,10 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 __int64 (__fastcall* DwmpActivateLivePreview)(int a1, __int64 a2, __int64 a3, int a4, void* a5);
 __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void* a5)
 {
-	if (IsBadReadPtr(a5, 0x8))
+	if (a5 == (void*)8)
+		a5 = 0;
+
+	if (a5 && IsBadReadPtr(a5, 0x8))
 		a5 = 0;
 	return DwmpActivateLivePreview(a1,a2,a3,a4,a5);
 }
@@ -738,6 +825,62 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 	return res;
 }
 
+
+HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
+	LPCWSTR lpClassName,
+	LPCWSTR lpWindowName,
+	DWORD dwStyle,
+	int x,
+	int y,
+	int nWidth,
+	int nHeight,
+	HWND hWndParent,
+	HMENU hMenu,
+	HINSTANCE hInstance,
+	LPVOID lpParam,
+	DWORD dwBand)
+{
+	DWORD p0 = (DWORD)_ReturnAddress();
+	HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+
+	if (ret)
+		SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+	return ret;
+}
+
+HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13, DWORD dwTypeFlags)
+{
+	DWORD p0 = (DWORD)_ReturnAddress();
+	exStyle = exStyle | WS_EX_TOOLWINDOW;
+	HWND ret = CreateWindowInBandExOrig(exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 & 1, dwTypeFlags);
+	dbgprintf(L"%p: CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, ret, GetLastError());
+	SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+	return ret;
+}
+
+BOOL WINAPI SetWindowBandNew(HWND hwnd, HWND hwndInsertAfter, DWORD flags)
+{
+	return TRUE;
+}
+
+BOOL WINAPI ReturnZero()
+{
+	return TRUE;
+}
+
+BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
+{
+	BOOL res = RegisterHotKeyApiOrg(hwnd, id, mod, vk);
+
+	if (!res)
+	{
+		return TRUE;
+	}
+
+	return TRUE;
+}
+
+
 void HookShell32();
 void HookAPIs()
 {
@@ -757,6 +900,10 @@ void HookAPIs()
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
+	CreateWindowInBandOrig = decltype(CreateWindowInBandOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand"));
+	CreateWindowInBandExOrig = decltype(CreateWindowInBandExOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBandEx"));
+	SetWindowBandApiOrg = decltype(SetWindowBandApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowBand"));
+	RegisterHotKeyApiOrg = decltype(RegisterHotKeyApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "RegisterHotKey"));
 
 	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
@@ -765,6 +912,28 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+
+	// UWP stuff
+	MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandOrig), CreateWindowInBandNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandOrig));
+	MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandExOrig), CreateWindowInBandExNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandExOrig));
+	MH_CreateHook(static_cast<LPVOID>(SetWindowBandApiOrg), SetWindowBandNew, reinterpret_cast<LPVOID*>(&SetWindowBandApiOrg));
+	MH_CreateHook(static_cast<LPVOID>(RegisterHotKeyApiOrg), RegisterWindowHotkeyNew, reinterpret_cast<LPVOID*>(&RegisterHotKeyApiOrg));
+
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "_AllowSetForegroundWindow"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "_GetWindowTrackInfoAsync"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "ClearForeground"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowGroup"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "DeleteWindowGroup"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "EnableWindowGroupPolicy"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetBridgeWindowChild"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetFallbackForeground"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowArrangement"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowGroup"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowShowState"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "UpdateWindowTrackingInfo"), ReturnZero, NULL);
+	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "AllowSetForegroundWindow"), ReturnZero, NULL);
+
+
 	if (CNSCHost_FillNSCOg && g_osVersion.BuildNumber() >= 10240)
 		MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
 	HookTrayThread();
@@ -826,15 +995,6 @@ void HookAPIs()
 	}
 }
 
-HWND WINAPI CreateWindowInBandNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13)
-{
-	DWORD p0 = (DWORD)_ReturnAddress();
-	exStyle = exStyle | WS_EX_TOOLWINDOW;
-	HWND ret = CreateWindowInBandOrig(exStyle,szClassName,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13 & 1);
-	dbgprintf(L"%p: CreateWindowInBand %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p",p0,exStyle,szClassName,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,ret,GetLastError());
-	SetProp(ret,L"explorer7.WindowBand",(HANDLE)p13);
-	return ret;
-}
 
 BOOL WINAPI GetUserObjectInformationNew( HANDLE hObj, int nIndex, PVOID pvInfo, DWORD nLength, LPDWORD lpnLengthNeeded )
 {	
@@ -858,23 +1018,18 @@ UINT_PTR WINAPI SetTimer_WUI( HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERP
 	return SetTimer(hWnd,nIDEvent,uElapse,lpTimerFunc);
 }
 
+
 void HookImmersive()
 {
 	HMODULE immersiveui = LoadLibrary(L"Windows.UI.Immersive.dll");	
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32,"CreateWindowInBand");
+	CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32,"GetWindowBand");
 	ChangeImportedAddress(immersiveui,"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
 	ChangeImportedAddress(immersiveui,"user32.dll",GetWindowBandOrig,GetWindowBandNew);
 	ChangeImportedAddress(immersiveui,"user32.dll",GetUserObjectInformation,GetUserObjectInformationNew);
 	ChangeImportedAddress(immersiveui,"user32.dll",SetTimer,SetTimer_WUI);
-	//bugbug!!!
-	ChangeImportedAddress(GetModuleHandle(L"twinui.dll"),"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
-	ChangeImportedAddress(GetModuleHandle(L"authui.dll"),"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
-	ChangeImportedAddress(GetModuleHandle(L"shell32.dll"),"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
-
-	ChangeImportedAddress(GetModuleHandle(L"twinapi.dll"),"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
-	ChangeImportedAddress(GetModuleHandle(L"Windows.UI.dll"),"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
 }
 
 FARPROC
@@ -965,7 +1120,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
-		//CreateTwinUI();
+		CreateTwinUI();
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
 	{

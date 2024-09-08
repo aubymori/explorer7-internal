@@ -22,26 +22,20 @@ DWORD WINAPI TwinThread( LPVOID lpParameter )
 
 void CreateTwinUI()
 {
-	PVOID pv;
-	if ( SUCCEEDED(CoCreateInstance(CLSID_ImmersiveShellBuilder,NULL,1,IID_ImmersiveShellBuilder,&pv)) )
+	IImmersiveShellCreator* ImmersiveShellCreator;
+	if ( SUCCEEDED(CoCreateInstance(CLSID_ImmersiveShellBuilder,NULL, CLSCTX_INPROC_SERVER, IID_ImmersiveShellBuilder, (LPVOID*)&ImmersiveShellCreator)))
 	{
 		dbgprintf(L"TwinUI factory created!");
-		IImmersiveShellCreator* ImmersiveShellCreator = (IImmersiveShellCreator*)pv;
+
 		IImmersiveShellController* controller;
 		HRESULT ret = ImmersiveShellCreator->CreateShell(&controller);
 		dbgprintf(L"TwinUI instance created %p %p",ret,controller);		
 		if ( SUCCEEDED(ret) )
 		{	
-			//HRESULT ret = controller->Start();
-			IStream* someinterface = (IStream*)*(DWORD*)((DWORD)controller+0x34);
-			IImmersiveBehavior* behavior;
-			CoUnmarshalInterface((IStream*)someinterface, IID_ImmersiveBehavior, (PVOID*)&behavior);
-			controller->SetCreationBehavior(new CImmersiveBehaviorWrapper(behavior));
-			controller->Start();
-			/*CreateThread(NULL,0,TwinThread,(PVOID)someinterface,0,NULL);*/
+			HRESULT hr = controller->Start();
+
+			dbgprintf(L"Immersive Shell Controller Result: %x", hr);
 		}
-		/*ret = CoCreateInstance(CLSID_ImmersiveShell,NULL,0x404,IID_ImmersiveShell,&pv);
-		dbgprintf(L"Immersive Shell created: %p",ret);*/
 	}
 }
 
