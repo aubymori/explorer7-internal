@@ -3,14 +3,17 @@
 #pragma function(memcpy)
 #pragma function(memset)
 
-void* malloc(size_t size)
-{
-	return HeapAlloc(GetProcessHeap(), 0, size);
-}
 
 void* calloc(size_t count, size_t size)
 {
 	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, count * size);
+}
+
+#ifndef DEBUG
+
+void* malloc(size_t size)
+{
+	return HeapAlloc(GetProcessHeap(), 0, size);
 }
 
 void free(void* ptr)
@@ -26,6 +29,7 @@ void* realloc(void* ptr, size_t size)
 	else 
 		return HeapAlloc(GetProcessHeap(), 0, size);
 }
+#endif
 
 void* recalloc(void* ptr, size_t size)
 {
