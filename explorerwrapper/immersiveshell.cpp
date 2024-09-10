@@ -41,15 +41,15 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 		shellhook = RegisterWindowMessageW(L"SHELLHOOK");
 		if (!shellhook)
 		{
-			printf("failed to register shellhook\n");
+			dbgprintf(L"failed to register shellhook\n");
 		}
 		if (!SetTaskmanWindowFunc(hwnd))
 		{
-			printf("failed to register taskman window\n");
+			dbgprintf(L"failed to register taskman window\n");
 		}
 		if (!RegisterShellHookWindow(hwnd))
 		{
-			printf("register shellhook window failed\n");
+			dbgprintf(L"register shellhook window failed\n");
 		}
 
 	}
@@ -77,7 +77,6 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 			}
 			else if ((UINT)w == 0x32)
 			{
-				printf("not handling this\n");
 				handle = FALSE;
 			}
 			if (handle)
@@ -99,16 +98,10 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 		IServiceProvider* ImmersiveShell;
 		if (CoCreateInstance(guidImmersiveShell, 0, 0x404u, IID_IServiceProvider, (LPVOID*)&ImmersiveShell) >= 0)
 		{
-			printf("created COM immersive shell thingy\n");
-
 			if (FAILED(ImmersiveShell->QueryService(SID_ImmersiveShellHookService, SID_Unknown, (void**)&ShellHookService)))
 			{
-				printf("failed to get service instance of SID_ImmersiveShellHookService\n");
+				
 			}
-		}
-		else
-		{
-			printf("failed to create immersive shell class: %d\n", GetLastError());
 		}
 	}
 	return DefWindowProc(hwnd, msg, w, l);
@@ -117,7 +110,6 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 void CreateTaskManWindow()
 {
 	// create taskman class (handles taskbar buttons)
-	printf("create taskman\n");
 	WNDCLASSEX taskmanclass = {};
 
 	taskmanclass.cbClsExtra = 0;
@@ -135,7 +127,6 @@ void CreateTaskManWindow()
 
 	if (!RegisterClassExW(&taskmanclass))
 	{
-		printf("failed to register taskman class %d", GetLastError());
 		return;
 	}
 	auto Taskman = CreateWindowExW(0, L"TaskmanWndClass", NULL, 0x82000000, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -160,15 +151,7 @@ void CreateTwinUI()
 {
 	auto user32 = LoadLibrary(TEXT("user32.dll"));
 	GetTaskmanWindowFunc = (GetTaskmanWindow)GetProcAddress(user32, "GetTaskmanWindow");
-	if (GetTaskmanWindowFunc == NULL)
-	{
-		printf("failed to get pointer to GetTaskmanWindow()\n");
-	}
 	SetTaskmanWindowFunc = (SetTaskmanWindow)GetProcAddress(user32, "SetTaskmanWindow");
-	if (SetTaskmanWindowFunc == NULL)
-	{
-		printf("failed to get pointer to SetTaskmanWindow()\n");
-	}
 	SetShellWindowFunc = (SetShellWindow)GetProcAddress(user32, "SetShellWindow");
 
 

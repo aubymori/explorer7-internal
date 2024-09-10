@@ -19,6 +19,28 @@ void* recalloc(void* ptr, size_t size)
 		return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
 }
 
+#ifndef DEBUG
+
+void* malloc(size_t size)
+{
+	return HeapAlloc(GetProcessHeap(), 0, size);
+}
+
+void free(void* ptr)
+{
+	if (ptr)
+		HeapFree(GetProcessHeap(), 0, ptr);
+}
+
+void* realloc(void* ptr, size_t size)
+{
+	if (ptr)
+		return HeapReAlloc(GetProcessHeap(), 0, ptr, size);
+	else
+		return HeapAlloc(GetProcessHeap(), 0, size);
+}
+#endif
+
 void* operator new(size_t size)
 {
 	return malloc(size);
