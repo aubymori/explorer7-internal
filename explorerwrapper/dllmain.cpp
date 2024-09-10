@@ -42,6 +42,7 @@ DWORD g_dwTrayThreadId = 0;
 
 bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
+bool g_enableImmersiveShellStack = false;
 
 static WNDPROC g_prevTrayProc;
 typedef DWORD (WINAPI *SHPtrParamAPI)(PVOID);
@@ -169,11 +170,11 @@ static HWND GetTaskListThumbWnd()
 	return hwnd_taskthumb;
 }
 
-static IImmersiveShellHookService* ShellHookService;
-static UINT shellhook = 0;
-
 LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	if (g_enableImmersiveShellStack)
+		SetProgmanAsShell(); // misha: TODO hack
+
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == WM_THEMECHANGED) //reinit thememanager on themechanged, so that inactive msstyles is updated
 		//ThemeManagerInitialize(); //causes crashing...
@@ -193,73 +194,6 @@ LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 			SetEvent(hEvent_DesktopVisible);
 		return 0;
 	}
-
-
-	// UWP stuff
-	if (uMsg == WM_CREATE)
-	{
-		shellhook = RegisterWindowMessageW(L"SHELLHOOK");
-		if (!shellhook)
-		{
-			printf("failed to register shellhook\n");
-		}
-
-	}
-	else if (uMsg == WM_DESTROY)
-	{
-		DeregisterShellHookWindow(hwnd);
-	}
-	else
-	{
-		if (uMsg == shellhook || uMsg == WM_HOTKEY)
-		{
-			if (ShellHookService)
-			{
-				BOOL handle = TRUE;
-				if ((UINT)wParam == 12)
-				{
-					ShellHookService->SetTargetWindowForSerialization((HWND)lParam);
-				}
-				else if ((UINT)wParam == 0x32)
-				{
-					printf("not handling this\n");
-					handle = FALSE;
-				}
-				if (handle)
-				{
-					ShellHookService->PostShellHookMessage(wParam, lParam);
-				}
-			}
-			else
-			{
-				GUID guidImmersiveShell;
-				CLSIDFromString(L"{c2f03a33-21f5-47fa-b4bb-156362a2f239}", &guidImmersiveShell);
-
-				GUID SID_ImmersiveShellHookService;
-				CLSIDFromString(L"{4624bd39-5fc3-44a8-a809-163a836e9031}", &SID_ImmersiveShellHookService);
-
-				GUID SID_Unknown;
-				CLSIDFromString(L"{914d9b3a-5e53-4e14-bbba-46062acb35a4}", &SID_Unknown);
-
-				IServiceProvider* ImmersiveShell;
-				if (CoCreateInstance(guidImmersiveShell, 0, 0x404u, IID_IServiceProvider, (LPVOID*)&ImmersiveShell) >= 0)
-				{
-					printf("created COM immersive shell thingy\n");
-
-					if (FAILED(ImmersiveShell->QueryService(SID_ImmersiveShellHookService, SID_Unknown, (void**)&ShellHookService)))
-					{
-						printf("failed to get service instance of SID_ImmersiveShellHookService\n");
-					}
-				}
-				else
-				{
-					HRESULT hr = GetLastError();
-					printf("failed to create immersive shell class: %x\n", hr);
-				}
-			}
-		}
-	}
-
 
 	return CallWindowProc(g_prevTrayProc,hwnd,uMsg,wParam,lParam);	
 }
@@ -406,6 +340,8 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd,LPCWSTR pszSubAppName,LPCWSTR pszSubI
 UINT WINAPI SetErrorModeNEW( UINT uMode )
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
+
+	CreateTwinUI();
 	return SetErrorMode(uMode);
 }
 
@@ -841,6 +777,7 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	DWORD dwBand)
 {
 	DWORD p0 = (DWORD)_ReturnAddress();
+	dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
 	HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
 
 	if (ret)
@@ -884,6 +821,10 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 void HookShell32();
 void HookAPIs()
 {
+	DWORD dwEnableUWP = 1;
+	g_registry.QueryValue(L"EnableImmersiveShell", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
+	g_enableImmersiveShellStack = (dwEnableUWP != 0);
+
 	hEvent_DesktopVisible = CreateEvent(NULL,TRUE,FALSE,L"ShellDesktopVisibleEvent");
 	//change desktop
 	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)200);
@@ -914,24 +855,32 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 
 	// UWP stuff
-	MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandOrig), CreateWindowInBandNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandOrig));
-	MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandExOrig), CreateWindowInBandExNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandExOrig));
-	MH_CreateHook(static_cast<LPVOID>(SetWindowBandApiOrg), SetWindowBandNew, reinterpret_cast<LPVOID*>(&SetWindowBandApiOrg));
-	MH_CreateHook(static_cast<LPVOID>(RegisterHotKeyApiOrg), RegisterWindowHotkeyNew, reinterpret_cast<LPVOID*>(&RegisterHotKeyApiOrg));
+	if (g_enableImmersiveShellStack)
+	{
+		MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandOrig), CreateWindowInBandNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandOrig));
+		MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandExOrig), CreateWindowInBandExNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandExOrig));
+		MH_CreateHook(static_cast<LPVOID>(SetWindowBandApiOrg), SetWindowBandNew, reinterpret_cast<LPVOID*>(&SetWindowBandApiOrg));
+		MH_CreateHook(static_cast<LPVOID>(RegisterHotKeyApiOrg), RegisterWindowHotkeyNew, reinterpret_cast<LPVOID*>(&RegisterHotKeyApiOrg));
 
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "_AllowSetForegroundWindow"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "_GetWindowTrackInfoAsync"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "ClearForeground"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowGroup"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "DeleteWindowGroup"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "EnableWindowGroupPolicy"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetBridgeWindowChild"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetFallbackForeground"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowArrangement"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowGroup"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowShowState"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "UpdateWindowTrackingInfo"), ReturnZero, NULL);
-	MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "AllowSetForegroundWindow"), ReturnZero, NULL);
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2581), ReturnZero, NULL); // GetWindowTrackInfoAsync
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2563), ReturnZero, NULL); // ClearForeground
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2628), ReturnZero, NULL); // CreateWindowGroup
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2629), ReturnZero, NULL); // DeleteWindowGroup
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2631), ReturnZero, NULL); // EnableWindowGroupPolicy
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2627), ReturnZero, NULL); // SetBridgeWindowChild
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2511), ReturnZero, NULL); // SetFallbackForeground
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2566), ReturnZero, NULL); // SetWindowArrangement
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2632), ReturnZero, NULL); // SetWindowGroup
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2579), ReturnZero, NULL); // SetWindowShowState
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2585), ReturnZero, NULL); // UpdateWindowTrackingInfo
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2514), ReturnZero, NULL); // RegisterEdgy
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2542), ReturnZero, NULL); // RegisterShellPTPListener
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2537), ReturnZero, NULL); // SendEventMessage
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2513), ReturnZero, NULL); // SetActiveProcessForMonitor
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2564), ReturnZero, NULL); // RegisterWindowArrangementCallout
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2567), ReturnZero, NULL); // EnableShellWindowManagementBehavior
+		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "AllowSetForegroundWindow"), ReturnZero, NULL);
+	}
 
 
 	if (CNSCHost_FillNSCOg && g_osVersion.BuildNumber() >= 10240)

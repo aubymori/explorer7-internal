@@ -108,22 +108,35 @@ struct wiktorArray
 	int size;
 	T* data;
 
-	void push_back(T InputData)
+	wiktorArray()
 	{
-		data = (T*)realloc(data, sizeof(T) * (size + 1));
-		data[size++] = InputData;
+		size = 0;
+		data = NULL;
 	}
 
 	~wiktorArray()
 	{
 		if (data)
+		{
 			free(data);
+			data = NULL;
+		}
+	}
+
+	void push_back(T InputData)
+	{
+		void* newData = realloc(data, sizeof(T) * (size + 1));
+		if (newData)
+		{
+			data = (T*)newData;
+			data[size++] = InputData;
+		}
 	}
 };
 
-static wiktorArray<int> patternToByte(const char* pattern)
+static wiktorArray<int>* patternToByte(const char* pattern)
 {
-	auto bytes = wiktorArray<int>{};
+	auto bytes = new wiktorArray<int>();
 	const auto start = const_cast<char*>(pattern);
 	const auto end = const_cast<char*>(pattern) + strlen(pattern);
 
@@ -134,9 +147,9 @@ static wiktorArray<int> patternToByte(const char* pattern)
 			++current;
 			if (*current == '?')
 				++current;
-			bytes.push_back(-1);
+			bytes->push_back(-1);
 		}
-		else { bytes.push_back(strtoulCUSTOM(current, &current, 16)); }
+		else { bytes->push_back(strtoulCUSTOM(current, &current, 16)); }
 	}
 	return bytes;
 }
@@ -150,8 +163,8 @@ static uintptr_t FindPattern(uintptr_t baseAddress, const char* signature)
 	auto patternBytes = patternToByte(signature);
 	const auto scanBytes = reinterpret_cast<unsigned char*>(baseAddress);
 
-	const auto s = patternBytes.size;
-	const auto d = patternBytes.data;
+	const auto s = patternBytes->size;
+	const auto d = patternBytes->data;
 
 	for (auto i = 0ul; i < sizeOfImage - s; ++i)
 	{
@@ -168,9 +181,13 @@ static uintptr_t FindPattern(uintptr_t baseAddress, const char* signature)
 		if (found)
 		{
 			uintptr_t address = reinterpret_cast<uintptr_t>(&scanBytes[i]);
+
+			delete patternBytes;
 			return address;
 		}
 	}
+
+	delete patternBytes;
 
 	return NULL;
 }
