@@ -341,7 +341,9 @@ UINT WINAPI SetErrorModeNEW( UINT uMode )
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
-	CreateTwinUI();
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+		CreateTwinUI_UWP();
+
 	return SetErrorMode(uMode);
 }
 
@@ -770,19 +772,31 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	int y,
 	int nWidth,
 	int nHeight,
-	HWND hWndParent,
+	HWND hwndParent,
 	HMENU hMenu,
 	HINSTANCE hInstance,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	DWORD p0 = (DWORD)_ReturnAddress();
-	dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
-	HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
+	if (g_enableImmersiveShellStack) // UWP enabled
+	{
+		DWORD p0 = (DWORD)_ReturnAddress();
+		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
+		HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam);
 
-	if (ret)
-		SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
-	return ret;
+		if (ret)
+			SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+		return ret;
+	}
+	else // Ittr: Preserve legacy codepath for win8.x and non-UWP users
+	{
+		DWORD p0 = (DWORD)_ReturnAddress();
+		dwStyle = dwStyle | WS_EX_TOOLWINDOW;
+		HWND ret = CreateWindowInBandOrig(dwExStyle, (LPWSTR)lpClassName, (PVOID)lpWindowName, (PVOID)dwStyle, (PVOID)x, (PVOID)y, (PVOID)nWidth, (PVOID)nHeight, hwndParent, hMenu, hInstance, lpParam, dwBand & 1);
+		dbgprintf(L"%p: CreateWindowInBand %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam, dwBand, ret, GetLastError());
+		SetProp(ret, L"explorer7.WindowBand", (HANDLE)dwBand);
+		return ret;
+	}
 }
 
 HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3, PVOID p4, PVOID p5, PVOID p6, PVOID p7, PVOID p8, PVOID p9, PVOID p10, PVOID p11, PVOID p12, DWORD p13, DWORD dwTypeFlags)
@@ -822,7 +836,7 @@ void HookShell32();
 void HookAPIs()
 {
 	DWORD dwEnableUWP = 1;
-	g_registry.QueryValue(L"EnableImmersiveShell", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
+	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD)); // Ittr: shortened the name for convenience but still not sure on it at the moment. TODO determine name before release
 	g_enableImmersiveShellStack = (dwEnableUWP != 0);
 
 	hEvent_DesktopVisible = CreateEvent(NULL,TRUE,FALSE,L"ShellDesktopVisibleEvent");
@@ -841,10 +855,6 @@ void HookAPIs()
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
-	CreateWindowInBandOrig = decltype(CreateWindowInBandOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand"));
-	CreateWindowInBandExOrig = decltype(CreateWindowInBandExOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBandEx"));
-	SetWindowBandApiOrg = decltype(SetWindowBandApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowBand"));
-	RegisterHotKeyApiOrg = decltype(RegisterHotKeyApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "RegisterHotKey"));
 
 	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
@@ -854,9 +864,15 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 
+	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// UWP stuff
-	if (g_enableImmersiveShellStack)
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
 	{
+		CreateWindowInBandOrig = decltype(CreateWindowInBandOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand"));
+		CreateWindowInBandExOrig = decltype(CreateWindowInBandExOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBandEx"));
+		SetWindowBandApiOrg = decltype(SetWindowBandApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowBand"));
+		RegisterHotKeyApiOrg = decltype(RegisterHotKeyApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "RegisterHotKey"));
+
 		MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandOrig), CreateWindowInBandNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandOrig));
 		MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandExOrig), CreateWindowInBandExNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandExOrig));
 		MH_CreateHook(static_cast<LPVOID>(SetWindowBandApiOrg), SetWindowBandNew, reinterpret_cast<LPVOID*>(&SetWindowBandApiOrg));
@@ -881,7 +897,6 @@ void HookAPIs()
 		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2567), ReturnZero, NULL); // EnableShellWindowManagementBehavior
 		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "AllowSetForegroundWindow"), ReturnZero, NULL);
 	}
-
 
 	if (CNSCHost_FillNSCOg && g_osVersion.BuildNumber() >= 10240)
 		MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
@@ -973,12 +988,26 @@ void HookImmersive()
 	HMODULE immersiveui = LoadLibrary(L"Windows.UI.Immersive.dll");	
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32,"CreateWindowInBand");
-	CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
+
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
+
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32,"GetWindowBand");
 	ChangeImportedAddress(immersiveui,"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
 	ChangeImportedAddress(immersiveui,"user32.dll",GetWindowBandOrig,GetWindowBandNew);
 	ChangeImportedAddress(immersiveui,"user32.dll",GetUserObjectInformation,GetUserObjectInformationNew);
 	ChangeImportedAddress(immersiveui,"user32.dll",SetTimer,SetTimer_WUI);
+
+	if (!g_enableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
+	{
+		//bugbug!!!
+		ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+		ChangeImportedAddress(GetModuleHandle(L"authui.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+		ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+
+		ChangeImportedAddress(GetModuleHandle(L"twinapi.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+		ChangeImportedAddress(GetModuleHandle(L"Windows.UI.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+	}
 }
 
 FARPROC
@@ -1069,7 +1098,10 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
-		CreateTwinUI();
+
+		if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+			CreateTwinUI_UWP();
+
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
 	{
@@ -1215,7 +1247,7 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	if ( rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
-		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - TODO re-enable for non
 		{
 			//register immersive shell fake too
 			RegisterFakeImmersive();

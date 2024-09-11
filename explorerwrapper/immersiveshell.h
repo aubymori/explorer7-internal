@@ -34,7 +34,31 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE CreateShell(IImmersiveShellController** controller) = 0;
 };
 
+// Ittr: Needs to exist for legacy or 8.1 codepath
+class CImmersiveBehaviorWrapper : public IImmersiveBehavior
+{
+public:
+	//constructor
+	CImmersiveBehaviorWrapper(IImmersiveBehavior* behavior);
+	//destructor
+	~CImmersiveBehaviorWrapper();
+	//IUnknown
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
+	ULONG STDMETHODCALLTYPE AddRef(void);
+	ULONG STDMETHODCALLTYPE Release(void);
+	//IImmersiveBehavior
+	HRESULT STDMETHODCALLTYPE OnImmersiveThreadStart(void);
+	HRESULT STDMETHODCALLTYPE OnImmersiveThreadStop(void);
+	HRESULT STDMETHODCALLTYPE GetMaximumComponentCount(unsigned int* count);
+	HRESULT STDMETHODCALLTYPE CreateComponent(unsigned int number, IUnknown** component);
+	HRESULT STDMETHODCALLTYPE ShouldCreateComponent(unsigned int number, int* allowed);
+private:
+	IImmersiveBehavior* m_behavior;
+	long m_cRef;
+};
+
 void CreateTwinUI();
+void CreateTwinUI_UWP();
 DWORD WINAPI TwinThread( LPVOID lpParameter );
 
 interface IImmersiveShellHookService : IUnknown

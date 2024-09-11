@@ -197,6 +197,7 @@
     <ClInclude Include="destinationlist.h" />
     <ClInclude Include="EnumStartMenu.h" />
     <ClInclude Include="forwards.h" />
+    <ClInclude Include="framework.h" />
     <ClInclude Include="immersivefactory.h" />
     <ClInclude Include="immersiveshell.h" />
     <ClInclude Include="MinHook.h" />
