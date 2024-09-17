@@ -224,11 +224,11 @@ static HRESULT GetMergedFolder(int folder1, int folder2, IShellFolder** ppsfStar
 
 	GUID GUID_NULL = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
 
-	hr = pasf->AddNameSpace(&GUID_NULL, psfUserStartMenu, pidlUserStartMenu, 4u);
+	hr = pasf->AddNameSpace(&GUID_NULL, psfUserStartMenu, pidlUserStartMenu, 0x0FF0A,2);
 	if (FAILED(hr))
 		return hr;
 
-	hr = pasf->AddNameSpace(&GUID_NULL, psfCommonStartMenu, pidlCommonStartMenu, 4u);
+	hr = pasf->AddNameSpace(&GUID_NULL, psfCommonStartMenu, pidlCommonStartMenu, 0x0E,2);
 	if (FAILED(hr))
 		return hr;
 
