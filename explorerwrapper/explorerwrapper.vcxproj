@@ -190,6 +190,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="appresolvernotify.h" />
+    <ClInclude Include="augmentedshellfolder.h" />
     <ClInclude Include="authui.h" />
     <ClInclude Include="autoplay.h" />
     <ClInclude Include="cregtree.h" />
@@ -206,6 +207,7 @@
     <ClInclude Include="projection.h" />
     <ClInclude Include="registry.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="shell32_wrappers.h" />
     <ClInclude Include="startmenupin.h" />
     <ClInclude Include="startmenuresolver.h" />
     <ClInclude Include="systraywrapper.h" />

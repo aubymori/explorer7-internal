@@ -21,6 +21,8 @@
 #include "nsctree.h"
 #include "timebomb.h"
 #include "cregtree.h"
+#include "shellapi.h"
+#include "autoplay.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -229,9 +231,9 @@ PVOID WINAPI SHCreateDesktopNEW(PVOID p1)
 PVOID WINAPI SHDesktopMessageLoopNEW(PVOID p1)
 {
 	PVOID ret = SHDesktopMessageLoop(p1);
-	SHPtrParamAPI SHCloseDesktopHandle;
-	SHCloseDesktopHandle = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)206);
-	SHCloseDesktopHandle(p1);
+	//SHPtrParamAPI SHCloseDesktopHandle;
+	//SHCloseDesktopHandle = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)206);
+	//SHCloseDesktopHandle(p1);
 	return ret;
 }
 
@@ -349,16 +351,196 @@ UINT WINAPI SetErrorModeNEW( UINT uMode )
 
 typedef BOOL (WINAPI* IsShellWindow_t)(HWND);
 IsShellWindow_t IsShellFrameWindow = nullptr;
-IsShellWindow_t IsShellManagedWindow = nullptr;
+//IsShellWindow_t IsShellManagedWindow = nullptr;
 
 typedef HWND(WINAPI* GhostWindowFromHungWindow_t)(HWND);
 GhostWindowFromHungWindow_t GhostWindowFromHungWindow = nullptr;
+
+ATOM g_SecondaryTaskbarAtom;
+
+HWND* v_hwndDesktop;
+
+
+
+//bool IsValidTabWindowForTray(HWND hwnd)
+//{
+//	bool bValidTabWindow = false;
+//
+//	if (hwnd)
+//	{
+//		HWND hwndA920 = (HWND)GetPropW(hwnd, (LPCWSTR)0xA920);
+//		IPropertyStore* propertyStore;
+//		//wil::unique_cotaskmem_string appId;
+//		if (hwndA920)
+//		{
+//			if (SUCCEEDED(SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&propertyStore))))
+//			{
+//				wil::PropertyStoreHelper propertyStoreHelper(propertyStore.get());
+//				if (SUCCEEDED(propertyStoreHelper.GetString(PKEY_AppUserModel_ID, appId.put())) && appId)
+//				{
+//					wil::com_ptr<IShellItem2> shellItem2;
+//					if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_AppsFolder, KF_FLAG_DONT_VERIFY, appId.get(), IID_PPV_ARGS(&shellItem2))))
+//					{
+//						bValidTabWindow = true;
+//					}
+//				}
+//			}
+//		}
+//		else
+//		{
+//			bValidTabWindow = true;
+//		}
+//	}
+//
+//	return bValidTabWindow;
+//}
+
+BOOL ShouldAddWindowToTrayHelper(HWND hwnd)
+{
+	//if (Feature_WindowTabHost && !IsValidTabWindowForTray(hwnd))
+	//	return FALSE;
+
+	DWORD dwExStyle = GetWindowLongW(hwnd, GWL_EXSTYLE);
+	return (!GetWindow(hwnd, GW_OWNER) || (dwExStyle & WS_EX_APPWINDOW) != 0) && (dwExStyle & WS_EX_TOOLWINDOW) == 0;
+}
+
+namespace ShellManagedWindowHelper
+{
+	bool ShouldTreatShellManagedWindowAsNotShellManaged(HWND hwnd)
+	{
+		return GetPropW(hwnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") != 0;
+	}
+}
+
+enum ZBID
+{
+	ZBID_DEFAULT = 0,
+	ZBID_DESKTOP = 1,
+	ZBID_UIACCESS = 2,
+	ZBID_IMMERSIVE_IHM = 3,
+	ZBID_IMMERSIVE_NOTIFICATION = 4,
+	ZBID_IMMERSIVE_APPCHROME = 5,
+	ZBID_IMMERSIVE_MOGO = 6,
+	ZBID_IMMERSIVE_EDGY = 7,
+	ZBID_IMMERSIVE_INACTIVEMOBODY = 8,
+	ZBID_IMMERSIVE_INACTIVEDOCK = 9,
+	ZBID_IMMERSIVE_ACTIVEMOBODY = 10,
+	ZBID_IMMERSIVE_ACTIVEDOCK = 11,
+	ZBID_IMMERSIVE_BACKGROUND = 12,
+	ZBID_IMMERSIVE_SEARCH = 13,
+	ZBID_GENUINE_WINDOWS = 14,
+	ZBID_IMMERSIVE_RESTRICTED = 15,
+	ZBID_SYSTEM_TOOLS = 16,
+	ZBID_LOCK = 17,
+	ZBID_ABOVELOCK_UX = 18,
+};
+
+struct BandData
+{
+	ZBID id;
+	bool bInclude;
+};
+
+static const BandData s_bandInclusionData[] =
+{
+	{ ZBID_DEFAULT, false },
+	{ ZBID_DESKTOP, true },
+	{ ZBID_UIACCESS, true },
+	{ ZBID_IMMERSIVE_IHM, false },
+	{ ZBID_IMMERSIVE_NOTIFICATION, false },
+	{ ZBID_IMMERSIVE_APPCHROME, false },
+	{ ZBID_IMMERSIVE_MOGO, false },
+	{ ZBID_IMMERSIVE_EDGY, false },
+	{ ZBID_IMMERSIVE_INACTIVEMOBODY, false },
+	{ ZBID_IMMERSIVE_INACTIVEDOCK, false },
+	{ ZBID_IMMERSIVE_ACTIVEMOBODY, false },
+	{ ZBID_IMMERSIVE_ACTIVEDOCK, false },
+	{ ZBID_IMMERSIVE_BACKGROUND, false },
+	{ ZBID_IMMERSIVE_SEARCH, false },
+	{ ZBID_GENUINE_WINDOWS, false },
+	{ ZBID_IMMERSIVE_RESTRICTED, false },
+	{ ZBID_SYSTEM_TOOLS, true },
+	{ ZBID_LOCK, false },
+	{ ZBID_ABOVELOCK_UX, false }
+};
+
+BOOL WINAPI GetWindowBandNew(HWND hwnd, DWORD* out);
+
+BOOL __stdcall GetWindowBandHelper(HWND hwnd, ZBID* out)
+{
+	if (GetWindowBandOrig)
+	{
+		return GetWindowBandNew(hwnd,(DWORD*)out);
+	}
+
+	static BOOL(__stdcall* fn)(HWND, ZBID*) = nullptr;
+	if (!fn)
+	{
+		HMODULE h = GetModuleHandleW(L"user32.dll");
+		if (h)
+			fn = (decltype(fn))GetProcAddress(h, "GetWindowBand");
+		//FAIL_FAST_IF_NULL(fn);
+		if (!fn)
+			return 0;
+	}
+	return fn(hwnd,out);
+}
+
+
+typedef BOOL(*IsShellManagedWindow_t)(HWND hwnd); // 2574
+BOOL IsShellManagedWindow(HWND hwnd)
+{
+	static IsShellManagedWindow_t fn = nullptr;
+	if (!fn)
+	{
+		HMODULE h = GetModuleHandleW(L"user32.dll");
+		if (h)
+			fn = (IsShellManagedWindow_t)GetProcAddress(h, MAKEINTRESOURCEA(2574));
+		//FAIL_FAST_IF_NULL(fn);
+		if (!fn)
+			return 0;
+	}
+	return fn(hwnd);
+}
+
+bool IsValidDesktopZOrderBand(HWND hwnd, BOOL bCheckShellManagedWindow)
+{
+	bool bValid = false;
+
+	ZBID band;
+	if (GetWindowBandHelper(hwnd, &band))
+	{
+		dbgprintf(L"GetWindowBandHelper returned true, %i",band);
+		bValid = s_bandInclusionData[band].bInclude;
+		dbgprintf(L"bValid is %i", (int)bValid);
+
+		//if (Feature_WindowTabHost && (HWND)GetPropW(hwnd, (LPCWSTR)0xA920))
+		//	bValid = true;
+
+		if (bValid && bCheckShellManagedWindow)
+			bValid = !IsShellManagedWindow(hwnd) || ShellManagedWindowHelper::ShouldTreatShellManagedWindowAsNotShellManaged(hwnd);
+		dbgprintf(L"bValid is now %i", (int)bValid);
+	}
+
+	return bValid;
+}
+
+bool IsWindowNotDesktopOrTray(HWND hwnd)
+{
+	if (!IsWindow(hwnd) || !IsValidDesktopZOrderBand(hwnd, TRUE) || hwnd == hwnd_taskbar || (v_hwndDesktop && hwnd == *v_hwndDesktop))
+		return false;
+
+	//if (GetClassWord(hwnd, GCW_ATOM) == g_SecondaryTaskbarAtom)
+	//	return g_SecondaryTaskbarAtom == 0;
+
+	return true;
+}
 
 //removes immersive background windows
 //(Microsoft Text Input Host, Shell Experience Host, etc.)
 BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 {
-	if (!IsWindowVisible(hWnd))
+	if (!IsWindowVisible(hWnd) || !IsValidDesktopZOrderBand(hWnd, TRUE))
 		return FALSE;
 
 	BOOL bCloaked;
@@ -372,13 +554,20 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 			return TRUE;
 	}
 
-	if (IsShellManagedWindow)
+	//if (IsShellManagedWindow)
 	{
 		if (IsShellManagedWindow(hWnd) && GetPropW(hWnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") == NULL)
 			return FALSE;
 	}
 
 	return TRUE;
+}
+
+__int64 ShouldAddWindowToTray(HWND hwnd)
+{
+	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisible(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
+	dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
+	return ret;
 }
 
 __int64 (__fastcall* DwmpActivateLivePreview)(int a1, __int64 a2, __int64 a3, int a4, void* a5);
@@ -784,8 +973,11 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
 		HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam);
 
+		dbgprintf(L"CREATEWINDOWINBANDNEW %i", dwBand);
+
 		if (ret)
 			SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+		SetProp(ret, L"explorer7.WindowBand", (HANDLE)dwBand);
 		return ret;
 	}
 	else // Ittr: Preserve legacy codepath for win8.x and non-UWP users
@@ -805,12 +997,17 @@ HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3,
 	exStyle = exStyle | WS_EX_TOOLWINDOW;
 	HWND ret = CreateWindowInBandExOrig(exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 & 1, dwTypeFlags);
 	dbgprintf(L"%p: CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, ret, GetLastError());
+	dbgprintf(L"CreateWindowInBandExOrig %i", p13);
+	
 	SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+	SetProp(ret, L"explorer7.WindowBand", (HANDLE)p13);
 	return ret;
 }
 
 BOOL WINAPI SetWindowBandNew(HWND hwnd, HWND hwndInsertAfter, DWORD flags)
 {
+	SetProp(hwnd, L"explorer7.WindowBand", (HANDLE)flags);
+	dbgprintf(L"SetWindowBandNew %i", flags);
 	return TRUE;
 }
 
@@ -830,7 +1027,6 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 
 	return TRUE;
 }
-
 
 void HookShell32();
 void HookAPIs()
@@ -858,11 +1054,23 @@ void HookAPIs()
 
 	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
+	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
+
+	uintptr_t desktopHwnd = FindPattern((uintptr_t)GetModuleHandle(0), "74 ?? 48 3B 3D ?? ?? ?? ?? 8D 43 01 0F 45 D8");
+	if (desktopHwnd)
+	{
+		desktopHwnd += 2;
+		v_hwndDesktop = (HWND*)(desktopHwnd + 7 + *reinterpret_cast<signed int*>(desktopHwnd + 3));
+	}
 
 	MH_Initialize();
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
+	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
+
 
 	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// UWP stuff
@@ -901,7 +1109,7 @@ void HookAPIs()
 	if (CNSCHost_FillNSCOg && g_osVersion.BuildNumber() >= 10240)
 		MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
 	HookTrayThread();
-	MH_EnableHook(MH_ALL_HOOKS);
+
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "CloseThemeData"), CloseThemeDataNEW);
@@ -921,7 +1129,7 @@ void HookAPIs()
 	//load functions needed for task enum hook
 	HMODULE user32 = LoadLibrary(L"user32.dll");
 	IsShellFrameWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2573);
-	IsShellManagedWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2574);
+	//IsShellManagedWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2574);
 	GhostWindowFromHungWindow = (GhostWindowFromHungWindow_t)GetProcAddress(user32, "GhostWindowFromHungWindow");
 	//perform the actual hook
 	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",IsWindowVisible,IsWindowVisibleNEW);
@@ -957,6 +1165,9 @@ void HookAPIs()
 		g_bClassicTheme = true;
 		SetThemeAppProperties(NULL);
 	}
+
+	//enable hooks at end
+	MH_EnableHook(MH_ALL_HOOKS);
 }
 
 

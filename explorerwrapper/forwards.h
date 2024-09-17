@@ -141,6 +141,7 @@
 #pragma comment(linker,FORWARDO(SHLWAPI,194))
 #pragma comment(linker,FORWARDO(SHLWAPI,2))
 #pragma comment(linker,FORWARDO(SHLWAPI,639))
+#pragma comment(linker,FORWARDO(SHLWAPI,260))
 
 
 //shlwapi - names

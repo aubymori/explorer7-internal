@@ -5,6 +5,9 @@
 #include <ShlObj.h>
 #include <cstdint>
 #include "version.h"
+#include "shell32_wrappers.h"
+#include "augmentedshellfolder.h"
+#include "MinHook.h"
 
 typedef PVOID (WINAPI *ResolveDelayLoadedAPIAPI)(PVOID ParentModuleBase, PVOID DelayloadDescriptor, PVOID FailureDllHook, PVOID FailureSystemHook,PIMAGE_THUNK_DATA ThunkAddress,ULONG Flags);
 static ResolveDelayLoadedAPIAPI ResolveDelayLoadedAPI;
@@ -72,6 +75,18 @@ HRESULT __stdcall SHEvaluateSystemCommandTemplateNEW(PCWSTR pszCmdTemplate, PWST
 	//return SHEvaluateSystemCommandTemplateWithOptions((unsigned __int16*)pszCmdTemplate, ppszParameters);
 }
 
+HRESULT(__stdcall* Shell32_DllGetClassObject)(REFCLSID rclsid, const IID* const riid, LPVOID* ppv);
+HRESULT __stdcall Shell32_DllGetClassObject_Hook(REFCLSID rclsid, const IID* const riid, LPVOID* ppv)
+{
+	if (rclsid == CLSID_ProgramsFolderAndFastItems)
+	{
+		*ppv = new CProgramsFolderClassFactory;
+		return S_OK;
+	}
+
+	return Shell32_DllGetClassObject(rclsid,riid,ppv);
+}
+
 void HookShell32()
 {
 	dbgprintf(L"1\n");
@@ -81,6 +96,8 @@ void HookShell32()
 	dbgprintf(L"%i\n",(unsigned long long)ResolveDelayLoadedAPI);
 	dbgprintf(L"2\n");
 	CoCreateInstanceBase = GetProcAddress(GetModuleHandle(L"combase.dll"),"CoCreateInstance");
+	Shell32_DllGetClassObject = (decltype(Shell32_DllGetClassObject))GetProcAddress(GetModuleHandle(L"shell32.dll"),"DllGetClassObject");
+	MH_CreateHook(Shell32_DllGetClassObject, Shell32_DllGetClassObject_Hook,(LPVOID*)&Shell32_DllGetClassObject);
 	dbgprintf(L"3\n");
 
 	SHGetValueWSHCore = GetProcAddress(LoadLibrary(L"shcore.dll"),"SHGetValueW");
@@ -108,4 +125,195 @@ void HookShell32()
 	}
 
 	dbgprintf(L"6\n");
+}
+
+LPITEMIDLIST CombinePIDLs(LPITEMIDLIST pidl1, LPITEMIDLIST pidl2)
+{
+	if (!pidl1 || !pidl2)
+		return nullptr;
+
+	// Calculate the size of the combined PIDL
+	SIZE_T size1 = ILGetSize(pidl1);
+	SIZE_T size2 = ILGetSize(pidl2);
+
+	// Allocate memory for the new PIDL
+	LPITEMIDLIST pidlCombined = (LPITEMIDLIST)CoTaskMemAlloc(size1 + size2 - sizeof(*pidl2));
+	if (!pidlCombined)
+		return nullptr;
+
+	// Copy the first PIDL
+	CopyMemory(pidlCombined, pidl1, size1);
+
+	// Copy the second PIDL
+	CopyMemory((BYTE*)pidlCombined + size1 - sizeof(*pidl2), pidl2, size2);
+
+	return pidlCombined;
+}
+
+HRESULT BindToDesktop(LPCITEMIDLIST pidl, IShellFolder** ppsfResult)
+{
+	HRESULT hr;
+	IShellFolder* psfDesktop;
+
+	*ppsfResult = NULL;
+
+	hr = SHGetDesktopFolder(&psfDesktop);
+	if (FAILED(hr))
+		return hr;
+
+	hr = psfDesktop->BindToObject(pidl, NULL, IID_PPV_ARGS(ppsfResult));
+
+	return hr;
+}
+
+enum
+{
+	ASFF_DEFAULT = 0x00000000, // There are no applicable Flags
+	ASFF_SORTDOWN = 0x00000001, // Sort the items in this ISF to the bottom.
+	ASFF_MERGESAMEGUID = 0x00000002, // Merge only namespaces with the same pguidObjects
+	ASFF_COMMON = 0x00000004, // this is a "Common" or "All Users" folder
+	// the following should all be collapsed to one ASFF_DEFNAMESPACE
+	ASFF_DEFNAMESPACE_BINDSTG = 0x00000100, // The namespace is the default handler for BindToStorage() for merged child items.
+	ASFF_DEFNAMESPACE_COMPARE = 0x00000200, // The namespace is the default handler for CompareIDs() for merged child items.
+	ASFF_DEFNAMESPACE_VIEWOBJ = 0x00000400, // The namespace is the default handler for CreateViewObject() for merged child items.
+	ASFF_DEFNAMESPACE_ATTRIB = 0x00001800, // The namespace is the default handler for GetAttributesOf() for merged child items.
+	ASFF_DEFNAMESPACE_DISPLAYNAME = 0x00001000, // The namespace is the default handler for GetDisplayNameOf(), SetNameOf() and ParseDisplayName() for merged child items.
+	ASFF_DEFNAMESPACE_UIOBJ = 0x00002000, // The namespace is the default handler for GetUIObjectOf() for merged child items.
+	ASFF_DEFNAMESPACE_ITEMDATA = 0x00004000, // The namespace is the default handler for GetItemData() for merged child items.
+	ASFF_DEFNAMESPACE_ALL = 0x0000FF00  // The namespace is the primary handler for all IShellFolder operations on merged child items.
+};
+
+static HRESULT GetMergedFolder(int folder1, int folder2, IShellFolder** ppsfStartMenu)
+{
+	HRESULT hr;
+	LPITEMIDLIST pidlUserStartMenu;
+	LPITEMIDLIST pidlCommonStartMenu;
+	IShellFolder* psfUserStartMenu = nullptr;
+	IShellFolder* psfCommonStartMenu = nullptr;
+	IAugmentedShellFolder* pasf = nullptr;
+
+	*ppsfStartMenu = NULL;
+	hr = CoCreateInstance(CLSID_MergedFolder, 0LL, 1u, GUID_2f711b17_773c_41d4_93fa_7f23edcecb66, (LPVOID*)&pasf);
+
+	hr = SHGetSpecialFolderLocation(NULL, folder1, &pidlUserStartMenu);
+	if (FAILED(hr))
+	{
+		hr = SHGetSpecialFolderLocation(NULL, folder2, &pidlCommonStartMenu);
+		if (FAILED(hr))
+			return hr;
+
+		hr = BindToDesktop(pidlCommonStartMenu, ppsfStartMenu);
+		ILFree(pidlCommonStartMenu);
+		return hr;
+	}
+	hr = SHGetSpecialFolderLocation(NULL, folder2, &pidlCommonStartMenu);
+	if (FAILED(hr))
+	{
+		hr = BindToDesktop(pidlUserStartMenu, ppsfStartMenu);
+		ILFree(pidlUserStartMenu);
+		return hr;
+	}
+
+	hr = BindToDesktop(pidlUserStartMenu, &psfUserStartMenu);
+	if (FAILED(hr))
+		return hr;
+
+	hr = BindToDesktop(pidlCommonStartMenu, &psfCommonStartMenu);
+	if (FAILED(hr))
+		return hr;
+
+	GUID GUID_NULL = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
+
+	hr = pasf->AddNameSpace(&GUID_NULL, psfUserStartMenu, pidlUserStartMenu, 4u);
+	if (FAILED(hr))
+		return hr;
+
+	hr = pasf->AddNameSpace(&GUID_NULL, psfCommonStartMenu, pidlCommonStartMenu, 4u);
+	if (FAILED(hr))
+		return hr;
+
+	*ppsfStartMenu = pasf;
+
+
+	ILFree(pidlCommonStartMenu);
+	ILFree(pidlUserStartMenu);
+
+	return hr;
+}
+
+HRESULT WINAPI Shell32_CoCreateInstance(
+	__in   REFCLSID rclsid,
+	__in   LPUNKNOWN pUnkOuter,
+	__in   DWORD dwClsContext,
+	__in   REFIID riid,
+	__out  LPVOID* ppv
+)
+{
+	HRESULT result;
+	if (rclsid == CLSID_ProgramsFolderAndFastItems)
+	{
+		IShellFolder* ShellFolder;
+		result = GetMergedFolder(CSIDL_PROGRAMS, CSIDL_COMMON_PROGRAMS, &ShellFolder);
+		return ShellFolder->QueryInterface(riid,ppv);
+	}
+
+	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+	if (result == S_OK && rclsid == CLSID_AutoPlayUI)
+	{
+		*ppv = new CAutoPlayWrapper((IAutoPlayUI*)*ppv);
+	}
+
+	return result;
+}
+
+CProgramsFolderClassFactory::CProgramsFolderClassFactory()
+{
+}
+
+CProgramsFolderClassFactory::~CProgramsFolderClassFactory()
+{
+}
+
+HRESULT __stdcall CProgramsFolderClassFactory::QueryInterface(REFIID riid, void** ppvObject)
+{
+	if (riid == IID_IUnknown)
+	{
+		*ppvObject = static_cast<IUnknown*>(this);
+		AddRef();
+		return S_OK;
+	}
+	if (riid == IID_IClassFactory)
+	{
+		*ppvObject = static_cast<IClassFactory*>(this);
+		AddRef();
+		return S_OK;
+	}
+	return E_NOINTERFACE;
+}
+
+ULONG __stdcall CProgramsFolderClassFactory::AddRef(void)
+{
+	return 1;
+}
+
+ULONG __stdcall CProgramsFolderClassFactory::Release(void)
+{
+	return 1;
+}
+
+HRESULT __stdcall CProgramsFolderClassFactory::CreateInstance(IUnknown* pUnkOuter, REFIID riid, void** ppvObject)
+{
+	if (pUnkOuter) return CLASS_E_NOAGGREGATION;
+	//if (riid == CLSID_ProgramsFolderAndFastItems)
+	{
+		IShellFolder* ShellFolder;
+		HRESULT result = GetMergedFolder(CSIDL_PROGRAMS, CSIDL_COMMON_PROGRAMS, &ShellFolder);
+		return ShellFolder->QueryInterface(riid, ppvObject);
+	}
+	return E_NOTIMPL;
+}
+
+HRESULT __stdcall CProgramsFolderClassFactory::LockServer(BOOL fLock)
+{
+	return S_OK;
 }

@@ -88,21 +88,4 @@ HRESULT STDMETHODCALLTYPE CAutoPlayWrapper::SetChkDskCompleted(void)
 	return m_autoui->SetChkDskCompleted();
 }
 
-HRESULT WINAPI Shell32_CoCreateInstance(
-  __in   REFCLSID rclsid,
-  __in   LPUNKNOWN pUnkOuter,
-  __in   DWORD dwClsContext,
-  __in   REFIID riid,
-  __out  LPVOID *ppv
-)
-{
-	HRESULT result;
-	result = CoCreateInstance(rclsid,pUnkOuter,dwClsContext,riid,ppv);
-	if (result == S_OK && rclsid == CLSID_AutoPlayUI)
-	{
-		*ppv = new CAutoPlayWrapper((IAutoPlayUI*)*ppv);
-	}
-
-	return result;
-}
 
