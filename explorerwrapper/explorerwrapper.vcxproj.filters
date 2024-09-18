@@ -105,6 +105,9 @@
     <ClInclude Include="shell32_wrappers.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="shellitemfilter.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -177,6 +180,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="cregtree.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="shellitemfilter.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>

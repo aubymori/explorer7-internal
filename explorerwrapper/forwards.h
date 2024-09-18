@@ -142,6 +142,12 @@
 #pragma comment(linker,FORWARDO(SHLWAPI,2))
 #pragma comment(linker,FORWARDO(SHLWAPI,639))
 #pragma comment(linker,FORWARDO(SHLWAPI,260))
+#pragma comment(linker,FORWARDO(SHLWAPI,244))
+#pragma comment(linker,FORWARDO(SHLWAPI,241))
+#pragma comment(linker,FORWARDO(SHLWAPI,552))
+#pragma comment(linker,FORWARDO(SHLWAPI,554))
+#pragma comment(linker,FORWARDO(SHLWAPI,250))
+#pragma comment(linker,FORWARDO(SHLWAPI,346))
 
 
 //shlwapi - names
@@ -201,3 +207,12 @@
 #pragma comment(linker,FORWARDN(SHLWAPI,StrToIntW))
 #pragma comment(linker,FORWARDN(SHLWAPI,StrTrimW))
 #pragma comment(linker,FORWARDN(SHLWAPI,StrPBrkW))
+#pragma comment(linker,FORWARDN(SHLWAPI,StrCpyNW))
+#pragma comment(linker,FORWARDN(SHLWAPI,SHRegCloseUSKey))
+#pragma comment(linker,FORWARDN(SHLWAPI,SHRegWriteUSValueW))
+#pragma comment(linker,FORWARDN(SHLWAPI,SHRegCreateUSKeyW))
+#pragma comment(linker,FORWARDN(SHLWAPI,SHRegSetUSValueW))
+#pragma comment(linker,FORWARDN(SHLWAPI,StrCatBuffW))
+#pragma comment(linker,FORWARDN(SHLWAPI,wnsprintfW))
+#pragma comment(linker,FORWARDN(SHLWAPI,StrCatW))
+#pragma comment(linker,FORWARDN(SHLWAPI,StrCpyW))

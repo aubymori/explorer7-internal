@@ -23,6 +23,7 @@
 #include "cregtree.h"
 #include "shellapi.h"
 #include "autoplay.h"
+#include "shellitemfilter.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -1304,6 +1305,12 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 {
 	HRESULT result;
 	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+
+	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK)
+	{
+		auto shellItemFilter = new CStartMenuItemFilter();
+		result = shellItemFilter->QueryInterface(riid,ppv);
+	}
 
 	if (rclsid == CLSID_SysTray) //create Metro before tray
 	{

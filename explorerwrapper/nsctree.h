@@ -1,6 +1,8 @@
 #pragma once
 #include "framework.h"
 
+DEFINE_GUID(CLSID_PersonalStartMenu, 0x3F6953F0, 0x5359, 0x47FC, 0x0BD, 0x99, 0x9F, 0x2C, 0x0B9, 0x5A, 0x62, 0x0FD);
+
 UINT (__fastcall*fGetDpiForWindow)(HWND hwnd);
 DPI_AWARENESS_CONTEXT (__fastcall*fGetWindowDpiAwarenessContext)(HWND hwnd);
 BOOL (__fastcall*fAreDpiAwarenessContextsEqual)(DPI_AWARENESS_CONTEXT A, DPI_AWARENESS_CONTEXT B);
