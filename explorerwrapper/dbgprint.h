@@ -174,3 +174,35 @@ static uintptr_t FindPattern(uintptr_t baseAddress, const char* signature)
 
 	return NULL;
 }
+
+static BOOL MaskCompare(PVOID pBuffer, LPCSTR lpPattern, LPCSTR lpMask)
+{
+	for (PBYTE value = (PBYTE)pBuffer; *lpMask; ++lpPattern, ++lpMask, ++value)
+	{
+		if (*lpMask == 'x' && *(LPCBYTE)lpPattern != *value)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+static __declspec(noinline) PVOID FindPatternHelper(PVOID pBase, SIZE_T dwSize, LPCSTR lpPattern, LPCSTR lpMask)
+{
+	for (SIZE_T index = 0; index < dwSize; ++index)
+	{
+		PBYTE pAddress = (PBYTE)pBase + index;
+
+		if (MaskCompare(pAddress, lpPattern, lpMask))
+			return pAddress;
+	}
+
+	return NULL;
+}
+
+inline PVOID FindPattern2(PVOID pBase, SIZE_T dwSize, LPCSTR lpPattern, LPCSTR lpMask)
+{
+	dwSize -= strlen(lpMask);
+	return FindPatternHelper(pBase, dwSize, lpPattern, lpMask);
+}
+
+extern BOOL g_bIsArm64;

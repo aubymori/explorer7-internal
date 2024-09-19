@@ -28,6 +28,7 @@
 #define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
 #define _WIN_VB 0 //Win10VB-specific changes - currently unused
 
+BOOL g_bIsArm64;
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
 HWND hwnd_taskbar;
@@ -900,20 +901,88 @@ GetProcAddress_Hook(
 //Basically this allows explorer to actually work on builds >9200
 void AssFuckShunimpl()
 {
-	uintptr_t shunImpl = (uintptr_t)GetModuleHandle(L"shunimpl.dll");
+	uintptr_t shunImpl = (uintptr_t)GetModuleHandleW(L"shunimpl.dll");
 	if (!shunImpl) return;
-	char* dllmainSHUNIMPL = (char*)FindPattern(shunImpl,"48 83 EC 28 83 FA 01");
 
-	if (dllmainSHUNIMPL)
+	PBYTE beginSection = nullptr;
+	DWORD sizeSection = 0;
+
+	PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)shunImpl;
+	if (dosHeader->e_magic == IMAGE_DOS_SIGNATURE)
 	{
-		char bytes[] = { 0xB0,0x01,0xC3 };
-
-		DWORD old;
-		VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
-		memcpy(dllmainSHUNIMPL, bytes, sizeof(bytes));
-		VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), old, 0);
+		PIMAGE_NT_HEADERS64 ntHeader = (PIMAGE_NT_HEADERS64)((BYTE*)dosHeader + dosHeader->e_lfanew);
+		if (ntHeader->Signature == IMAGE_NT_SIGNATURE)
+		{
+			PIMAGE_SECTION_HEADER firstSection = IMAGE_FIRST_SECTION(ntHeader);
+			for (unsigned int i = 0; i < ntHeader->FileHeader.NumberOfSections; ++i)
+			{
+				PIMAGE_SECTION_HEADER section = firstSection + i;
+				if (!strcmp((const char*)section->Name, ".text"))
+				{
+					beginSection = (PBYTE)dosHeader + section->VirtualAddress;
+					sizeSection = section->SizeOfRawData;
+					break;
+				}
+			}
+		}
 	}
-	
+
+	if (!beginSection || !sizeSection)
+		return;
+
+	if (!g_bIsArm64)
+	{
+		// 48 83 EC 28 83 FA 01
+		PBYTE dllmainSHUNIMPL = (PBYTE)FindPattern2(beginSection, sizeSection, "\x48\x83\xEC\x28\x83\xFA\x01", "xxxxxxx");
+		if (dllmainSHUNIMPL)
+		{
+			BYTE bytes[] = { 0xB0, 0x01, 0xC3 };
+
+			DWORD old;
+			VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
+			memcpy(dllmainSHUNIMPL, bytes, sizeof(bytes));
+			VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), old, nullptr);
+		}
+	}
+	else
+	{
+		// FD 7B BF A9 FD 03 00 91 3F 04 00 71 01 02 00 54
+		// Pick the second one (ARM64EC code)
+		PBYTE dllmainSHUNIMPL = (PBYTE)FindPattern2(beginSection, sizeSection, "\xFD\x7B\xBF\xA9\xFD\x03\x00\x91\x3F\x04\x00\x71\x01\x02\x00\x54", "xxxxxxxxxxxxxxxx");
+		if (dllmainSHUNIMPL)
+		{
+			dllmainSHUNIMPL = (PBYTE)FindPattern2(dllmainSHUNIMPL + 16, sizeSection - 16 - (dllmainSHUNIMPL - beginSection), "\xFD\x7B\xBF\xA9\xFD\x03\x00\x91\x3F\x04\x00\x71\x01\x02\x00\x54", "xxxxxxxxxxxxxxxx");
+		}
+
+		if (dllmainSHUNIMPL)
+		{
+			dllmainSHUNIMPL -= 4; // Account for PACIBSP
+
+			BYTE bytes[] = { 0x20, 0x00, 0x80, 0x52, 0xC0, 0x03, 0x5F, 0xD6 };
+
+			DWORD old;
+			VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
+			memcpy(dllmainSHUNIMPL, bytes, sizeof(bytes));
+			VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), old, nullptr);
+		}
+	}
+}
+
+void CheckArm64()
+{
+	typedef BOOL (WINAPI *IsWow64Process2_t)(HANDLE hProcess, USHORT* pProcessMachine, USHORT* pNativeMachine);
+	IsWow64Process2_t pfnIsWow64Process2 = (IsWow64Process2_t)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "IsWow64Process2");
+	if (pfnIsWow64Process2)
+	{
+		USHORT processMachine, nativeMachine;
+		if (pfnIsWow64Process2(GetCurrentProcess(), &processMachine, &nativeMachine))
+		{
+			if (nativeMachine == IMAGE_FILE_MACHINE_ARM64)
+			{
+				g_bIsArm64 = TRUE;
+			}
+		}
+	}
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -926,6 +995,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	{
 		case DLL_PROCESS_ATTACH:
 			{
+				CheckArm64();
 				AssFuckShunimpl();
 
 				dbgprintf(L"Dll Attach\n");
@@ -942,7 +1012,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			}
 			break;
 		case DLL_THREAD_ATTACH:
-			{			
+			{
+				CheckArm64();
 				if (!g_alttabhooked && GetModuleHandle(L"alttab.dll"))
 				{
 					CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(GetModuleHandle(L"user32.dll"),"CreateWindowInBand");
