@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-release:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
@@ -50,3 +50,29 @@ jobs:
         name: wrp64
         path: |
           .\Release\
+  build-debug:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+    - uses: ilammy/msvc-dev-cmd@v1.13.0
+      with:
+        arch: amd64
+    - name: Clone minhook
+      run: git clone https://github.com/TsudaKageyu/minhook.git
+    - name: Build minhook
+      shell: cmd
+      run: |
+        cd .\minhook\build\VC17\
+        msbuild MinHookVC17.sln /p:Configuration=Release /p:Platform=x64
+        copy /Y .\lib\Release\libMinHook.x64.lib ..\..\..\explorerwrapper\
+    - name: Compile explorerwrapper
+      run: | 
+        msbuild explorerwrapper.sln /p:Configuration=Debug /p:Platform=x64
+    - name: Upload dll
+      uses: actions/upload-artifact@v4.4.0
+      with:
+        name: wrp64
+        path: |
+          .\Debug\
