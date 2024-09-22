@@ -20,6 +20,13 @@ These keys are located under `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Curre
 
 explorer7 allows any theme from Windows Vista - Windows 8.0 to be used for the start menu/taskbar. If applicable, you **must** include the "en-US" folder that comes along with your .msstyles file, otherwise the theme won't be applied. Windows 8.1+ themes do apply, but do not have the proper classes for the Start Menu, and as of today, they cannot be restored.
 
+## Manual Patch
+
+If you wish to patch your explorer.exe to use the wrapper dll, you need something like [CFF Explorer](https://ntcore.com/files/CFF_Explorer.zip) to change out the imports for `SHLWAPI.DLL`, `OLE32.DLL` and (if applicable) `EXPLORERFRAME.DLL` to `WRP64.DLL` (wrapper dll). This is what the ex7forw8 installer does to the files you provide.
+
+![image](https://github.com/user-attachments/assets/3122093d-8068-49c1-80a5-161468a65dfe)
+
+
 ## Minhook Linker errors
 
 If you're having linker errors because of the prebuilt minhook, do the following:
