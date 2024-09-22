@@ -1,4 +1,6 @@
-![image](https://github.com/user-attachments/assets/259d81ce-8a87-4ef7-9ea8-c60a937d3984)
+<p align=center>
+  <img src="https://github.com/user-attachments/assets/10465c11-481a-4403-aeef-19149a776f17">
+</p>
 
 explorer7 (formerly known as ex7forw8) is a **wrapper dll** that allows Windows 7's explorer.exe to run properly on modern Windows versions. This brings back the original Windows 7 Start Menu/Taskbar experience.
 
