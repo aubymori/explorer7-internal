@@ -1043,6 +1043,32 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 	return TRUE;
 }
 
+HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
+{
+	dbgprintf(L"LoadImageW_CallHook has been called!");
+	return LoadImageW(hInst,name,type,cx,cy,fuLoad);
+}
+
+void HookLoadImageForSizeAndFont()
+{
+	auto callLoadImage = (uintptr_t)FindPattern((uintptr_t)GetModuleHandle(0), "FF 15 ?? ?? ?? ?? 48 89 43 ?? 48 85 C0 74 ?? 4C 8D ?? ?? ?? BA ?? ?? ?? ?? 48 8B C8 FF 15");
+	if (callLoadImage)
+	{
+		//write a nop
+		DWORD old;
+		VirtualProtect((void*)callLoadImage, 1, PAGE_EXECUTE_READWRITE, &old);
+		*reinterpret_cast<char*>(callLoadImage) = 0x90;
+		VirtualProtect((void*)callLoadImage, 1, old, 0);
+
+		callLoadImage += 1;
+
+		// write a call to our function
+		DetourCall((void*)callLoadImage, LoadImageW_CallHook);
+
+		
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1195,6 +1221,8 @@ void HookAPIs()
 		g_bClassicTheme = true;
 		SetThemeAppProperties(NULL);
 	}
+
+	HookLoadImageForSizeAndFont();
 
 	//enable hooks at end
 	MH_EnableHook(MH_ALL_HOOKS);
