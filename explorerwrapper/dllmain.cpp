@@ -799,7 +799,7 @@ HTHEME(__stdcall* fOpenThemeDataForDpi)(HWND hwnd, LPCWSTR pszClassList, UINT dp
 HTHEME(__stdcall* fOpenThemeDataEx)(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags);
 HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 {
-	if (g_dwTrayThreadId != GetCurrentThreadId())
+	if (g_dwTrayThreadId > 0 && g_dwTrayThreadId != GetCurrentThreadId())
 		return fOpenThemeData(hwnd, pszClassList);
 
 	if (!AllowThemes())
@@ -823,7 +823,7 @@ HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 
 HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT dpi)
 {
-	if (g_dwTrayThreadId != GetCurrentThreadId())
+	if (g_dwTrayThreadId > 0 && g_dwTrayThreadId != GetCurrentThreadId())
 		return fOpenThemeDataForDpi(hwnd, pszClassList, dpi);
 
 	if (!AllowThemes())
@@ -847,7 +847,7 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 
 HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags)
 {
-	if (g_dwTrayThreadId != GetCurrentThreadId())
+	if (g_dwTrayThreadId > 0 && g_dwTrayThreadId != GetCurrentThreadId())
 		return fOpenThemeDataEx(hwnd, pszClassList, dwFlags);
 
 	if (!AllowThemes())
@@ -1048,6 +1048,21 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL),"kernel32.dll",SetErrorMode,SetErrorModeNEW);
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
 	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",IsCompositionActive,IsCompositionActiveNEW);
+
+	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"),L"AMAP");
+	if (LoadAnimationDataMap)
+	{
+		LoadAnimationDataMap = (void*)GetFunctionStart((uintptr_t)LoadAnimationDataMap, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
+
+		//byebye
+		DWORD old;
+		VirtualProtect(LoadAnimationDataMap, 1, PAGE_EXECUTE_READWRITE, &old);
+		*reinterpret_cast<char*>(LoadAnimationDataMap) = 0xC3;
+		VirtualProtect(LoadAnimationDataMap, 1, old, 0);
+	}
+	else
+		MessageBox(0,L"SHite",L"FUck",0);
+
 	ThemeManagerInitialize();
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
@@ -1382,7 +1397,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 				dbgprintf(L"Explorer_CoCreateInstance: Cache7 using IStartMenuItemsCache8/10 is OK!!\n");
 		}
 	}
-	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) && riid == IID_IPinnedList2 && result != S_OK)
+	if ((rclsid == CLSID_StartMenuPin || rclsid == CLSID_TaskbarPin) /* && riid == IID_IPinnedList2*/ && result != S_OK)
 	{
 		int build = g_osVersion.BuildNumber();
 		IID id = IID_IPinnedList25;

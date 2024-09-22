@@ -195,6 +195,28 @@ const MERGEDFOLDERINFO c_rgmfiProgramsFolder[] = {
 	{   CSIDL_COMMON_PROGRAMS,                 ASFF_COMMON | ASFF_MERGESAMEGUID,                 &CLSID_ProgramsFolderCommon, 2}
 };
 
+struct FolderDefinition //reversed from 1507
+{
+	const GUID* FolderID;
+	DWORD flag;
+	DWORD flag2;
+};
+
+const FolderDefinition c_rgrfi[] = 
+{   
+	{&FOLDERID_ApplicationShortcuts , 0, 0x38},
+	{&FOLDERID_StartMenu , 0, 0x18},
+	{&FOLDERID_Programs , 0, 0x14},
+	{&FOLDERID_CommonStartMenu , 0, 0x1A},
+	{&FOLDERID_CommonPrograms , 0, 0x16},
+	{&FOLDERID_Games , 0, 0x10},
+	{&FOLDERID_Desktop , 0x1000, 1},
+	{&FOLDERID_PublicDesktop , 0x1000, 3},
+	{&FOLDERID_UserPinned , 0, 0x20},
+	{&FOLDERID_CommonStartMenuPlaces , 0, 0x61} 
+};
+
+
 //adapted from reactos
 static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, IShellFolder** ppsfStartMenu)
 {
@@ -216,35 +238,56 @@ static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, ISh
 			pasf->AddNameSpace((LPGUID)&FOLDERID_AppsFolder, AppsFolder, 0, ASFF_MERGESAMEGUID, 0);
 			AppsFolder->Release();
 		}
+
+		for (int i = 0; i < _ARRAYSIZE(c_rgrfi); ++i)
+		{
+			auto& Def = c_rgrfi[i];
+			if (Def.FolderID != &FOLDERID_ApplicationShortcuts && (Def.flag2 & 0x10) != 0)
+			{
+				SHGetKnownFolderItem(*Def.FolderID, KF_FLAG_DONT_VERIFY, 0LL, IID_PPV_ARGS(&shellItem));
+				if (shellItem)
+				{
+					shellItem->BindToHandler(0, BHID_SFObject, IID_PPV_ARGS(&AppsFolder));
+
+					pasf->AddNameSpace((LPGUID)Def.FolderID, AppsFolder, 0, 0xFF08, 0);
+					AppsFolder->Release();
+				}
+			}
+		}
+
 		shellItem->Release();
 	}
-
-	for (int i = 0; i < length; ++i)
+	else
 	{
-		auto Info = Folders[i];
-		LPITEMIDLIST pidlUserStartMenu;
-		IShellFolder* psfUserStartMenu = nullptr;
-	
-		hr = SHGetSpecialFolderLocation(NULL, Info.csidl, &pidlUserStartMenu);
-		if (FAILED(hr)) continue;
-	
-		hr = BindToDesktop(pidlUserStartMenu, &psfUserStartMenu);
-		if (FAILED(hr))
+		for (int i = 0; i < length; ++i)
 		{
-			ILFree(pidlUserStartMenu);
-			continue;
-		}
-	
-		hr = pasf->AddNameSpace((LPGUID)Info.pguidObj, psfUserStartMenu, pidlUserStartMenu, Info.uANSFlags, Info.idk);
-		if (FAILED(hr))
-		{
+			auto Info = Folders[i];
+			LPITEMIDLIST pidlUserStartMenu;
+			IShellFolder* psfUserStartMenu = nullptr;
+
+			hr = SHGetSpecialFolderLocation(NULL, Info.csidl, &pidlUserStartMenu);
+			if (FAILED(hr)) continue;
+
+			hr = BindToDesktop(pidlUserStartMenu, &psfUserStartMenu);
+			if (FAILED(hr))
+			{
+				ILFree(pidlUserStartMenu);
+				continue;
+			}
+
+			hr = pasf->AddNameSpace((LPGUID)Info.pguidObj, psfUserStartMenu, pidlUserStartMenu, Info.uANSFlags, Info.idk);
+			if (FAILED(hr))
+			{
+				psfUserStartMenu->Release();
+				ILFree(pidlUserStartMenu);
+				continue;
+			}
 			psfUserStartMenu->Release();
 			ILFree(pidlUserStartMenu);
-			continue;
 		}
-		psfUserStartMenu->Release();
-		ILFree(pidlUserStartMenu);
 	}
+
+	
 
 	*ppsfStartMenu = pasf;
 
