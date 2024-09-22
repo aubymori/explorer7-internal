@@ -409,7 +409,7 @@ namespace ShellManagedWindowHelper
 {
 	bool ShouldTreatShellManagedWindowAsNotShellManaged(HWND hwnd)
 	{
-		return GetPropW(hwnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") != 0;
+		return GetPropW(hwnd, L"Microsoft.Windows.ShellManagedWindowAsNormalWindow") != 0 || GetPropW(hwnd, L"Windows.ImmersiveShell.DisableShowingMainViewOnActivation") == 0;
 	}
 }
 
@@ -504,6 +504,17 @@ BOOL IsShellManagedWindow(HWND hwnd)
 	return fn(hwnd);
 }
 
+bool ShouldExcludeFromTaskbar(HWND hwnd)
+{
+	wchar_t text[256];
+	GetWindowTextW(hwnd, text, 255);
+
+	if (!StrCmpW(text, L"Microsoft Text Input Application") || !StrCmpW(text, L"Windows Shell Experience Host") || !StrCmpW(text, L"Start") || !StrCmpW(text, L"Search"))
+		return true;
+
+	return false;
+}
+
 bool IsValidDesktopZOrderBand(HWND hwnd, BOOL bCheckShellManagedWindow)
 {
 	bool bValid = false;
@@ -511,17 +522,17 @@ bool IsValidDesktopZOrderBand(HWND hwnd, BOOL bCheckShellManagedWindow)
 	ZBID band;
 	if (GetWindowBandHelper(hwnd, &band))
 	{
-		dbgprintf(L"GetWindowBandHelper returned true, %i",band);
 		bValid = s_bandInclusionData[band].bInclude;
-		dbgprintf(L"bValid is %i", (int)bValid);
 
 		//if (Feature_WindowTabHost && (HWND)GetPropW(hwnd, (LPCWSTR)0xA920))
 		//	bValid = true;
 
 		if (bValid && bCheckShellManagedWindow)
 			bValid = !IsShellManagedWindow(hwnd) || ShellManagedWindowHelper::ShouldTreatShellManagedWindowAsNotShellManaged(hwnd);
-		dbgprintf(L"bValid is now %i", (int)bValid);
 	}
+
+	if (bValid)
+		bValid = !ShouldExcludeFromTaskbar(hwnd);
 
 	return bValid;
 }
@@ -977,8 +988,11 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 		dbgprintf(L"CREATEWINDOWINBANDNEW %i", dwBand);
 
 		if (ret)
+		{
 			SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
-		SetProp(ret, L"explorer7.WindowBand", (HANDLE)dwBand);
+			SetProp(ret, L"explorer7.WindowBand", (HANDLE)dwBand);
+		}
+
 		return ret;
 	}
 	else // Ittr: Preserve legacy codepath for win8.x and non-UWP users
@@ -1197,7 +1211,7 @@ BOOL WINAPI GetWindowBandNew(HWND hwnd,DWORD* out)
 {
 	BOOL ret = GetWindowBandOrig(hwnd,out);
 	DWORD origband = (DWORD)GetProp(GetAncestor(hwnd,GA_ROOTOWNER),L"explorer7.WindowBand");
-	dbgprintf(L"GetWindowBand %p %p %p",hwnd,*out,origband);
+	//dbgprintf(L"GetWindowBand %p %p %p",hwnd,*out,origband);
 	if (origband && out) *out = origband;	
 	return ret;
 }
