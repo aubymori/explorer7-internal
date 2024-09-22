@@ -1043,10 +1043,46 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 	return TRUE;
 }
 
+BOOL FileExists(LPCTSTR szPath)
+{
+  DWORD dwAttrib = GetFileAttributes(szPath);
+
+  return (dwAttrib != INVALID_FILE_ATTRIBUTES && 
+         !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
 HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
 {
 	dbgprintf(L"LoadImageW_CallHook has been called!");
-	return LoadImageW(hInst,name,type,cx,cy,fuLoad);
+
+	WCHAR szExeDir[MAX_PATH];
+	GetModuleFileNameW(NULL, szExeDir, MAX_PATH);
+	WCHAR *backslash = StrRChrW(szExeDir, NULL, L'\\');
+	if (*backslash == L'\\')
+		*backslash = L'\0';
+
+	WCHAR szOrbName[MAX_PATH];
+	LSTATUS res = g_registry.QueryValue(L"OrbImage", (LPBYTE)szOrbName, sizeof(szOrbName));
+	if (!*szOrbName || ERROR_SUCCESS != res)
+		StringCchCopyW(szOrbName, MAX_PATH, L"default");
+
+	WCHAR szOrbPath[MAX_PATH * 2];
+	wsprintfW(
+		szOrbPath,
+		L"%s\\orbs\\%s.bmp",
+		szExeDir,
+		szOrbName
+	);
+
+	if(FileExists(szOrbPath) == FALSE)
+	{
+		return LoadImageW(hInst,name,type,cx,cy,fuLoad);
+	}
+	else
+	{
+		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, cx, cy, fuLoad | LR_LOADFROMFILE);
+	}
+	
 }
 
 void HookLoadImageForSizeAndFont()
@@ -1065,7 +1101,7 @@ void HookLoadImageForSizeAndFont()
 		// write a call to our function
 		DetourCall((void*)callLoadImage, LoadImageW_CallHook);
 
-		
+
 	}
 }
 
