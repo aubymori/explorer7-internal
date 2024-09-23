@@ -658,22 +658,6 @@ HANDLE WINAPI BrandingLoadImageNEW(
 		);
 }
 
-//Ittr: Consolidated function for pattern byte replacements.
-void ChangeImportedPattern(void* dllPattern, const char* newBytes, bool isGuid) //thank you wiktor
-{
-	if (dllPattern)
-	{
-		SIZE_T size;
-		if (isGuid == true) { size = sizeof(GUID); } else { size = sizeof(newBytes); }
-
-		//Magical byte replacement code
-		DWORD old;
-		VirtualProtect(dllPattern, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(dllPattern, newBytes, size);
-		VirtualProtect(dllPattern, size, old, 0);
-	}
-}
-
 //Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
 //Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
 void ShowWin32Menus()
@@ -682,9 +666,9 @@ void ShowWin32Menus()
 	char* immersiveBytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
 
 	//Load and patch both DLLs. ExplorerFrame gets called in later so we have to account for that
-	char bytes[] = { 0xB0, 0x00, 0xC3 };
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, false);
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
+	unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, sizeof(bytes));
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, sizeof(bytes));
 }
 
 void FixAuthUI()
@@ -706,63 +690,43 @@ void FixAuthUI()
 	char* pattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytes);
 	char* pattern1 = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytesOld);
 
+	DWORD old;
+	unsigned char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+	SIZE_T size = sizeof(patch1);
 	if (pattern)
 	{
-		DWORD old;
-		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-		SIZE_T size = sizeof(patch1);
-
 		// mov rax, [rcx]
 		// call qword ptr [rax+18h]
 		char* inst1 = pattern + 14;
-		VirtualProtect(inst1, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst1, patch1, size);
-		VirtualProtect(inst1, size, old, 0);
+		ChangeImportedPattern(inst1, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+30h]
 		char* inst2 = pattern + 27;
-		VirtualProtect(inst2, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst2, patch1, size);
-		VirtualProtect(inst2, size, old, 0);
+		ChangeImportedPattern(inst2, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+20h]
 		char* inst3 = pattern + 53;
-		VirtualProtect(inst3, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst3, patch1, size);
-		VirtualProtect(inst3, size, old, 0);
-
+		ChangeImportedPattern(inst3, patch1, size);
 	}
 
 	if (pattern1 && !pattern) //Ittr: Only apply to CLogoffPane::_OnCreate if we need to, otherwise this causes crashing on later 7 explorer.
 	{
-		DWORD old;
-		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-		SIZE_T size = sizeof(patch1);
-
 		// mov rax, [rcx]
 		// call qword ptr [rax+18h]
 		char* inst1 = pattern1 + 14;
-		VirtualProtect(inst1, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst1, patch1, size);
-		VirtualProtect(inst1, size, old, 0);
+		ChangeImportedPattern(inst1, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+30h]
 		char* inst2 = pattern1 + 27;
-		old = NULL;
-		VirtualProtect(inst2, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst2, patch1, size);
-		VirtualProtect(inst2, size, old, 0);
+		ChangeImportedPattern(inst2, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+20h]
 		char* inst3 = pattern1 + 58;
-		old = NULL;
-		VirtualProtect(inst3, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst3, patch1, size);
-		VirtualProtect(inst3, size, old, 0);
+		ChangeImportedPattern(inst3, patch1, size);
 	}
 }
 
@@ -1156,12 +1120,8 @@ void HookLoadImageForSizeAndFont()
 
 	if (callDrawExtended)
 	{
-		char bytes[] = { 0xB0,0x01,0xC3 };
-
-		DWORD old;
-		VirtualProtect(callDrawExtended, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
-		memcpy(callDrawExtended, bytes, sizeof(bytes));
-		VirtualProtect(callDrawExtended, sizeof(bytes), old, 0);
+		unsigned char bytes[] = { 0xB0,0x01,0xC3 };
+		ChangeImportedPattern(callDrawExtended, bytes, sizeof(bytes));
 	}
 }
 
@@ -1396,12 +1356,8 @@ void AssFuckShunimpl()
 
 	if (dllmainSHUNIMPL)
 	{
-		char bytes[] = { 0xB0,0x01,0xC3 };
-
-		DWORD old;
-		VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
-		memcpy(dllmainSHUNIMPL, bytes, sizeof(bytes));
-		VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), old, 0);
+		unsigned char bytes[] = { 0xB0,0x01,0xC3 };
+		ChangeImportedPattern(dllmainSHUNIMPL, bytes, sizeof(bytes));
 	}
 	
 }

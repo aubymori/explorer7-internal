@@ -17,7 +17,7 @@ constexpr char MONTH_DAYS[] =
 constexpr UINT GetDay(UINT year, UINT month, UINT day)
 {
 	UINT out = (year - 1) * 365;
-	for (int i = 0; i < month - 1; i++)
+	for (UINT i = 0; i < month - 1; i++)
 	{
 		out += MONTH_DAYS[i];
 	}

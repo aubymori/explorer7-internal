@@ -130,7 +130,6 @@ void CreateTaskManWindow()
 void SetProgmanAsShell()
 {
 	BOOL res = false;
-	HRESULT err;
 	if (SetShellWindowFunc && !successfullySetShellWindow)
 	{
 		HWND progMan = FindWindow(TEXT("Progman"), TEXT("Program Manager"));

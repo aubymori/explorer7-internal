@@ -97,7 +97,7 @@ strtoulCUSTOM(const char* nptr, char** endptr, int base)
 		//errno = ERANGE;
 	}
 	else if (neg)
-		acc = -acc;
+		acc = -(long)acc;
 	if (endptr != 0)
 		*endptr = (char*)(any ? s - 1 : nptr);
 	return (acc);
@@ -167,10 +167,10 @@ static uintptr_t FindPattern(uintptr_t baseAddress, const char* signature)
 	const auto s = patternBytes->size;
 	const auto d = patternBytes->data;
 
-	for (auto i = 0ul; i < sizeOfImage - s; ++i)
+	for (size_t i = 0; i < sizeOfImage - s; ++i)
 	{
 		bool found = true;
-		for (auto j = 0ul; j < s; ++j)
+		for (size_t j = 0; j < s; ++j)
 		{
 			if (scanBytes[i + j] != d[j] && d[j] != -1)
 			{
@@ -248,7 +248,7 @@ inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 		}
 	}
 
-	for (int i = 0; i < DataSize; i++)
+	for (size_t i = 0; i < DataSize; i++)
 	{
 		if (wcscmp((const wchar_t*)RefStr, (const wchar_t*)(DataSection + i)) == 0)
 		{
@@ -256,7 +256,7 @@ inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 		}
 	}
 
-	for (int i = 0; i < TextSize; i++)
+	for (size_t i = 0; i < TextSize; i++)
 	{
 		// opcode: lea
 		if ((TextSection[i] == uint8_t(0x4C) || TextSection[i] == uint8_t(0x48)) && TextSection[i + 1] == uint8_t(0x8D))
@@ -356,4 +356,17 @@ inline void DetourCall(void* Target, void* Detour)
 
 	//install the hook
 	memcpy(Target, jmpInstruction, sizeof(jmpInstruction));
+}
+
+
+//Ittr: Consolidated function for pattern byte replacements.
+static void ChangeImportedPattern(void* dllPattern, const unsigned char* newBytes, SIZE_T size) //thank you wiktor
+{
+	if (dllPattern)
+	{
+		DWORD old;
+		VirtualProtect(dllPattern, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(dllPattern, newBytes, size);
+		VirtualProtect(dllPattern, size, old, 0);
+	}
 }

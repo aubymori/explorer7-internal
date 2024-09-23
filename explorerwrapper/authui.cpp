@@ -24,6 +24,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::QueryInterface(REFIID riid, void** ppv
 		return m_authui8->QueryInterface(riid, ppvObject);
 	if (m_authui10)
 		return m_authui10->QueryInterface(riid, ppvObject);
+	return S_OK;
 }
 
 ULONG STDMETHODCALLTYPE CAuthUIWrapper::AddRef(void)
@@ -55,6 +56,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::Refresh()
 		return m_authui8->Refresh();
 	if (m_authui10)
 		return m_authui10->Refresh();
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::CreateListener(IUnknown** p1)
@@ -70,6 +72,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::SetChoiceMask(ULONG p1)
 		return m_authui8->SetChoiceMask(p1);
 	if (m_authui10)
 		return m_authui10->SetChoiceMask(p1);
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetMessageWnd(HWND** p1)
@@ -84,6 +87,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::SetShowBadChoices(int p1)
 		return m_authui8->SetShowBadChoices(p1);
 	if (m_authui10)
 		return m_authui10->SetShowBadChoices(p1);
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceEnumerator(IUnknown** p1)
@@ -92,6 +96,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceEnumerator(IUnknown** p1)
 		return m_authui8->GetChoiceEnumerator(p1);
 	if (m_authui10)
 		return m_authui10->GetChoiceEnumerator(p1);
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetDefaultChoice(ULONG* p1)
@@ -100,6 +105,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetDefaultChoice(ULONG* p1)
 		return m_authui8->GetDefaultChoice(p1);
 	if (m_authui10)
 		return m_authui10->GetDefaultChoice(p1);
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::UserHasShutdownRights(void)
@@ -108,6 +114,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::UserHasShutdownRights(void)
 		return m_authui8->UserHasShutdownRights();
 	if (m_authui10)
 		return m_authui10->UserHasShutdownRights();
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceName(ULONG p1, int p2, LPWSTR p3, UINT p4)
@@ -117,6 +124,7 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceName(ULONG p1, int p2, LPWSTR
 		return m_authui8->GetChoiceName(p1, p2, p3, p4);
 	if (m_authui10)
 		return m_authui10->GetChoiceName(p1, p2, p3, p4);
+	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceDesc(ULONG p1, LPWSTR p2, UINT p3)
@@ -125,4 +133,5 @@ HRESULT STDMETHODCALLTYPE CAuthUIWrapper::GetChoiceDesc(ULONG p1, LPWSTR p2, UIN
 		return  m_authui8->GetChoiceDesc(p1, p2, p3);
 	if (m_authui10)
 		return  m_authui10->GetChoiceDesc(p1, p2, p3);
+	return S_OK;
 }
