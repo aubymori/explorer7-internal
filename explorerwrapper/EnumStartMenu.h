@@ -16,33 +16,34 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IEnumStartMenuItem: public IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE Next( ULONG celt, PSTARTMENUITEM rgelt, ULONG * pceltFetched ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Skip( ULONG celt ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Reset(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Clone(IEnumStartMenuItem**) = 0;
+	STDMETHOD(Next)( ULONG celt, PSTARTMENUITEM rgelt, ULONG * pceltFetched ) PURE;
+	STDMETHOD(Skip)( ULONG celt ) PURE;
+	STDMETHOD(Reset)(void) PURE;
+	STDMETHOD(Clone)(IEnumStartMenuItem**) PURE;
 };
 
 class CEnumStartMenu : public IEnumStartMenuItem
 {
 public:
-	//constructor
 	CEnumStartMenu();
-	//destructor
 	~CEnumStartMenu();
+
 	//IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
-    ULONG STDMETHODCALLTYPE AddRef( void);    
-    ULONG STDMETHODCALLTYPE Release( void);
+    STDMETHODIMP QueryInterface(REFIID riid,void **ppvObject);    
+	STDMETHODIMP_(ULONG) AddRef( void);
+	STDMETHODIMP_(ULONG) Release( void);
+
 	//IEnumUnknown
-	HRESULT STDMETHODCALLTYPE Clone(IEnumStartMenuItem **ppenum);
-	HRESULT STDMETHODCALLTYPE Next(ULONG celt,PSTARTMENUITEM rgelt,ULONG *pceltFetched);
-	HRESULT STDMETHODCALLTYPE Reset();
-	HRESULT STDMETHODCALLTYPE Skip(ULONG celt);
+	STDMETHODIMP Clone(IEnumStartMenuItem **ppenum);
+	STDMETHODIMP Next(ULONG celt,PSTARTMENUITEM rgelt,ULONG *pceltFetched);
+	STDMETHODIMP Reset();
+	STDMETHODIMP Skip(ULONG celt);
+
 	//our methods
-	void STDMETHODCALLTYPE AddItem(PSTARTMENUITEM item);
-	void STDMETHODCALLTYPE Sort();
-	void STDMETHODCALLTYPE RemoveDuplicates();
-	void STDMETHODCALLTYPE SetLimit(long limit);
+	STDMETHODIMP_(void) AddItem(PSTARTMENUITEM item);
+	STDMETHODIMP_(void) Sort();
+	STDMETHODIMP_(void) RemoveDuplicates();
+	STDMETHODIMP_(void) SetLimit(long limit);
 private:
 	long m_cRef;
 	long m_count;

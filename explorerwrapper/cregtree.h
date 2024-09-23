@@ -10,11 +10,11 @@ MIDL_INTERFACE("7897eca6-1b1b-452a-8581-bb9482aea7cc")
 IRegTreeOptions8 : public IUnknown
 {
 public:
-    virtual HRESULT STDMETHODCALLTYPE InitTree(HWND, HKEY, LPCSTR, LPCSTR) = 0;
-    virtual HRESULT STDMETHODCALLTYPE WalkTree(unsigned int) = 0;
-    virtual HRESULT STDMETHODCALLTYPE ToggleItem(_TREEITEM*) = 0;
-    virtual HRESULT STDMETHODCALLTYPE ShowHelp(_TREEITEM*, ULONG) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetEventListener(IUnknown*) = 0;
+    STDMETHOD(InitTree)(HWND, HKEY, LPCSTR, LPCSTR) PURE;
+    STDMETHOD(WalkTree)(unsigned int) PURE;
+    STDMETHOD(ToggleItem)(_TREEITEM*) PURE;
+    STDMETHOD(ShowHelp)(_TREEITEM*, ULONG) PURE;
+    STDMETHOD(SetEventListener)(IUnknown*) PURE;
 };
 
 class CRegTreeOptionsWrapper : public IRegTreeOptions8
@@ -24,16 +24,16 @@ public:
     ~CRegTreeOptionsWrapper();
 
     // IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
-    ULONG STDMETHODCALLTYPE AddRef(void);
-    ULONG STDMETHODCALLTYPE Release(void);
+    STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
+    STDMETHODIMP_(ULONG) AddRef(void);
+    STDMETHODIMP_(ULONG) Release(void);
 
     // IRegTreeOptions
-    HRESULT STDMETHODCALLTYPE InitTree(HWND, HKEY, LPCSTR, LPCSTR);
-    HRESULT STDMETHODCALLTYPE WalkTree(unsigned int);
-    HRESULT STDMETHODCALLTYPE ToggleItem(_TREEITEM*);
-    HRESULT STDMETHODCALLTYPE ShowHelp(_TREEITEM*, ULONG);
-    HRESULT STDMETHODCALLTYPE SetEventListener(IUnknown*);
+    STDMETHODIMP InitTree(HWND, HKEY, LPCSTR, LPCSTR);
+    STDMETHODIMP WalkTree(unsigned int);
+    STDMETHODIMP ToggleItem(_TREEITEM*);
+    STDMETHODIMP ShowHelp(_TREEITEM*, ULONG);
+    STDMETHODIMP SetEventListener(IUnknown*);
 private:
     IRegTreeOptions8* regtree;
     long m_cref;

@@ -33,7 +33,7 @@ ULONG __stdcall CAutoDestWrapper::Release(void)
 	return m_cRef;
 }
 
-HRESULT __stdcall CAutoDestWrapper::Initialize(const wchar_t* p1, const wchar_t* p2, const wchar_t* p3)
+HRESULT __stdcall CAutoDestWrapper::Initialize(LPCWSTR p1, LPCWSTR p2, LPCWSTR p3)
 {
 	return m_dest10->Initialize(p1, p2, p3);
 }
