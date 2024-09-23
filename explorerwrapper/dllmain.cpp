@@ -1113,7 +1113,7 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	WCHAR szOrbFile[MAX_PATH];
 	GetOrbDPIAndPos(szOrbFile);
 
-	WCHAR szOrbPath[MAX_PATH * 2];
+	WCHAR szOrbPath[MAX_PATH * 3];
 	wsprintfW(
 		szOrbPath,
 		L"%s\\orbs\\%s\\%s.bmp",
