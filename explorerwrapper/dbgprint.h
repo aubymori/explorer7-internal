@@ -255,6 +255,16 @@ inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 			StringAddress = DataSection + i;
 		}
 	}
+	if (!StringAddress)
+	{
+		for (int i = 0; i < TextSize; i++)
+		{
+			if (wcscmp((const wchar_t*)RefStr, (const wchar_t*)(TextSection + i)) == 0)
+			{
+				StringAddress = TextSection + i;
+			}
+		}
+	}
 
 	for (size_t i = 0; i < TextSize; i++)
 	{

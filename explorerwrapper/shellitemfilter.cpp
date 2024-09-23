@@ -21,6 +21,7 @@ CStartMenuItemFilter::CStartMenuItemFilter()
     memset(m_commonPrograms,0,sizeof(m_commonPrograms));
     memset(m_adminTools,0,sizeof(m_adminTools));
     memset(m_commonAdminTools,0,sizeof(m_commonAdminTools));
+    memset(m_games,0,sizeof(m_games));
     
     WCHAR psz[264];
     fSHGetFolderPathEx(FOLDERID_Programs,0,0,psz,260);
@@ -31,6 +32,8 @@ CStartMenuItemFilter::CStartMenuItemFilter()
     lstrcpy(LPWSTR(this->m_commonAdminTools), psz);
     fSHGetFolderPathEx(FOLDERID_AdminTools, 0, 0, psz, 260);
     lstrcpy(LPWSTR(this->m_adminTools), psz);
+    fSHGetFolderPathEx(FOLDERID_Games, 0, 0, psz, 260);
+    lstrcpy(LPWSTR(this->m_games), psz);
 }
 
 HRESULT __stdcall CStartMenuItemFilter::QueryInterface(REFIID riid, void** ppvObject)
@@ -160,6 +163,9 @@ bool CStartMenuItemFilter::FilterPidl(IShellFolder* shellfolder, LPCITEMIDLIST i
             return 0;
         
         if (this->m_adminTools && !lstrcmpiW(strret.pOleStr, this->m_adminTools))
+            return 0;
+
+        if (this->m_games && !lstrcmpiW(strret.pOleStr, this->m_games))
             return 0;
     }
     return v4;

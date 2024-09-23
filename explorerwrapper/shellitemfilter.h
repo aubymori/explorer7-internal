@@ -25,4 +25,5 @@ public:
     WCHAR m_commonPrograms[MAX_PATH];
     WCHAR m_adminTools[MAX_PATH];
     WCHAR m_commonAdminTools[MAX_PATH];
+    WCHAR m_games[MAX_PATH];
 };

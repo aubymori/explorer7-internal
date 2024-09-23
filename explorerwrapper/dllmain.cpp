@@ -24,6 +24,7 @@
 #include "shellapi.h"
 #include "autoplay.h"
 #include "shellitemfilter.h"
+#include "shell32_wrappers.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -70,7 +71,7 @@ static SetWindowBandApi SetWindowBandApiOrg;
 typedef BOOL(WINAPI* RegisterHotKeyApi)(HWND hwnd, int id, UINT fsMod, UINT vk);
 static RegisterHotKeyApi RegisterHotKeyApiOrg;
 
-
+wiktorArray<HTHEME>* themeHandles;
 
 // 7 {4376df10-a662-420b-b30d-958881461ef9}
 // 8 {7A5FCA8A-76B1-44C8-A97C-E7173CCA5F4F}
@@ -173,14 +174,37 @@ static HWND GetTaskListThumbWnd()
 	return hwnd_taskthumb;
 }
 
+const UINT ThemeChangeMessage = WM_USER + 69420;
+BOOL CALLBACK RefreshWindows(HWND wnd, LPARAM prm)
+{
+	if (wnd == (HWND)prm) return TRUE;
+
+	PostMessage(wnd, WM_THEMECHANGED, 0, 0);
+	dbgprintf(L"themechanged sent to %i",wnd);
+	return TRUE;
+}
+
 LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
 
 	if (uMsg == 0x56D) return 0;
-	if (uMsg == WM_THEMECHANGED) //reinit thememanager on themechanged, so that inactive msstyles is updated
-		//ThemeManagerInitialize(); //causes crashing...
+	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
+	{
+		for (int i = 0; i < themeHandles->size; ++i)
+		{
+			CloseThemeData(themeHandles->data[i]);
+		}
+		realloc(themeHandles->data, 0);
+		themeHandles->size = 0;
+
+		ThemeManagerInitialize();
+		EnumWindows(RefreshWindows, (LPARAM)hwnd);
+
+		uMsg = WM_THEMECHANGED;
+		return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
+	}
 
 	if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_WINDOWPOSCHANGED)
 	{
@@ -792,7 +816,7 @@ HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 
 	if (theme == nullptr)
 		dbgprintf(L"OPENTHEMEDATA FAILED %s", pszClassList);
-
+	themeHandles->push_back(theme);
 	return theme;
 }
 
@@ -816,7 +840,7 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 
 	if (theme == nullptr)
 		dbgprintf(L"OPENTHEMEDATAFORDPI FAILED %s", pszClassList);
-
+	themeHandles->push_back(theme);
 	return theme;
 }
 
@@ -840,7 +864,7 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 
 	if (theme == nullptr)
 		dbgprintf(L"OPENTHEMEDATAEX FAILED %s", pszClassList);
-
+	themeHandles->push_back(theme);
 	return theme;
 }
 
@@ -1092,7 +1116,7 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	}
 	else
 	{
-		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, cx, cy, fuLoad | LR_LOADFROMFILE);
+		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, 0, 0, fuLoad | LR_LOADFROMFILE);
 	}
 }
 
@@ -1125,6 +1149,17 @@ void HookLoadImageForSizeAndFont()
 	}
 }
 
+HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnknown* pUnkOuter,  IID&  riid, void** ppv)
+{
+	HRESULT res = SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter,riid,ppv);
+	//if (res != S_OK && riid == GUID_88df9332_6adb_4604_8218_508673ef7f8a)
+	//{
+	//	riid = GUID_4f33718d_bae1_4f9b_96f2_d2a16e683346;
+	//	return SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter, riid, ppv);
+	//}
+	return res;
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1138,6 +1173,8 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll",SHCreateDesktopOrig,SHCreateDesktopNEW);
 	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)201);
 	ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll",SHDesktopMessageLoop,SHDesktopMessageLoopNEW);
+
+	ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"),"SHCoCreateInstance"), SHCoCreateInstanceNew);
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)902), GetProcAddress(GetModuleHandle(L"shunimpl.dll"),(LPSTR)473));
 	//change appid
@@ -1158,6 +1195,18 @@ void HookAPIs()
 	}
 	else
 		MessageBox(0,L"SHite",L"FUck",0);
+
+	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
+	if (GetClassIdForShellTarget)
+	{
+		GetClassIdForShellTarget = (void*)GetFunctionStart((uintptr_t)GetClassIdForShellTarget, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
+
+		//byebye
+		DWORD old;
+		VirtualProtect(GetClassIdForShellTarget, 1, PAGE_EXECUTE_READWRITE, &old);
+		*reinterpret_cast<char*>(GetClassIdForShellTarget) = 0xC3;
+		VirtualProtect(GetClassIdForShellTarget, 1, old, 0);
+	}
 
 	ThemeManagerInitialize();
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
@@ -1374,6 +1423,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			{
 				AssFuckShunimpl();
 
+				themeHandles = new wiktorArray<HTHEME>();
+				themeHandles->data = 0;
+				themeHandles->size = 0;
+
 				dbgprintf(L"Dll Attach\n");
 				g_hInstance = hModule;
 				if ( GetModuleHandle(L"DisplaySwitch.exe") )
@@ -1398,7 +1451,12 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			}
 			break;
 		case DLL_THREAD_DETACH:
+			break;
 		case DLL_PROCESS_DETACH:
+			realloc(themeHandles->data, 0);
+			themeHandles->size = 0;
+			delete themeHandles;
+
 			break;
 	}
 	return TRUE;

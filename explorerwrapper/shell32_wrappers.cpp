@@ -209,7 +209,7 @@ const FolderDefinition c_rgrfi[] =
 	{&FOLDERID_Programs , 0, 0x14},
 	{&FOLDERID_CommonStartMenu , 0, 0x1A},
 	{&FOLDERID_CommonPrograms , 0, 0x16},
-	{&FOLDERID_Games , 0, 0x10},
+	//{&FOLDERID_Games , 0, 0x10}, //dont include games folder till further notice, causes duplicate entries
 	{&FOLDERID_Desktop , 0x1000, 1},
 	{&FOLDERID_PublicDesktop , 0x1000, 3},
 	{&FOLDERID_UserPinned , 0, 0x20},
@@ -235,8 +235,9 @@ static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, ISh
 		{
 			shellItem->BindToHandler(0, BHID_SFObject, IID_PPV_ARGS(&AppsFolder));
 
-			pasf->AddNameSpace((LPGUID)&FOLDERID_AppsFolder, AppsFolder, 0, ASFF_MERGESAMEGUID, 0);
+			pasf->AddNameSpace((LPGUID)&FOLDERID_AppsFolder, AppsFolder, 0, ASFF_DEFNAMESPACE_ALL | ASFF_UNK, 2);
 			AppsFolder->Release();
+			shellItem->Release();
 		}
 
 		for (int i = 0; i < _ARRAYSIZE(c_rgrfi); ++i)
@@ -249,7 +250,7 @@ static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, ISh
 				{
 					shellItem->BindToHandler(0, BHID_SFObject, IID_PPV_ARGS(&AppsFolder));
 
-					pasf->AddNameSpace((LPGUID)Def.FolderID, AppsFolder, 0, 0xFF08, 0);
+					pasf->AddNameSpace((LPGUID)Def.FolderID, AppsFolder, 0, 0xFF08 | ASFF_DEFNAMESPACE_ALL | ASFF_UNK, 1);
 					AppsFolder->Release();
 				}
 			}
