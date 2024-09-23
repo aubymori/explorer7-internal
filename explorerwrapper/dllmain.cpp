@@ -1130,7 +1130,6 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	{
 		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, cx, cy, fuLoad | LR_LOADFROMFILE);
 	}
-	
 }
 
 void HookLoadImageForSizeAndFont()
@@ -1150,6 +1149,19 @@ void HookLoadImageForSizeAndFont()
 		DetourCall((void*)callLoadImage, LoadImageW_CallHook);
 
 
+	}
+
+	char* callDrawExtended = (char*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 57 48 83 EC 30 33 DB 48 8B F9 48 39 59 40");
+	if (!callDrawExtended) return;
+
+	if (callDrawExtended)
+	{
+		char bytes[] = { 0xB0,0x01,0xC3 };
+
+		DWORD old;
+		VirtualProtect(callDrawExtended, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
+		memcpy(callDrawExtended, bytes, sizeof(bytes));
+		VirtualProtect(callDrawExtended, sizeof(bytes), old, 0);
 	}
 }
 
