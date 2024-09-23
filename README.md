@@ -21,8 +21,8 @@ These keys are located under `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Curre
 
 | Name | Type | Description | Default Value |
 | ---- | ---- | ----------- | ------------- |
-| Theme | REG_SZ | Name of the theme to use. This is relative to the directory. For example, `"aero"` will use the theme at `"explorer7\theme\aero.msstyles"`, `"Aero\aero"` will use the theme at `"explorer7\theme\Aero\aero.msstyles"`. If this is not specified, `aero` will be used. | **aero** |
-| OrbImage | REG_SZ | Name of the orb to use. This is relative to the directory. For example, `"aero"` will use the theme at `"explorer7\orbs\aero.bmp"`, `"Aero\aero"` will use the theme at `"explorer7\orbs\Aero\aero.bmp"`. If this is not specified, `default` will be used. | **default** |
+| Theme | REG_SZ | Name of the theme file to use. This is relative to the directory. For example, `"aero"` will use the theme at `"explorer7\theme\aero.msstyles"`, `"Aero\aero"` will use the theme at `"explorer7\theme\Aero\aero.msstyles"`. If this is not specified, `aero` will be used. | **aero** |
+| OrbImage | REG_SZ | Name of the orb image file to use. This is relative to the directory. For example, `"6801"` will use the orb at `"explorer7\orbs\6801.bmp"`, `"Orb1\6801"` will use the theme at `"explorer7\orbs\Orb1\6801.bmp"`. If this is not specified, the internal explorer image will be used. | **default** |
 | DisableComposition | REG_DWORD | When set to 1, Explorer7 will act as if the Desktop Window Manager is not running. | **0** |
 | ClassicTheme | REG_DWORD | When set to 1, Explorer7 will use the Windows Classic theme. | **0** |
 | EnableImmersive | REG_DWORD | Controls the ability to run UWP apps in the system. When set to 0, UWP apps won't run. | **1** |
