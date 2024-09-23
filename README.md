@@ -15,14 +15,133 @@ explorer7 (formerly known as ex7forw8) is a **wrapper dll** that allows Windows 
 
 </details>
 
+## Known issues (Milestone 1)
+
+**MAKE SURE YOU READ THESE FIRST TO KNOW WHAT YOU'RE GETTING INTO!**
+
+**Windows 8.1**
+- No proper strings for "Customize Start Menu" dialog.
+
+**Windows 10**
+- No support for UWP applications (in the works).
+- Autoplay does not work.
+- Metro "Open With" dialog opens on top left of screen.
+- System msstyles with name "aero.msstyles" messes with the Start Menu colorization.
+- Wallpaper stops working/Desktop becomes buggy when plugging another monitor in/changing multimonitor configuration while explorer is running.
+- Desktop area sticks to a specific resolution and requires going into the Wallpaper control panel page to fix (i.e going from 1920x1080 to 1024x768, the desktop area/wallpaper would be rendered as 1080p still, vice versa).
+- Searching for an executable rather than its display name results in program not opening (i.e cmd.exe instead of Command Prompt).
+- Notification Area Icon settings in Control Panel are missing.
+- "All Programs" list is heavily unfinished. Folders will come first and shortcuts will have an arrow icon on them.
+- Unless icon is blanked, the badge for compression (in case enabled) will appear on taskbar/start menu items.
+- Dragging selection on desktop in circles for a few seconds results in a lot of breakage, requiring an explorer.exe restart.
+
+**Windows 11**
+- Taskbar/Start menu pins broken due to confirmation dialog introduction (fixed in Windows 10 22h2).
+- Yet to be documented!
+
+**Windows 7 limitations/bugs**
+
+None of the following will be accounted for in explorer7:
+
+- Multi-monitor taskbars are not supported. These would be introduced by Windows 8 build 7779.
+- Startup items defined in modern Task Manager are not accounted for. You must use old msconfig.exe.
+- The taskbar does not remember its size/position until a while after.
+
+## Installation Guide
+
+For most users, you'll want the **regular installation method**:
+
+<details>
+  <summary>Standard installation</summary>
+  
+**Pre-Requirements**
+1. explorer7 package from releases
+2. Valid Windows 7 x64 installation medium, in the same language as your system
+
+**How-to**
+1. Mount Windows 7 install media by double clicking on it
+2. Have the explorer7 package extracted somewhere handy. A good folder would be `X:\Program Files\explorer7`
+3. Run ex7forw8.exe. The installer will ask for Windows 7 files. You can select any of the 2 options provided the installation media is mounted.
+4. You should see the following dialog if the installer succeeded:
+   
+   ![image](https://github.com/user-attachments/assets/000d1a87-7297-4c58-93ba-03ea8cdb1035)
+   
+5. If you wish to switch your shell to the Windows 7 explorer right now, use the option for it. You can always change back by running ex7forw8.exe once again and selecting the "Use Windows 8 explorer" option (this is currently misnamed, all it does is revert to your system's default shell)
+6. Enjoy!
+</details>
+ 
+
+In case you have an unsupported explorer.exe version you wish to try your luck on, or your installation medium is in another language, you may try **manually patching and installing** providing your own files:
+
+<details>
+  <summary>Manual Installation/Patching</summary>
+
+**Pre-Requirements:**
+1. explorer7 package from releases
+2. [CFF Explorer](https://ntcore.com/files/CFF_Explorer.zip)
+3. Valid installation medium of your choice (Windows XP x64 - Windows 7 SP1 x64)
+4. [7-Zip](https://www.7-zip.org/) or [WinRAR](https://www.win-rar.com/start.html) unless you want to mount install.wim using DISM to extract a few files like a maniac
+5. Slight experience utilizing a personal computer
+
+**Step 1 - Fetching files**
+
+**NOTE:** Windows XP did not have MUI files You only need the `explorer.exe` from it. You can also skip the en-US folder creation part.
+
+1. Mount your install media
+2. Open `\sources\install.wim` using your archiver of choice (listed 2 in the pre-requirements)
+3. Fetch the following files from install.wim (copy them somewhere safe): `\1\Windows\explorer.exe`, `\1\Windows\en-US\explorer.exe.mui` and `\1\Windows\System32\en-US\shell32.dll.mui`
+4. Make an "en-US" folder in the folder which contains the explorer7 package. The file tree will look something like the following:
+```
+ex7_example/
+├─ theme/
+├─ en-US/
+├─ ex7forw8.exe
+├─ Import Me.reg
+├─ README.txt
+├─ wrp64.dll
+
+```
+5. Copy `shell32.dll.mui` and `explorer.exe.mui` to the `en-US` folder you've just created, and `explorer.exe` alongside `wrp64.dll`:
+```
+ex7_example/
+├─ theme/
+├─ en-US/
+│  ├─ explorer.exe.mui
+│  ├─ shell32.dll.mui
+├─ ex7forw8.exe
+├─ explorer.exe
+├─ Import Me.reg
+├─ README.txt
+├─ wrp64.dll
+
+```
+
+Now you should have all of the necessary files to go onto the next step.
+
+**Step 2 - Patching explorer.exe**
+
+**NOTE:** For now, do not replace the `SHLWAPI.DLL` import on XP x64's `explorer.exe`.
+
+By default, explorer.exe will not use the wrapper dll, so you have to change out a few imports in the executable. Make sure you've fetched [CFF Explorer](https://ntcore.com/files/CFF_Explorer.zip) from the requirements.
+1. Open CFF Explorer, drag explorer.exe into the window
+2. Open the "Import Directory" folder in the left sidebar
+3. Change out the imports for `SHLWAPI.DLL`, `OLE32.DLL` and (if applicable) `EXPLORERFRAME.DLL`:
+![image](https://github.com/user-attachments/assets/3122093d-8068-49c1-80a5-161468a65dfe)
+4. Save the file.
+
+By now, you should be able to start `explorer.exe` from task manager or through other means. 
+
+</details>
+
+
 ## Registry keys
 
 These keys are located under `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced`.
 
 | Name | Type | Description | Default Value |
 | ---- | ---- | ----------- | ------------- |
-| Theme | REG_SZ | Name of the theme file to use. This is relative to the directory. For example, `"aero"` will use the theme at `"explorer7\theme\aero.msstyles"`, `"Aero\aero"` will use the theme at `"explorer7\theme\Aero\aero.msstyles"`. If this is not specified, `aero` will be used. | **aero** |
-| OrbImage | REG_SZ | Name of the orb image file to use. This is relative to the directory. For example, `"6801"` will use the orb at `"explorer7\orbs\6801.bmp"`, `"Orb1\6801"` will use the theme at `"explorer7\orbs\Orb1\6801.bmp"`. If this is not specified, the internal explorer image will be used. | **default** |
+| Theme | REG_SZ | Name of the theme file to use. This is relative to the installation directory. For example, `"aero"` will use the theme at `"explorer7\theme\aero.msstyles"`, `"Aero\aero"` will use the theme at `"explorer7\theme\Aero\aero.msstyles"`. If this is not specified, `aero` will be used. | **aero** |
+| OrbImage | REG_SZ | Name of the orb images directory to use. This is relative to the installation directory. For example, `"6801"` will use the orb at `"explorer7\orbs\6801.bmp"`, `"Orb1\6801"` will use the theme at `"explorer7\orbs\Orb1\6801.bmp"`. If this is not specified, the internal explorer image will be used. Need to revise this because i don't know how the behavior actually is lol!| **default** |
 | DisableComposition | REG_DWORD | When set to 1, Explorer7 will act as if the Desktop Window Manager is not running. | **0** |
 | ClassicTheme | REG_DWORD | When set to 1, Explorer7 will use the Windows Classic theme. | **0** |
 | EnableImmersive | REG_DWORD | Controls the ability to run UWP apps in the system. When set to 0, UWP apps won't run. | **1** |
@@ -56,12 +175,6 @@ explorer7/
 </details>
 
 
-## Manual Patch
-
-If you wish to patch your explorer.exe to use the wrapper dll, you need something like [CFF Explorer](https://ntcore.com/files/CFF_Explorer.zip) to change out the imports for `SHLWAPI.DLL`, `OLE32.DLL` and (if applicable) `EXPLORERFRAME.DLL` to `WRP64.DLL` (wrapper dll). This is what the ex7forw8 installer does to the files you provide.
-
-![image](https://github.com/user-attachments/assets/3122093d-8068-49c1-80a5-161468a65dfe)
-
 ## Development plan
 
 We're working based on a milestone stage. Here's the planned stages of development:
@@ -69,7 +182,7 @@ We're working based on a milestone stage. Here's the planned stages of developme
 |   Stage   | Goal | Status |
 | -------- | --------- | ------ |
 | Milestone 1 | Project start, stability on Windows 8.1 and a solid base for Windows 10 support. | ✅ Completed |
-| Milestone 2 | Ironing out any last Windows 8.1-specific bugs, stability on Windows 10, UWP support and a solid base for Windows 11 | ⏳ Work in progress |
+| Milestone 2 | Ironing out any last Windows 8.1-specific bugs, stability on Windows 10, UWP support, some QOL work (installer, configurator, older .msstyles support, custom orb support) and a solid base for Windows 11 | ⏳ Work in progress |
 | Milestone 3 | Working out any last bugs on Windows 10, finishing up what's left for Windows 11, 1.0 | ⛔ Not in works |
 
 While this project is aimed at restoring Windows 7 explorer.exe functionality, older explorers have been proven to work with the wrapper. In the future, we plan to support them directly.  Here's the chart
