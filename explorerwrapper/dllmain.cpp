@@ -175,7 +175,7 @@ static HWND GetTaskListThumbWnd()
 
 LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (g_enableImmersiveShellStack)
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
 
 	if (uMsg == 0x56D) return 0;
@@ -1415,7 +1415,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	HRESULT result;
 	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
 
-	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK)
+	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK && g_osVersion.BuildNumber() >= 10074) //Ittr: as far as im aware doesnt cause crashing on 1507/11. needs further checking when im awake
 	{
 		auto shellItemFilter = new CStartMenuItemFilter();
 		result = shellItemFilter->QueryInterface(riid,ppv);
