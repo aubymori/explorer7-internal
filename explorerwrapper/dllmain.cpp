@@ -1051,6 +1051,50 @@ BOOL FileExists(LPCTSTR szPath)
          !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
+void GetOrbDPIAndPos(LPWSTR fName)
+{
+	APPBARDATA abd;
+	abd.cbSize = sizeof(APPBARDATA);
+	SHAppBarMessage(ABM_GETTASKBARPOS, &abd);
+
+	HDC screen = GetDC(NULL);
+	double hPixelsPerInch = GetDeviceCaps(screen,LOGPIXELSX);
+	double vPixelsPerInch = GetDeviceCaps(screen,LOGPIXELSY);
+	ReleaseDC(NULL, screen);
+	double dpi = (hPixelsPerInch + vPixelsPerInch) * 0.5;
+
+	if(dpi >= 120)
+	{
+		if(dpi >= 144) 
+		{
+			if(dpi >= 192)
+			{
+				if(abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6808");
+				else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6812");
+				else StringCchCopyW(fName, MAX_PATH, L"6804");
+			}
+			else
+			{
+				if(abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6807");
+				else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6811");
+				else StringCchCopyW(fName, MAX_PATH, L"6803");
+			}
+		}
+		else
+		{
+			if(abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6806");
+			else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6810");
+			else StringCchCopyW(fName, MAX_PATH, L"6802");
+		}
+	}
+	else
+	{
+		if(abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6805");
+		else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6809");
+		else StringCchCopyW(fName, MAX_PATH, L"6801");
+	}
+}
+
 HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
 {
 	dbgprintf(L"LoadImageW_CallHook has been called!");
@@ -1061,17 +1105,21 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	if (*backslash == L'\\')
 		*backslash = L'\0';
 
-	WCHAR szOrbName[MAX_PATH];
-	LSTATUS res = g_registry.QueryValue(L"OrbImage", (LPBYTE)szOrbName, sizeof(szOrbName));
-	if (!*szOrbName || ERROR_SUCCESS != res)
-		StringCchCopyW(szOrbName, MAX_PATH, L"default");
+	WCHAR szOrbDir[MAX_PATH];
+	LSTATUS res = g_registry.QueryValue(L"OrbDirectory", (LPBYTE)szOrbDir, sizeof(szOrbDir));
+	if (!*szOrbDir || ERROR_SUCCESS != res)
+		return LoadImageW(hInst,name,type,cx,cy,fuLoad);
+
+	WCHAR szOrbFile[MAX_PATH];
+	GetOrbDPIAndPos(szOrbFile);
 
 	WCHAR szOrbPath[MAX_PATH * 2];
 	wsprintfW(
 		szOrbPath,
-		L"%s\\orbs\\%s.bmp",
+		L"%s\\orbs\\%s\\%s.bmp",
 		szExeDir,
-		szOrbName
+		szOrbDir,
+		szOrbFile
 	);
 
 	if(FileExists(szOrbPath) == FALSE)
