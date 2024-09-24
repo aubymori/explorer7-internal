@@ -74,10 +74,8 @@ ULONG __stdcall CStartMenuItemFilter::Release(void)
 {
     auto ref = _InterlockedDecrement(&this->m_ref);
     if (!ref)
-    {
         delete this;
-        return ref;
-    }
+    return ref;
 }
 
 bool IsMergedFolderGUID(IShellFolder* ShellFolder, LPCITEMIDLIST pidl, REFGUID Guid)

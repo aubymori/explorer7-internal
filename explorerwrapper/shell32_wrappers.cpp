@@ -1,15 +1,11 @@
-#include <Windows.h>
-#include <Shlwapi.h>
+#include "framework.h"
 #include "autoplay.h"
 #include "dbgprint.h"
-#include <ShlObj.h>
-#include <cstdint>
 #include "version.h"
 #include "shell32_wrappers.h"
 #include "augmentedshellfolder.h"
 #include "MinHook.h"
 #include "knownfolders.h"
-#include <Shlguid.h>
 #include "registry.h"
 
 DWORD bEnableUWPAppsInStart = true;
@@ -224,7 +220,7 @@ static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, ISh
 	IAugmentedShellFolder* pasf = nullptr;
 
 	*ppsfStartMenu = NULL;
-	hr = CoCreateInstance(CLSID_MergedFolder, 0LL, 1u, GUID_2f711b17_773c_41d4_93fa_7f23edcecb66, (LPVOID*)&pasf);
+	hr = CoCreateInstance(CLSID_MergedFolder, 0LL, 1u, IID_IAugmentedFolder, (LPVOID*)&pasf);
 
 	if (bEnableUWPAppsInStart)
 	{
@@ -287,73 +283,9 @@ static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, ISh
 			ILFree(pidlUserStartMenu);
 		}
 	}
-
-	
-
 	*ppsfStartMenu = pasf;
-
 	return hr;
 }
-
-/*
-static HRESULT GetMergedFolder(int folder1, int folder2, IShellFolder** ppsfStartMenu)
-{
-	HRESULT hr;
-	LPITEMIDLIST pidlUserStartMenu;
-	LPITEMIDLIST pidlCommonStartMenu;
-	IShellFolder* psfUserStartMenu = nullptr;
-	IShellFolder* psfCommonStartMenu = nullptr;
-	IAugmentedShellFolder* pasf = nullptr;
-
-	*ppsfStartMenu = NULL;
-	hr = CoCreateInstance(CLSID_MergedFolder, 0LL, 1u, GUID_2f711b17_773c_41d4_93fa_7f23edcecb66, (LPVOID*)&pasf);
-
-	hr = SHGetSpecialFolderLocation(NULL, folder1, &pidlUserStartMenu);
-	if (FAILED(hr))
-	{
-		hr = SHGetSpecialFolderLocation(NULL, folder2, &pidlCommonStartMenu);
-		if (FAILED(hr))
-			return hr;
-
-		hr = BindToDesktop(pidlCommonStartMenu, ppsfStartMenu);
-		ILFree(pidlCommonStartMenu);
-		return hr;
-	}
-	hr = SHGetSpecialFolderLocation(NULL, folder2, &pidlCommonStartMenu);
-	if (FAILED(hr))
-	{
-		hr = BindToDesktop(pidlUserStartMenu, ppsfStartMenu);
-		ILFree(pidlUserStartMenu);
-		return hr;
-	}
-
-	hr = BindToDesktop(pidlUserStartMenu, &psfUserStartMenu);
-	if (FAILED(hr))
-		return hr;
-
-	hr = BindToDesktop(pidlCommonStartMenu, &psfCommonStartMenu);
-	if (FAILED(hr))
-		return hr;
-
-	GUID GUID_NULL = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-
-	hr = pasf->AddNameSpace(&GUID_NULL, psfUserStartMenu, pidlUserStartMenu, 0x0FF0A,2);
-	if (FAILED(hr))
-		return hr;
-
-	hr = pasf->AddNameSpace(&GUID_NULL, psfCommonStartMenu, pidlCommonStartMenu, 0x0E,2);
-	if (FAILED(hr))
-		return hr;
-
-	*ppsfStartMenu = pasf;
-
-
-	ILFree(pidlCommonStartMenu);
-	ILFree(pidlUserStartMenu);
-
-	return hr;
-}
-*/
 
 HRESULT WINAPI Shell32_CoCreateInstance(
 	__in   REFCLSID rclsid,

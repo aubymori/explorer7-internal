@@ -3,6 +3,14 @@
 
 DEFINE_GUID(CLSID_PersonalStartMenu, 0x3F6953F0, 0x5359, 0x47FC, 0x0BD, 0x99, 0x9F, 0x2C, 0x0B9, 0x5A, 0x62, 0x0FD);
 
+MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
+INameSpaceTreeControlValuesPrivate : IUnknown
+{
+public:
+	virtual void stub() = 0;
+	virtual void SetIndentValue(int indent) = 0;
+};
+
 UINT (__fastcall*fGetDpiForWindow)(HWND hwnd);
 DPI_AWARENESS_CONTEXT (__fastcall*fGetWindowDpiAwarenessContext)(HWND hwnd);
 BOOL (__fastcall*fAreDpiAwarenessContextsEqual)(DPI_AWARENESS_CONTEXT A, DPI_AWARENESS_CONTEXT B);
@@ -107,14 +115,6 @@ static __int64 __fastcall CNscTree_SetItemHeight(__int64 a1, int a2)
 	CNscTree_ScaleAndSetRowHeight(a1 - 256);
 	return 0LL;
 }
-
-MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
-INameSpaceTreeControlValuesPrivate : IUnknown
-{
-public:
-	virtual void stub() = 0;
-	virtual void SetIndentValue(int indent) = 0;
-};
 
 extern HRESULT(__fastcall* CNSCHost_FillNSCOg)(uintptr_t nscHost);
 static HRESULT __fastcall CNSCHost_FillNSC(uintptr_t nscHost) //todo: reimplement the filter from 7 shell32, CLSID_PersonalStartMenu GUID_2659b475_eeb8_48b7_8f07_b378810f48cf

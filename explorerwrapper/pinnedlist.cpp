@@ -1,8 +1,6 @@
 #include "pinnedlist.h"
 #include "dbgprint.h"
 
-bool g_bSwapModifyPointers = false;
-
 CPinnedListWrapper::CPinnedListWrapper(IUnknown* flex, int build)
 {
 	m_build = build;
@@ -88,7 +86,7 @@ HRESULT __stdcall CPinnedListWrapper::Modify(PCIDLIST_ABSOLUTE p1, PCIDLIST_ABSO
 	if (m_flexList)
 		return m_flexList->Modify(p1, p2);
 	if (m_pinnedList3)
-		return m_pinnedList3->Modify(p1, p2, (PLMC)18);
+		return m_pinnedList3->Modify(p1, p2, 18);
 	return S_OK;
 }
 

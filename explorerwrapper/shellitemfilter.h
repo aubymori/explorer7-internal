@@ -1,22 +1,19 @@
 #pragma once
 #include "framework.h"
+
 class CStartMenuItemFilter : public IShellItemFilter
 {
 public:
     CStartMenuItemFilter();
 
     //IUnknown interface
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
-
-    virtual ULONG STDMETHODCALLTYPE AddRef(void);
-
-    virtual ULONG STDMETHODCALLTYPE Release(void);
-
+    STDMETHOD(QueryInterface)(REFIID riid, void** ppvObject);
+    STDMETHOD_(ULONG,AddRef)(void);
+    STDMETHOD_(ULONG, Release)(void);
 
     //IShellItemFilter interface
-    virtual HRESULT STDMETHODCALLTYPE IncludeItem(IShellItem* psi);
-
-    virtual HRESULT STDMETHODCALLTYPE GetEnumFlagsForItem(IShellItem* psi,SHCONTF* pgrfFlags);
+    STDMETHOD(IncludeItem)(IShellItem* psi);
+    STDMETHOD(GetEnumFlagsForItem)(IShellItem* psi,SHCONTF* pgrfFlags);
 
     bool FilterPidl(IShellFolder* shellfolder, LPCITEMIDLIST idl);
 

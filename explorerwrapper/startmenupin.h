@@ -4,8 +4,10 @@
 #define INITGUID
 #include "framework.h"
 
+#pragma region GUID definitions
 DEFINE_GUID(CLSID_StartMenuPin,0xA2A9545D, 0xA0C2, 0x42B4, 0x97,0x08,0xA0,0xB2,0xBA,0xDD,0x77,0xC8); //{A2A9545D-A0C2-42B4-9708-A0B2BADD77C8}
 DEFINE_GUID(CLSID_TaskbarPin,0x90AA3A4E, 0x1CBA, 0x4233, 0xB8,0xBB,0x53,0x57,0x73,0xD4,0x84,0x49);
+#pragma endregion
 
 typedef HRESULT (WINAPI* CreateInstance_API)(PVOID,REFIID,PVOID*);
 	typedef struct { 
@@ -31,32 +33,32 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IStartMenuShellExtInit
 {
 public:
-	virtual void QueryInterface() = 0;
-	virtual void AddRef() = 0;
-	virtual void Release() = 0;
-	virtual void Initialize() = 0;
-	virtual LRESULT SetChangeCount(DWORD value) = 0;
-	virtual IStream* OpenPinRegStream(DWORD grfMode) = 0;
-	virtual IStream* OpenLinksRegStream(DWORD grfMode) = 0;
-	virtual void NotifyPinListChange() = 0;
-	virtual LRESULT GetPinStreamVersion() = 0;
-	virtual LRESULT SetPinStreamVersion(DWORD value) = 0;
-	virtual void Unimpl1() = 0;
-	virtual void UpgradeItem() = 0;
-	virtual LRESULT GetBackupSubDirName(LPWSTR szOut, UINT cbLen) = 0;
-	virtual void IsAcceptableTarget() = 0;
-	virtual DWORD IsRestricted() = 0;
-	virtual void Unimpl2() = 0;
-	virtual LRESULT GetMenuStringID(UINT* w) = 0;
-	virtual int GetHelpText(unsigned __int64, LPWSTR, UINT) = 0;
-	virtual LRESULT GetChangeCount(DWORD* pdwVal) = 0;
-	virtual wchar_t* GetVerb(UINT op) = 0;
-	virtual void SendPinRearrangeSQM() = 0;
-	virtual LRESULT SetRemovedChangeCount(DWORD value) = 0;
-	virtual LRESULT GetRemovedChangeCount() = 0;
-	virtual void GetPinnedAppSQMEventID() = 0;
-	virtual void AppliesTo() = 0;
-	virtual void v_GetPinListMutexName() = 0;
+	STDMETHOD_(void,QueryInterface)() PURE;
+	STDMETHOD_(void, AddRef)() PURE;
+	STDMETHOD_(void, Release)() PURE;
+	STDMETHOD_(void, Initialize)() PURE;
+	STDMETHOD_(LRESULT, SetChangeCount)(DWORD value) PURE;
+	STDMETHOD_(IStream*, OpenPinRegStream)(DWORD grfMode) PURE;
+	STDMETHOD_(IStream*, OpenLinksRegStream)(DWORD grfMode) PURE;
+	STDMETHOD_(void, NotifyPinListChange)() PURE;
+	STDMETHOD_(LRESULT,GetPinStreamVersion)() PURE;
+	STDMETHOD_(LRESULT, SetPinStreamVersion)(DWORD value) PURE;
+	STDMETHOD_(void, Unimpl1)() PURE;
+	STDMETHOD_(void, UpgradeItem)() PURE;
+	STDMETHOD_(LRESULT, GetBackupSubDirName)(LPWSTR szOut, UINT cbLen) PURE;
+	STDMETHOD_(void, IsAcceptableTarget)() PURE;
+	STDMETHOD_(DWORD, IsRestricted)() PURE;
+	STDMETHOD_(void, Unimpl2)() PURE;
+	STDMETHOD_(LRESULT, GetMenuStringID)(UINT* w) PURE;
+	STDMETHOD_(int, GetHelpText)(unsigned __int64, LPWSTR, UINT) PURE;
+	STDMETHOD_(LRESULT, GetChangeCount)(DWORD* pdwVal) PURE;
+	STDMETHOD_(wchar_t*, GetVerb)(UINT op) PURE;
+	STDMETHOD_(void, SendPinRearrangeSQM)() PURE;
+	STDMETHOD_(LRESULT, SetRemovedChangeCount)(DWORD value) PURE;
+	STDMETHOD_(LRESULT, GetRemovedChangeCount)() PURE;
+	STDMETHOD_(void, GetPinnedAppSQMEventID)() PURE;
+	STDMETHOD_(void, AppliesTo)() PURE;
+	STDMETHOD_(void, v_GetPinListMutexName)() PURE;
 };
 
 class CStartMenuPin  : public IStartMenuShellExtInit/*, public IContextMenuShort*/
