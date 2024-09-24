@@ -384,3 +384,4 @@ HRESULT __stdcall CProgramsFolderClassFactory::LockServer(BOOL fLock)
 {
 	return S_OK;
 }
+

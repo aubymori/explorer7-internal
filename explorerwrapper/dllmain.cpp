@@ -25,6 +25,7 @@
 #include "autoplay.h"
 #include "shellitemfilter.h"
 #include "shell32_wrappers.h"
+#include "shellurl.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -1152,11 +1153,12 @@ void HookLoadImageForSizeAndFont()
 HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnknown* pUnkOuter,  IID&  riid, void** ppv)
 {
 	HRESULT res = SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter,riid,ppv);
-	//if (res != S_OK && riid == GUID_88df9332_6adb_4604_8218_508673ef7f8a)
-	//{
-	//	riid = GUID_4f33718d_bae1_4f9b_96f2_d2a16e683346;
-	//	return SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter, riid, ppv);
-	//}
+	if (res != S_OK && riid == GUID_88df9332_6adb_4604_8218_508673ef7f8a)
+	{
+		IShellURL10* shellurl10;
+		res = SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter, GUID_4f33718d_bae1_4f9b_96f2_d2a16e683346, (void**)&shellurl10);
+		*ppv = new CShellURLWrapper(shellurl10);
+	}
 	return res;
 }
 

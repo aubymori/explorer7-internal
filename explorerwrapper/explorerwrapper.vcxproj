@@ -209,6 +209,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="shell32_wrappers.h" />
     <ClInclude Include="shellitemfilter.h" />
+    <ClInclude Include="shellurl.h" />
     <ClInclude Include="startmenupin.h" />
     <ClInclude Include="startmenuresolver.h" />
     <ClInclude Include="systraywrapper.h" />
@@ -253,6 +254,7 @@
     <ClCompile Include="registry.cpp" />
     <ClCompile Include="shell32_wrappers.cpp" />
     <ClCompile Include="shellitemfilter.cpp" />
+    <ClCompile Include="shellurl.cpp" />
     <ClCompile Include="startmenupin.cpp" />
     <ClCompile Include="startmenuresolver.cpp">
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</WholeProgramOptimization>
