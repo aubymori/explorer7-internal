@@ -601,7 +601,7 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 
 __int64 ShouldAddWindowToTray(HWND hwnd)
 {
-	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisible(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
+	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisibleNEW(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
 	dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
 	return ret;
 }
