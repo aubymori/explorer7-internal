@@ -23,15 +23,13 @@ explorer7 (formerly known as ex7forw8) is a **wrapper dll** that allows Windows 
 - No proper strings for "Customize Start Menu" dialog.
 
 **Windows 10**
-- No support for UWP applications (in the works).
+- Partial support for UWP apps.
 - Autoplay does not work.
-- Metro "Open With" dialog opens on top left of screen.
+- Metro "Open With" dialog opens on top left of screen (works with UWP enabled)
 - System msstyles with name "aero.msstyles" messes with the Start Menu colorization.
 - Wallpaper stops working/Desktop becomes buggy when plugging another monitor in/changing multimonitor configuration while explorer is running.
 - Desktop area sticks to a specific resolution and requires going into the Wallpaper control panel page to fix (i.e going from 1920x1080 to 1024x768, the desktop area/wallpaper would be rendered as 1080p still, vice versa).
-- Searching for an executable rather than its display name results in program not opening (i.e cmd.exe instead of Command Prompt).
 - Notification Area Icon settings in Control Panel are missing.
-- "All Programs" list is heavily unfinished. Folders will come first and shortcuts will have an arrow icon on them.
 - Unless icon is blanked, the badge for compression (in case enabled) will appear on taskbar/start menu items.
 - Dragging selection on desktop in circles for a few seconds results in a lot of breakage, requiring an explorer.exe restart.
 
