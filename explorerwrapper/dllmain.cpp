@@ -45,6 +45,7 @@ HANDLE hEvent_DesktopVisible;
 
 DWORD g_dwTrayThreadId = 0;
 
+
 bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
 bool g_enableImmersiveShellStack = false;
@@ -71,6 +72,12 @@ static SetWindowBandApi SetWindowBandApiOrg;
 
 typedef BOOL(WINAPI* RegisterHotKeyApi)(HWND hwnd, int id, UINT fsMod, UINT vk);
 static RegisterHotKeyApi RegisterHotKeyApiOrg;
+
+typedef LONG(WINAPI* GetClassIconCB_t)(PVOID pThis, PVOID a2, int a3);
+static GetClassIconCB_t GetClassIconCB_orig;
+
+typedef LONG(WINAPI* setIcon_t)(PVOID pThis, HWND a2, HICON a3, int a4);
+static setIcon_t setIcon;
 
 wiktorArray<HTHEME>* themeHandles;
 
@@ -603,7 +610,7 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 __int64 ShouldAddWindowToTray(HWND hwnd)
 {
 	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisibleNEW(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
-	dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
+	//dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
 	return ret;
 }
 
@@ -632,6 +639,73 @@ HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 
 	return DwmIsCompositionEnabled(pfEnabled);
 }
+
+
+VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
+{
+	if (IsShellFrameWindow && IsShellFrameWindow(a2))
+	{
+		IShellItemImageFactory* psiif = nullptr;
+		IPropertyStore* ips;
+		SHGetPropertyStoreForWindow(a2, IID_PPV_ARGS(&ips));
+		GUID myGuid = { 0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3} };
+		PROPERTYKEY propertyKey = { myGuid, 5 };
+		PROPVARIANT pv;
+		ips->GetValue(propertyKey, &pv);
+		if (pv.vt == VT_LPWSTR)
+		{
+			LPCWSTR aumid = pv.pwszVal;
+			SHCreateItemInKnownFolder(FOLDERID_AppsFolder, KF_FLAG_DONT_VERIFY, aumid, IID_PPV_ARGS(&psiif));
+			if (psiif)
+			{
+				SIIGBF flags = SIIGBF_ICONONLY | SIIGBF_ICONBACKGROUND;
+				HBITMAP hb;
+				SIZE size = { GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CXICON) };
+				HRESULT hr = psiif->GetImage(size, flags, &hb);
+				if (SUCCEEDED(hr))
+				{
+					HIMAGELIST hImageList = ImageList_Create(size.cx, size.cy, ILC_COLOR32, 1, 0);
+					if (ImageList_Add(hImageList, hb, NULL) != -1)
+					{
+						HICON hc = ImageList_GetIcon(hImageList, 0, 0);
+						ImageList_Destroy(hImageList);
+
+						// set
+						setIcon(This, a2, hc, a4);
+
+						DeleteObject(hb);
+						psiif->Release();
+					}
+					DeleteObject(hb);
+				}
+				psiif->Release();
+			}
+		}
+		ips->Release();
+	}
+	else
+		setIcon(This, a2, a3, a4);
+}
+
+/*
+INT64 GetClassIconCB(PVOID This, struct ICONBCPARAM* a2, int a3)
+{
+	INT64 ret = 0;
+	if (IsShellFrameWindow)
+	{
+		if (IsShellFrameWindow(*(HWND*)a2+1))
+		{
+			return 4294967294;
+			//return GetClassIconCB_orig(This, a2, a3);
+		}
+		else
+		{
+			return GetClassIconCB_orig(This, a2, a3);
+		}
+	}
+	return 0;
+}
+*/
 
 //fix for classic start menu icon
 typedef HANDLE(WINAPI* BrandingLoadImage_t)(
@@ -1215,6 +1289,11 @@ void HookAPIs()
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
 
+	void* _ctaskbandadd = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "FF F3 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F8 06 00 00");
+	//void* _ctaskbandclasscb = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B F1 48 8B 0A 49 8B F8 48 8B DA");
+	//addIcon_orig = (addIcon_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 18 56 57 41 54 48 83 EC 20 45 33 E4");
+	//void* _ctaskbanddefault = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 57 48 83 EC 20 48 8B DA 48 8B F9 BA 05 7F 00 00");
+
 	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
@@ -1233,6 +1312,10 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
+
+	MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&setIcon));
+	//MH_CreateHook(static_cast<LPVOID>(_ctaskbandclasscb), GetClassIconCB, reinterpret_cast<LPVOID*>(&GetClassIconCB_orig));
+	//MH_CreateHook(static_cast<LPVOID>(_ctaskbanddefault), GetClassIconDefault, reinterpret_cast<LPVOID*>(&GetClassIconDef_orig));
 
 
 	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
@@ -1520,15 +1603,15 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		if (riid == IID_IAppResolver7)
 		{
-			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
+			//dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
 			PVOID rslvr8 = NULL;
 			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IAppResolver8, &rslvr8);
 			//create our object
 
 			CStartMenuResolver *resolver7 = new CStartMenuResolver((IAppResolver8 *)rslvr8);
 			result = resolver7->QueryInterface(riid, ppv);
-			if (result == S_OK)
-				dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
+			//if (result == S_OK)
+				//dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 		}
 		else if (riid == IID_IStartMenuItemsCache7)
 		{

@@ -273,6 +273,12 @@
   <ItemGroup>
     <ResourceCompile Include="wrapper.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\icon1.ico" />
+    <Image Include="res\start%401.25x.bmp" />
+    <Image Include="res\start%401.5x.bmp" />
+    <Image Include="res\start.bmp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
