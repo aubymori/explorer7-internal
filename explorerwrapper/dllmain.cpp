@@ -658,7 +658,7 @@ VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
 			SHCreateItemInKnownFolder(FOLDERID_AppsFolder, KF_FLAG_DONT_VERIFY, aumid, IID_PPV_ARGS(&psiif));
 			if (psiif)
 			{
-				SIIGBF flags = SIIGBF_ICONONLY | SIIGBF_ICONBACKGROUND;
+				SIIGBF flags = SIIGBF_ICONONLY; // Ittr: Using SIIGBF_ICONONLY gives us 8.x behaviour so more or less what we want - extra background flag causes duplicate background/icon-shrinkage.
 				HBITMAP hb;
 				SIZE size = { GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CXICON) };
 				HRESULT hr = psiif->GetImage(size, flags, &hb);
