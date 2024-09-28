@@ -65,7 +65,7 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::QueryInterface(REFIID riid, void**
 {
 	if (riid == IID_IAppResolver7)
 	{
-		dbgprintf(L"IID_IAppResolver7\n");
+		//dbgprintf(L"IID_IAppResolver7\n");
 		*ppvObject = static_cast<IAppResolver7*>(this);
 		AddRef();
 		return S_OK;
@@ -159,7 +159,7 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::CanPinApp(IUnknown* p1)
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetRelaunchProperties(HWND* p1, DWORD* p2, DWORD* p3, DWORD* p4, DWORD* p5, DWORD* p6)
 {
-	dbgprintf(L"GetRelaunchProperties");
+	//dbgprintf(L"GetRelaunchProperties");
 	return m_resolver8->GetRelaunchProperties(p1, p2, p3, p4, p5, p6, nullptr);
 }
 
