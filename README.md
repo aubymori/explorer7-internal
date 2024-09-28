@@ -172,6 +172,57 @@ explorer7/
   
 </details>
 
+## Custom orbs
+
+As an additional feature, explorer7 lets you import your own custom orbs without having to patch your explorer.exe using Resource Hacker or using specialized programs. Due to WinGDI limitations, it only supports .bmp images. To do this, simply make a directory inside the "orbs" folder and place your images inside it with the naming scheme from the example layout below. If it finds the appropiate images, the orb system will also account for 125% and 150% DPI (HiDPI) automatically. The layout should be as it follows:
+
+<details>
+  <summary>Valid layout for custom orbs:</summary>
+
+`OrbDirectory` registry key set to `blue`
+```
+explorer7/
+├─ orbs/
+│  ├─ blue/
+│  │  ├─ 6801.bmp (100% DPI - 52x162 - Bottom-aligned taskbar image)
+│  │  │  6802.bmp (125% DPI - 66x198 - Bottom-aligned taskbar image)
+│  │  │  6803.bmp (150% DPI - 81x243 - Bottom-aligned taskbar image)
+│  │  │  6804.bmp (190% DPI - 106x318 - Bottom-aligned taskbar image)
+│  │  │  6805.bmp (100% DPI - 52x162 - Left/right-aligned taskbar image)
+│  │  │  6806.bmp (125% DPI - 66x198 - Left/right-aligned taskbar image)
+│  │  │  6807.bmp (150% DPI - 81x243 - Left/right-aligned taskbar image)
+│  │  │  6808.bmp (190% DPI - 106x318 - Left/right-aligned taskbar image)
+│  │  │  6809.bmp (100% DPI - 52x162 - Top-aligned taskbar image)
+│  │  │  6810.bmp (125% DPI - 66x198 - Top-aligned taskbar image)
+│  │  │  6811.bmp (150% DPI - 81x243 - Top-aligned taskbar image)
+│  │  │  6812.bmp (190% DPI - 106x318 - Top-aligned taskbar image)
+
+```
+
+`OrbDirectory` registry key set to `colors\green`
+```
+explorer7/
+├─ orbs/
+│  ├─ colors/
+│  │  ├─ green/
+│  │  │  ├─ 6801.bmp (100% DPI - 52x162 - Bottom-aligned taskbar image)
+│  │  │  │  6802.bmp (125% DPI - 66x198 - Bottom-aligned taskbar image)
+│  │  │  │  6803.bmp (150% DPI - 81x243 - Bottom-aligned taskbar image)
+│  │  │  │  6804.bmp (190% DPI - 106x318 - Bottom-aligned taskbar image)
+│  │  │  │  6805.bmp (100% DPI - 52x162 - Left/right-aligned taskbar image)
+│  │  │  │  6806.bmp (125% DPI - 66x198 - Left/right-aligned taskbar image)
+│  │  │  │  6807.bmp (150% DPI - 81x243 - Left/right-aligned taskbar image)
+│  │  │  │  6808.bmp (190% DPI - 106x318 - Left/right-aligned taskbar image)
+│  │  │  │  6809.bmp (100% DPI - 52x162 - Top-aligned taskbar image)
+│  │  │  │  6810.bmp (125% DPI - 66x198 - Top-aligned taskbar image)
+│  │  │  │  6811.bmp (150% DPI - 81x243 - Top-aligned taskbar image)
+│  │  │  │  6812.bmp (190% DPI - 106x318 - Top-aligned taskbar image)
+
+```
+  
+</details>
+
+NOTE: If an image is larger than what the system expects, the image might clip out. Use the example layout as a reference! For more information, you can also check out this guide: https://www.sevenforums.com/tutorials/73616-how-create-custom-start-orb-image.html
 
 ## Development plan
 
