@@ -77,13 +77,13 @@ typedef LONG(WINAPI* GetClassIconCB_t)(PVOID pThis, PVOID a2, int a3);
 static GetClassIconCB_t GetClassIconCB_orig;
 
 typedef LONG(WINAPI* setIcon_t)(PVOID pThis, HWND a2, HICON a3, int a4);
-static setIcon_t setIcon;
+static setIcon_t SetIcon;
 
 typedef VOID(WINAPI* updateItem_t)(PVOID pThis, int a2);
-static updateItem_t updateItem;
+static updateItem_t UpdateItem;
 
 typedef LONG(WINAPI* setIconThumb_t)(PVOID pThis, HICON a2, int a3, unsigned int a4);
-static  setIconThumb_t setIconThumb;
+static  setIconThumb_t SetIconThumb;
 
 wiktorArray<HTHEME>* themeHandles;
 
@@ -646,7 +646,7 @@ HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 	return DwmIsCompositionEnabled(pfEnabled);
 }
 
-HICON getUWPIcon(HWND a2)
+HICON GetUWPIcon(HWND a2)
 {
 	HICON icon = NULL;
 	IShellItemImageFactory* psiif = nullptr;
@@ -705,11 +705,11 @@ VOID UpdateItemIcon(PVOID This, int a2)
 	if (IsShellFrameWindow && IsShellFrameWindow(v6))
 	{
 		//OutputDebugStringW(L"uwp window");
-		HICON hc = getUWPIcon(v6);
-		if (hc) setIconThumb(This, hc, a2, 3);
+		HICON hc = GetUWPIcon(v6);
+		if (hc) SetIconThumb(This, hc, a2, 3);
 	}
 	else
-		updateItem(This, a2);
+		UpdateItem(This, a2);
 
 }
 
@@ -717,11 +717,11 @@ VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
 {
 	if (IsShellFrameWindow && IsShellFrameWindow(a2))
 	{
-		HICON hc = getUWPIcon(a2);
-		if (hc) setIcon(This, a2, hc, a4);
+		HICON hc = GetUWPIcon(a2);
+		if (hc) SetIcon(This, a2, hc, a4);
 	}
 	else
-		setIcon(This, a2, a3, a4);
+		SetIcon(This, a2, a3, a4);
 }
 
 /*
@@ -1330,7 +1330,7 @@ void HookAPIs()
 	//void* _ctaskbandclasscb = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B F1 48 8B 0A 49 8B F8 48 8B DA");
 	//addIcon_orig = (addIcon_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 18 56 57 41 54 48 83 EC 20 45 33 E4");
 	void* _cthumbnailUpdate = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 30 48 8B 81 B0 00 00 00");
-	setIconThumb = (setIconThumb_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 63 D8 4C 8B 81 B0 00 00 00");
+	SetIconThumb = (setIconThumb_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 63 D8 4C 8B 81 B0 00 00 00");
 
 	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
@@ -1351,9 +1351,14 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
 
-	MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&setIcon));
-	MH_CreateHook(static_cast<LPVOID>(_cthumbnailUpdate), UpdateItemIcon, reinterpret_cast<LPVOID*>(&updateItem));
-	//MH_CreateHook(static_cast<LPVOID>(_ctaskbandclasscb), GetClassIconCB, reinterpret_cast<LPVOID*>(&GetClassIconCB_orig));
+
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
+	{
+		// This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
+		MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&SetIcon));
+		MH_CreateHook(static_cast<LPVOID>(_cthumbnailUpdate), UpdateItemIcon, reinterpret_cast<LPVOID*>(&UpdateItem));
+		//MH_CreateHook(static_cast<LPVOID>(_ctaskbandclasscb), GetClassIconCB, reinterpret_cast<LPVOID*>(&GetClassIconCB_orig));
+	}
 
 
 	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
