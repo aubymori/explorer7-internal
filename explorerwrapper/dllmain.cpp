@@ -358,8 +358,8 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 		}
 	}*/
 	//else if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
-	if (!_WIN_BLUE && (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))) //bad temporary hack to ensure this doesnt run on 8.1+
-		pBlurBehind->fEnable = 0;
+	//if (!_WIN_BLUE && (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))) //bad temporary hack to ensure this doesnt run on 8.1+
+		//pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
 
