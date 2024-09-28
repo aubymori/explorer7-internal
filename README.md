@@ -222,7 +222,8 @@ explorer7/
   
 </details>
 
-NOTE: If an image is larger than what the system expects, the image might clip out. Use the example layout as a reference! For more information, you can also check out this guide: https://www.sevenforums.com/tutorials/73616-how-create-custom-start-orb-image.html
+NOTE 1: BE CAREFUL! If the image corresponding to your case DOES NOT exist in your orb directory, it will automatically fall back to the original image inside explorer.exe.
+NOTE 2: If an image is larger than what the system expects, the image might clip out. Use the example layout as a reference! For more information, you can also check out this guide: https://www.sevenforums.com/tutorials/73616-how-create-custom-start-orb-image.html
 
 ## Development plan
 
