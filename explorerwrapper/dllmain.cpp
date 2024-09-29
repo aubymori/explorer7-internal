@@ -340,39 +340,8 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
-<<<<<<< Updated upstream
-	/*if (_WIN_BLUE) --Doesn't work yet
-	{
-		if (IsCompositionActive() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))
-		{
-			WINCOMPATTRDATA transparency;
-			struct ATTR13DATA
-			{
-				DWORD p1;
-				DWORD p2;
-				DWORD p3;
-				DWORD p4;
-			};
-			ATTR13DATA attr13 = { 0 };
-			attr13.p1 = 2;
-			transparency.attribute = 0x19;
-			transparency.pData = &attr13;
-			transparency.dataSize = 0x16;
-			SetWindowCompositionAttribute(hwnd, &transparency);
-
-			pBlurBehind->hRgnBlur = 0i64;
-			pBlurBehind->fTransitionOnMaximized = 1;
-			pBlurBehind->dwFlags = 3;
-			pBlurBehind->fEnable = 1;
-			return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
-		}
-	}*/
-	//else if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
-	//if (!_WIN_BLUE && (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))) //bad temporary hack to ensure this doesnt run on 8.1+
-=======
 	if(hwnd == GetTaskListThumbWnd()) ForceActiveWindowAppearance(hwnd);
 	//if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
->>>>>>> Stashed changes
 		//pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
