@@ -300,9 +300,18 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->attribute, *(DWORD*)pAttrData->pData);
 	if (_WIN_BLUE && IsCompositionActive()) //If we are 8.1 or higher for some reason Tihiy's original hack doesn't work so we forcefully run this instead
 	{
-		//Ittr: Restore active colorization based on attribute from ForceActiveWindowAppearance function in 9600 explorer
-		ForceActiveWindowAppearance(hwnd);
-		return SetWindowCompositionAttribute(hwnd, pAttrData);
+		/*
+			NOTE TO SELF (AND OTHERS):
+			PSEUDO-AERO STILL WORKS ON 8.1 AND 10.
+			I HAVEN'T TESTED THE DLL WITH IT UNDER 8.1, BUT ON 10 ITS JUST ENTIRELY TRANSPARENT (NO ACCENT COLORING)
+			TRANSPARENCY MAKES IT WORK JUST FINE.
+			STILL NEED TO FIX ACTIVE COLORIZATION AND OPAQUE CONTENT!!!!
+		*/
+		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) //enable rtm pseudo-aero
+		{
+			ForceActiveWindowAppearance(hwnd);
+			return SetWindowCompositionAttribute(hwnd, pAttrData);
+		}
 	}
 	else if (!_WIN_BLUE && pAttrData->attribute == 0x10) //changed in 7->8
 	{
@@ -331,6 +340,7 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
+<<<<<<< Updated upstream
 	/*if (_WIN_BLUE) --Doesn't work yet
 	{
 		if (IsCompositionActive() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))
@@ -359,6 +369,10 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 	}*/
 	//else if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
 	//if (!_WIN_BLUE && (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))) //bad temporary hack to ensure this doesnt run on 8.1+
+=======
+	if(hwnd == GetTaskListThumbWnd()) ForceActiveWindowAppearance(hwnd);
+	//if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
+>>>>>>> Stashed changes
 		//pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
