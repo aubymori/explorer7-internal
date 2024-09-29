@@ -57,7 +57,7 @@ static void __fastcall CNscTree_ScaleAndSetIndent(__int64 a1)
 	int v3; // eax
 	int nNumerator; // [rsp+30h] [rbp+8h] BYREF
 	int v6; // [rsp+38h] [rbp+10h] BYREF
-	int extraOffset;
+	int extraOffset = 0;
 
 	if (g_osVersion.BuildNumber() >= 21996) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
 		extraOffset = 8;
@@ -70,7 +70,7 @@ static void __fastcall CNscTree_ScaleAndSetIndent(__int64 a1)
 
 static void __fastcall CNscTree_SetIndentValue(__int64 a1, int a2)
 {
-	int extraOffset;
+	int extraOffset = 0;
 
 	if (g_osVersion.BuildNumber() >= 21996) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
 		extraOffset = 8;
@@ -88,7 +88,7 @@ static void __fastcall CNscTree_ScaleAndSetRowHeight(__int64 a1)
 	HDC v7; // rbx
 	int DeviceCaps; // edi
 	int v9; // eax
-	int extraOffset;
+	int extraOffset = 0;
 
 	if (g_osVersion.BuildNumber() >= 21996) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
 		extraOffset = 8;
@@ -120,7 +120,7 @@ static void __fastcall CNscTree_ScaleAndSetRowHeight(__int64 a1)
 
 static __int64 __fastcall CNscTree_SetItemHeight(__int64 a1, int a2)
 {
-	int extraOffset;
+	int extraOffset = 0;
 
 	if (g_osVersion.BuildNumber() >= 21996) // Ittr: Handle windows 11 offset difference. Inefficient but simplified code wasnt working
 		extraOffset = 8;
