@@ -45,7 +45,6 @@ HANDLE hEvent_DesktopVisible;
 
 DWORD g_dwTrayThreadId = 0;
 
-
 bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
 bool g_enableImmersiveShellStack = false;
