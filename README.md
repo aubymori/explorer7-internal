@@ -23,7 +23,6 @@ explorer7 is a **wrapper dll** that allows Windows 7's explorer.exe to run prope
 - No proper strings for "Customize Start Menu" dialog.
 
 **Windows 10**
-- Partial support for UWP apps.
 - Autoplay does not work.
 - Metro "Open With" dialog opens on top left of screen (works with UWP enabled)
 - System msstyles with name "aero.msstyles" messes with the Start Menu colorization.
