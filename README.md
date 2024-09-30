@@ -2,7 +2,7 @@
   <img src="https://github.com/user-attachments/assets/10465c11-481a-4403-aeef-19149a776f17">
 </p>
 
-explorer7 (formerly known as ex7forw8) is a **wrapper dll** that allows Windows 7's explorer.exe to run properly on modern Windows versions. This brings back the original Windows 7 Start Menu/Taskbar experience.
+explorer7 is a **wrapper dll** that allows Windows 7's explorer.exe to run properly on modern Windows versions. This brings back the original Windows 7 Start Menu/Taskbar experience.
 
 <details>
   <summary>Screenshots</summary>
@@ -31,7 +31,6 @@ explorer7 (formerly known as ex7forw8) is a **wrapper dll** that allows Windows 
 - Desktop area sticks to a specific resolution and requires going into the Wallpaper control panel page to fix (i.e going from 1920x1080 to 1024x768, the desktop area/wallpaper would be rendered as 1080p still, vice versa).
 - Notification Area Icon settings in Control Panel are missing.
 - Unless icon is blanked, the badge for compression (in case enabled) will appear on taskbar/start menu items.
-- Dragging selection on desktop in circles for a few seconds results in a lot of breakage, requiring an explorer.exe restart.
 
 **Windows 11**
 - Taskbar/Start menu pins broken due to confirmation dialog introduction (fixed in Windows 10 22h2).
