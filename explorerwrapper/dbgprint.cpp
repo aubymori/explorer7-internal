@@ -170,7 +170,6 @@ BOOL WINAPI ChangeExportedAddress_ORDINAL(HMODULE hModule, ULONGLONG origOrdinal
     PIMAGE_DOS_HEADER dosHeader;
     PIMAGE_NT_HEADERS pNTHeader;
     PIMAGE_EXPORT_DIRECTORY pImportDir;
-    DWORD_PTR* pFunctions;
     //LPSTR name;
     DWORD oldpr;
 
@@ -192,7 +191,7 @@ BOOL WINAPI ChangeExportedAddress_ORDINAL(HMODULE hModule, ULONGLONG origOrdinal
 
         char name[256] = "NO NAME";
 
-        int x = 0;
+        size_t x = 0;
         for (x = 0; x < pImportDir->NumberOfNames; ++x)
         {
             if (ordinals[x] == i)

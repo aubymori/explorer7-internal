@@ -10,6 +10,36 @@ decltype(OpenThemeDataFromFile) OpenThemeDataFromFile = 0;
 
 UXTHEMEFILE *g_loadedTheme = 0;
 
+void FreeTheme(UXTHEMEFILE* file)
+{
+	if (file)
+	{
+		if (file->sharableSectionView)
+		{
+			UnmapViewOfFile(file->sharableSectionView);
+		}
+		if (file->nsSectionView)
+		{
+			UnmapViewOfFile(file->nsSectionView);
+		}
+
+		CloseHandle(file->hNsSection);
+		CloseHandle(file->hSharableSection);
+
+		free(file);
+	}
+}
+
+DWORD WINAPI DelayFreeThread(LPVOID lParam)
+{
+	//wait 1 sec
+	Sleep(1000);
+
+	FreeTheme((UXTHEMEFILE*)lParam);
+
+	return 0;
+}
+
 void ThemeManagerInitialize()
 {
 	//dont bother error checking, if u dont got uxtheme, ur shit is prob already fucked and theres no saving u
@@ -55,15 +85,9 @@ HRESULT LoadThemeFile(wchar_t *Path)
 
 	if (g_loadedTheme)
 	{
-		if (g_loadedTheme->sharableSectionView)
-		{
-			UnmapViewOfFile(g_loadedTheme->sharableSectionView);
-		}
-		if (g_loadedTheme->nsSectionView)
-		{
-			UnmapViewOfFile(g_loadedTheme->nsSectionView);
-		}
-		free(g_loadedTheme);
+		//create delay free thread
+		//CreateThread(0,0, DelayFreeThread,g_loadedTheme,0,0);
+		FreeTheme(g_loadedTheme);
 		g_loadedTheme = 0;
 	}
 
@@ -92,7 +116,9 @@ HRESULT LoadThemeFile(wchar_t *Path)
 			{
 				UnmapViewOfFile(g_loadedTheme->nsSectionView);
 			}
-			free(g_loadedTheme);
+			CloseHandle(g_loadedTheme->hNsSection);
+			CloseHandle(g_loadedTheme->hSharableSection);
+			//free(g_loadedTheme);
 			g_loadedTheme = 0;
 			dbgprintf(L"LoadTHemeFile failed 1");
 		}
@@ -129,7 +155,9 @@ HRESULT LoadThemeFile(wchar_t *Path)
 			{
 				UnmapViewOfFile(g_loadedTheme->nsSectionView);
 			}
-			free(g_loadedTheme);
+			CloseHandle(g_loadedTheme->hNsSection);
+			CloseHandle(g_loadedTheme->hSharableSection);
+			//free(g_loadedTheme);
 			g_loadedTheme = 0;
 			dbgprintf(L"LoadTHemeFile failed 2");
 		}

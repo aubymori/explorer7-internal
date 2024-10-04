@@ -24,6 +24,8 @@
 #include "shellapi.h"
 #include "autoplay.h"
 #include "shellitemfilter.h"
+#include "shell32_wrappers.h"
+#include "shellurl.h"
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -48,20 +50,20 @@ bool g_bDisableComposition = false;
 bool g_enableImmersiveShellStack = false;
 
 static WNDPROC g_prevTrayProc;
-typedef DWORD (WINAPI *SHPtrParamAPI)(PVOID);
-typedef PVOID (WINAPI *SHCreateDesktopAPI)(PVOID);
+typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
+typedef PVOID(WINAPI* SHCreateDesktopAPI)(PVOID);
 
 static SHCreateDesktopAPI SHCreateDesktopOrig;
 static SHPtrParamAPI DwmGetColorizationParametersOrig;
 static SHCreateDesktopAPI SHDesktopMessageLoop; //TEST
 
-typedef HWND (WINAPI *CreateWindowInBandAPI)(DWORD,LPWSTR,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,PVOID,DWORD);
+typedef HWND(WINAPI* CreateWindowInBandAPI)(DWORD, LPWSTR, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, DWORD);
 static CreateWindowInBandAPI CreateWindowInBandOrig;
 
 typedef HWND(WINAPI* CreateWindowInBandExAPI)(DWORD, LPWSTR, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, PVOID, DWORD, DWORD);
 static CreateWindowInBandExAPI CreateWindowInBandExOrig;
 
-typedef BOOL (WINAPI *GetWindowBandAPI)(HWND,DWORD*);
+typedef BOOL(WINAPI* GetWindowBandAPI)(HWND, DWORD*);
 static GetWindowBandAPI GetWindowBandOrig;
 
 typedef HWND(WINAPI* SetWindowBandApi)(HWND hwnd, HWND hwndInsertAfter, DWORD dwBand);
@@ -70,7 +72,19 @@ static SetWindowBandApi SetWindowBandApiOrg;
 typedef BOOL(WINAPI* RegisterHotKeyApi)(HWND hwnd, int id, UINT fsMod, UINT vk);
 static RegisterHotKeyApi RegisterHotKeyApiOrg;
 
+typedef LONG(WINAPI* GetClassIconCB_t)(PVOID pThis, PVOID a2, int a3);
+static GetClassIconCB_t GetClassIconCB_orig;
 
+typedef LONG(WINAPI* setIcon_t)(PVOID pThis, HWND a2, HICON a3, int a4);
+static setIcon_t SetIcon;
+
+typedef VOID(WINAPI* updateItem_t)(PVOID pThis, int a2);
+static updateItem_t UpdateItem;
+
+typedef LONG(WINAPI* setIconThumb_t)(PVOID pThis, HICON a2, int a3, unsigned int a4);
+static  setIconThumb_t SetIconThumb;
+
+wiktorArray<HTHEME>* themeHandles;
 
 // 7 {4376df10-a662-420b-b30d-958881461ef9}
 // 8 {7A5FCA8A-76B1-44C8-A97C-E7173CCA5F4F}
@@ -79,9 +93,9 @@ DEFINE_GUID(IID_TrayClock8, 0x7A5FCA8A, 0x76B1, 0x44C8, 0xA9, 0x7C, 0xE7, 0x17, 
 
 struct WINCOMPATTRDATA
 {
-    DWORD attribute; // the attribute to query, see below
-    PVOID pData; // buffer to store the result
-    ULONG dataSize; // size of the pData buffer
+	DWORD attribute; // the attribute to query, see below
+	PVOID pData; // buffer to store the result
+	ULONG dataSize; // size of the pData buffer
 };
 
 enum ACCENT_STATE : INT {				// Affects the rendering of the background of a window. These names are only for ACCENT_POLICY purposes 
@@ -106,7 +120,7 @@ enum WINDOWCOMPOSITIONATTRIB : INT {	// Determines what attribute is being manip
 	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 0xF				// The attribute being get or set is an accent policy.
 };
 
-typedef BOOL (WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
+typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
 //extern declared in nsctree.h
@@ -115,38 +129,38 @@ HRESULT(__fastcall* CNSCHost_FillNSCOg)(uintptr_t nscHost);
 //extern declared in version.h
 COSVersion g_osVersion;
 
-typedef struct { 
-	DWORD ColorizationColor; 
-    DWORD ColorizationAfterglow; 
-    DWORD ColorizationColorBalance; 
-    DWORD ColorizationAfterglowBalance; 
-    DWORD ColorizationBlurBalance; 
-    DWORD ColorizationGlassReflectionIntensity; 
-    DWORD ColorizationOpaqueBlend;
-} DWMCOLORIZATIONPARAMS, *PDWMCOLORIZATIONPARAMS; 
+typedef struct {
+	DWORD ColorizationColor;
+	DWORD ColorizationAfterglow;
+	DWORD ColorizationColorBalance;
+	DWORD ColorizationAfterglowBalance;
+	DWORD ColorizationBlurBalance;
+	DWORD ColorizationGlassReflectionIntensity;
+	DWORD ColorizationOpaqueBlend;
+} DWMCOLORIZATIONPARAMS, * PDWMCOLORIZATIONPARAMS;
 
 static BOOL IsRTMDWM()
-{	
+{
 	if (!IsCompositionActive()) return FALSE;
 
 	DWMCOLORIZATIONPARAMS colors;
 	CHAR buffer[0x28];
-	memset(buffer,0,0x28);
+	memset(buffer, 0, 0x28);
 	DwmGetColorizationParametersOrig(&buffer);
-	memcpy(&colors,(PVOID)buffer,sizeof(DWMCOLORIZATIONPARAMS));
+	memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
 	return (colors.ColorizationGlassReflectionIntensity == 1);
 }
 
 static HWND GetTaskbarWnd()
 {
 	if (!hwnd_taskbar)
-		hwnd_taskbar = FindWindow(L"Shell_TrayWnd",NULL);
+		hwnd_taskbar = FindWindow(L"Shell_TrayWnd", NULL);
 	return hwnd_taskbar;
 }
 
 static BOOL CALLBACK FindSMCallback(HWND hwnd, LPARAM lParam)
-{	
-	if ( GetClassWord(hwnd,GCW_ATOM) == (ATOM)lParam && (GetProp(hwnd,L"StartMenuTag")) )
+{
+	if (GetClassWord(hwnd, GCW_ATOM) == (ATOM)lParam && (GetProp(hwnd, L"StartMenuTag")))
 	{
 		hwnd_startmenu = hwnd;
 		return FALSE;
@@ -159,9 +173,9 @@ static HWND GetStartMenuWnd()
 {
 	if (!hwnd_startmenu || !IsWindow(hwnd_startmenu))
 	{
-		WNDCLASS dummy = {0};
-		ATOM dv2atom = GetClassInfo(GetModuleHandle(NULL),L"DV2ControlHost",&dummy);
-		EnumThreadWindows(GetCurrentThreadId(),FindSMCallback,(LPARAM)dv2atom);
+		WNDCLASS dummy = { 0 };
+		ATOM dv2atom = GetClassInfo(GetModuleHandle(NULL), L"DV2ControlHost", &dummy);
+		EnumThreadWindows(GetCurrentThreadId(), FindSMCallback, (LPARAM)dv2atom);
 	}
 	return hwnd_startmenu;
 }
@@ -173,53 +187,76 @@ static HWND GetTaskListThumbWnd()
 	return hwnd_taskthumb;
 }
 
-LRESULT CALLBACK NewTrayProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+const UINT ThemeChangeMessage = WM_USER + 69420;
+BOOL CALLBACK RefreshWindows(HWND wnd, LPARAM prm)
 {
-	if (g_enableImmersiveShellStack)
+	if (wnd == (HWND)prm) return TRUE;
+
+	PostMessage(wnd, WM_THEMECHANGED, 0, 0);
+	dbgprintf(L"themechanged sent to %i", wnd);
+	return TRUE;
+}
+
+LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
 
 	if (uMsg == 0x56D) return 0;
-	if (uMsg == WM_THEMECHANGED) //reinit thememanager on themechanged, so that inactive msstyles is updated
-		//ThemeManagerInitialize(); //causes crashing...
+	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
+	{
+		for (int i = 0; i < themeHandles->size; ++i)
+		{
+			CloseThemeData(themeHandles->data[i]);
+		}
+		realloc(themeHandles->data, 0);
+		themeHandles->size = 0;
+
+		ThemeManagerInitialize();
+		EnumWindows(RefreshWindows, (LPARAM)hwnd);
+
+		uMsg = WM_THEMECHANGED;
+		return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
+	}
 
 	if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_WINDOWPOSCHANGED)
 	{
-		RemoveProp(hwnd,L"TaskbarMonitor");
-		SetProp(hwnd,L"TaskbarMonitor",(HANDLE)MonitorFromWindow(hwnd,MONITOR_DEFAULTTOPRIMARY));
+		RemoveProp(hwnd, L"TaskbarMonitor");
+		SetProp(hwnd, L"TaskbarMonitor", (HANDLE)MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY));
 		//send displaychanged to desktop
-		if (uMsg == WM_DISPLAYCHANGE) PostMessage(hwnd_desktop,0x44B,0,0);
+		if (uMsg == WM_DISPLAYCHANGE) PostMessage(hwnd_desktop, 0x44B, 0, 0);
 	}
 	if (uMsg == 0x574) //handledelayboot
 	{
 		if (lParam == 3)
-			return CallWindowProc(g_prevTrayProc,hwnd,0x5B5,wParam,lParam); //fire ShellDesktopSwitch event
+			return CallWindowProc(g_prevTrayProc, hwnd, 0x5B5, wParam, lParam); //fire ShellDesktopSwitch event
 		if (lParam == 1)
 			SetEvent(hEvent_DesktopVisible);
 		return 0;
 	}
 
-	return CallWindowProc(g_prevTrayProc,hwnd,uMsg,wParam,lParam);	
+	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
 }
 
 void ShimDesktop8()
 {
 	static int InitOnce = FALSE;
 	if (InitOnce) return;
-	hwnd_desktop = FindWindow(L"Progman",L"Program Manager");
+	hwnd_desktop = FindWindow(L"Progman", L"Program Manager");
 	HWND hwndTray = GetTaskbarWnd();
-	if (!hwnd_desktop || !hwndTray ) return;
+	if (!hwnd_desktop || !hwndTray) return;
 	InitOnce = TRUE;
 	//hook tray
-	g_prevTrayProc = (WNDPROC)GetWindowLongPtr(hwndTray,GWLP_WNDPROC);
-	SetWindowLongPtr(hwndTray,GWLP_WNDPROC,(LONG_PTR)NewTrayProc);
+	g_prevTrayProc = (WNDPROC)GetWindowLongPtr(hwndTray, GWLP_WNDPROC);
+	SetWindowLongPtr(hwndTray, GWLP_WNDPROC, (LONG_PTR)NewTrayProc);
 	//set monitor (doh!)
-	SetProp(hwndTray,L"TaskbarMonitor",(HANDLE)MonitorFromWindow(hwndTray,MONITOR_DEFAULTTOPRIMARY));
+	SetProp(hwndTray, L"TaskbarMonitor", (HANDLE)MonitorFromWindow(hwndTray, MONITOR_DEFAULTTOPRIMARY));
 	//init desktop	
-	PostMessage(hwnd_desktop,0x45C,1,1); //wallpaper
-	PostMessage(hwnd_desktop,0x45E,0,2); //wallpaper host
-	PostMessage(hwnd_desktop,0x45C,2,3); //wallpaper & icons
-	PostMessage(hwnd_desktop,0x45B,0,0); //final init
-	PostMessage(hwnd_desktop,0x40B,0,0); //pins
+	PostMessage(hwnd_desktop, 0x45C, 1, 1); //wallpaper
+	PostMessage(hwnd_desktop, 0x45E, 0, 2); //wallpaper host
+	PostMessage(hwnd_desktop, 0x45C, 2, 3); //wallpaper & icons
+	PostMessage(hwnd_desktop, 0x45B, 0, 0); //final init
+	PostMessage(hwnd_desktop, 0x40B, 0, 0); //pins
 }
 
 PVOID WINAPI SHCreateDesktopNEW(PVOID p1)
@@ -241,11 +278,11 @@ PVOID WINAPI SHDesktopMessageLoopNEW(PVOID p1)
 DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 {
 	CHAR buffer[0x28];
-	memset(buffer,0,0x28);
+	memset(buffer, 0, 0x28);
 	dbgprintf(L"DwmGetColorizationParameters\nColorizationColor %p\nColorizationAfterglow %p\nColorizationColorBalance %p\nColorizationAfterglowBalance %p\nColorizationBlurBalance %p\nColorizationGlassReflectionIntensity %p\nColorizationOpaqueBlend %p",
-		colors->ColorizationColor,colors->ColorizationAfterglow,colors->ColorizationColorBalance,colors->ColorizationAfterglowBalance,colors->ColorizationBlurBalance,colors->ColorizationGlassReflectionIntensity,colors->ColorizationOpaqueBlend);
+		colors->ColorizationColor, colors->ColorizationAfterglow, colors->ColorizationColorBalance, colors->ColorizationAfterglowBalance, colors->ColorizationBlurBalance, colors->ColorizationGlassReflectionIntensity, colors->ColorizationOpaqueBlend);
 	DWORD ret = DwmGetColorizationParametersOrig(&buffer);
-	memcpy(colors,(PVOID)buffer,sizeof(DWMCOLORIZATIONPARAMS));
+	memcpy(colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
 	return ret;
 }
 
@@ -258,20 +295,27 @@ void ForceActiveWindowAppearance(HWND hwnd)
 }
 
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData)
-{	
-	dbgprintf(L"SetWindowCompositionAttribute %X %x %d",hwnd,pAttrData->attribute,*(DWORD*)pAttrData->pData);
+{
+	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->attribute, *(DWORD*)pAttrData->pData);
 	if (_WIN_BLUE && IsCompositionActive()) //If we are 8.1 or higher for some reason Tihiy's original hack doesn't work so we forcefully run this instead
 	{
-		//Ittr: Restore active colorization based on attribute from ForceActiveWindowAppearance function in 9600 explorer
-		ForceActiveWindowAppearance(hwnd);
-		return SetWindowCompositionAttribute(hwnd, pAttrData);
+		/*
+			NOTE TO SELF (AND OTHERS):
+			PSEUDO-AERO STILL WORKS ON 8.1 AND 10.
+			TRANSPARENCY MAKES IT WORK JUST FINE.
+		*/
+		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) //enable rtm pseudo-aero
+		{
+			ForceActiveWindowAppearance(hwnd);
+			return SetWindowCompositionAttribute(hwnd, pAttrData);
+		}
 	}
 	else if (!_WIN_BLUE && pAttrData->attribute == 0x10) //changed in 7->8
 	{
 		pAttrData->attribute = 0xF;
 		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero
 		{
-			SetWindowCompositionAttribute(hwnd,pAttrData);
+			SetWindowCompositionAttribute(hwnd, pAttrData);
 			WINCOMPATTRDATA rtm;
 			struct ATTR13DATA
 			{
@@ -280,67 +324,41 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 				DWORD p3;
 				DWORD p4;
 			};
-			ATTR13DATA attr13 = {0};
+			ATTR13DATA attr13 = { 0 };
 			attr13.p1 = 4;
 			rtm.attribute = 0x13;
 			rtm.pData = &attr13;
 			rtm.dataSize = 0x10;
-			return SetWindowCompositionAttribute(hwnd,&rtm);
+			return SetWindowCompositionAttribute(hwnd, &rtm);
 		}
 	}
-	return SetWindowCompositionAttribute(hwnd,pAttrData);
+	return SetWindowCompositionAttribute(hwnd, pAttrData);
 }
 
-HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND *pBlurBehind)
+HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
-	/*if (_WIN_BLUE) --Doesn't work yet
-	{
-		if (IsCompositionActive() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))
-		{
-			WINCOMPATTRDATA transparency;
-			struct ATTR13DATA
-			{
-				DWORD p1;
-				DWORD p2;
-				DWORD p3;
-				DWORD p4;
-			};
-			ATTR13DATA attr13 = { 0 };
-			attr13.p1 = 2;
-			transparency.attribute = 0x19;
-			transparency.pData = &attr13;
-			transparency.dataSize = 0x16;
-			SetWindowCompositionAttribute(hwnd, &transparency);
-
-			pBlurBehind->hRgnBlur = 0i64;
-			pBlurBehind->fTransitionOnMaximized = 1;
-			pBlurBehind->dwFlags = 3;
-			pBlurBehind->fEnable = 1;
-			return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
-		}
-	}*/
-	//else if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
-	if (!_WIN_BLUE && (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()))) //bad temporary hack to ensure this doesnt run on 8.1+
-		pBlurBehind->fEnable = 0;
-	return DwmEnableBlurBehindWindow(hwnd,pBlurBehind);
+	if(hwnd == GetTaskListThumbWnd()) ForceActiveWindowAppearance(hwnd);
+	//if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
+		//pBlurBehind->fEnable = 0;
+	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
 
-int WINAPI SetWindowRgnNEW( HWND hWnd, HRGN hRgn, BOOL bRedraw )
-{	
+int WINAPI SetWindowRgnNEW(HWND hWnd, HRGN hRgn, BOOL bRedraw)
+{
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
-	if ( hRgn == NULL && hWnd == GetStartMenuWnd() ) return 0;
-	return SetWindowRgn(hWnd,hRgn,bRedraw);
+	if (hRgn == NULL && hWnd == GetStartMenuWnd()) return 0;
+	return SetWindowRgn(hWnd, hRgn, bRedraw);
 }
 
-HRESULT WINAPI SetWindowThemeNEW(HWND hwnd,LPCWSTR pszSubAppName,LPCWSTR pszSubIdList)
+HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
 {
 	//Ittr: Temporarily comment these out as unneeded - we want original 7 theme classes to be used where appropriate!
 	//if ( lstrcmp(pszSubAppName,L"VerticalShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"VerticalShowDesktop8",pszSubIdList);
 	//if ( lstrcmp(pszSubAppName,L"ShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"ShowDesktop8",pszSubIdList);
-	return SetWindowTheme(hwnd,pszSubAppName,pszSubIdList);
+	return SetWindowTheme(hwnd, pszSubAppName, pszSubIdList);
 }
 
-UINT WINAPI SetErrorModeNEW( UINT uMode )
+UINT WINAPI SetErrorModeNEW(UINT uMode)
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
@@ -350,7 +368,7 @@ UINT WINAPI SetErrorModeNEW( UINT uMode )
 	return SetErrorMode(uMode);
 }
 
-typedef BOOL (WINAPI* IsShellWindow_t)(HWND);
+typedef BOOL(WINAPI* IsShellWindow_t)(HWND);
 IsShellWindow_t IsShellFrameWindow = nullptr;
 //IsShellWindow_t IsShellManagedWindow = nullptr;
 
@@ -471,10 +489,10 @@ BOOL __stdcall GetWindowBandHelper(HWND hwnd, ZBID* out)
 {
 	if (GetWindowBandOrig)
 	{
-		return GetWindowBandNew(hwnd,(DWORD*)out);
+		return GetWindowBandNew(hwnd, (DWORD*)out);
 	}
 
-	static BOOL(__stdcall* fn)(HWND, ZBID*) = nullptr;
+	static BOOL(__stdcall * fn)(HWND, ZBID*) = nullptr;
 	if (!fn)
 	{
 		HMODULE h = GetModuleHandleW(L"user32.dll");
@@ -484,7 +502,7 @@ BOOL __stdcall GetWindowBandHelper(HWND hwnd, ZBID* out)
 		if (!fn)
 			return 0;
 	}
-	return fn(hwnd,out);
+	return fn(hwnd, out);
 }
 
 
@@ -577,12 +595,12 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 
 __int64 ShouldAddWindowToTray(HWND hwnd)
 {
-	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisible(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
-	dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
+	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisibleNEW(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
+	//dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
 	return ret;
 }
 
-__int64 (__fastcall* DwmpActivateLivePreview)(int a1, __int64 a2, __int64 a3, int a4, void* a5);
+__int64(__fastcall* DwmpActivateLivePreview)(int a1, __int64 a2, __int64 a3, int a4, void* a5);
 __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void* a5)
 {
 	if (a5 == (void*)8)
@@ -590,7 +608,7 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 
 	if (a5 && IsBadReadPtr(a5, 0x8))
 		a5 = 0;
-	return DwmpActivateLivePreview(a1,a2,a3,a4,a5);
+	return DwmpActivateLivePreview(a1, a2, a3, a4, a5);
 }
 
 //Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
@@ -608,6 +626,104 @@ HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 	return DwmIsCompositionEnabled(pfEnabled);
 }
 
+HICON GetUWPIcon(HWND a2)
+{
+	HICON icon = NULL;
+	IShellItemImageFactory* psiif = nullptr;
+	IPropertyStore* ips;
+	SHGetPropertyStoreForWindow(a2, IID_PPV_ARGS(&ips));
+	GUID myGuid = { 0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3} };
+	PROPERTYKEY propertyKey = { myGuid, 5 };
+	PROPVARIANT pv;
+	ips->GetValue(propertyKey, &pv);
+	if (pv.vt == VT_LPWSTR)
+	{
+		LPCWSTR aumid = pv.pwszVal;
+		SHCreateItemInKnownFolder(FOLDERID_AppsFolder, KF_FLAG_DONT_VERIFY, aumid, IID_PPV_ARGS(&psiif));
+		if (psiif)
+		{
+			SIIGBF flags = SIIGBF_ICONONLY;
+			HBITMAP hb;
+			SIZE size = { GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CXICON) };
+			HRESULT hr = psiif->GetImage(size, flags, &hb);
+			if (SUCCEEDED(hr))
+			{
+				HIMAGELIST hImageList = ImageList_Create(size.cx, size.cy, ILC_COLOR32, 1, 0);
+				if (ImageList_Add(hImageList, hb, NULL) != -1)
+				{
+					HICON hc = ImageList_GetIcon(hImageList, 0, 0);
+					ImageList_Destroy(hImageList);
+
+					// set
+					icon = hc;
+
+					DeleteObject(hb);
+					psiif->Release();
+				}
+				DeleteObject(hb);
+			}
+			psiif->Release();
+		}
+	}
+	ips->Release();
+	return icon;
+}
+
+VOID UpdateItemIcon(PVOID This, int a2)
+{
+	typedef void* (__fastcall* GetTaskItemFunc)(void*);
+	typedef HWND(__fastcall* GetWindowFunc)(void*);
+
+	HDPA hdpaTaskThumbnails = *(HDPA*)((PBYTE)This + 0xB0);
+	auto v4 = DPA_FastGetPtr(hdpaTaskThumbnails, a2);
+	auto vtable = *(uintptr_t**)v4;
+	GetTaskItemFunc GetTaskItem = (GetTaskItemFunc)vtable[0x60 / sizeof(uintptr_t)];
+	void* v5 = GetTaskItem(v4);
+	auto vtable_v5 = *(uintptr_t**)v5;
+	GetWindowFunc GetWindow = (GetWindowFunc)vtable_v5[0x98 / sizeof(uintptr_t)];
+	HWND v6 = GetWindow(v5);
+	if (IsShellFrameWindow && IsShellFrameWindow(v6))
+	{
+		//OutputDebugStringW(L"uwp window");
+		HICON hc = GetUWPIcon(v6);
+		if (hc) SetIconThumb(This, hc, a2, 3);
+	}
+	else
+		UpdateItem(This, a2);
+
+}
+
+VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
+{
+	if (IsShellFrameWindow && IsShellFrameWindow(a2))
+	{
+		HICON hc = GetUWPIcon(a2);
+		if (hc) SetIcon(This, a2, hc, a4);
+	}
+	else
+		SetIcon(This, a2, a3, a4);
+}
+
+/*
+INT64 GetClassIconCB(PVOID This, struct ICONBCPARAM* a2, int a3)
+{
+	INT64 ret = 0;
+	if (IsShellFrameWindow)
+	{
+		if (IsShellFrameWindow(*(HWND*)a2+1))
+		{
+			return 4294967294;
+			//return GetClassIconCB_orig(This, a2, a3);
+		}
+		else
+		{
+			return GetClassIconCB_orig(This, a2, a3);
+		}
+	}
+	return 0;
+}
+*/
+
 //fix for classic start menu icon
 typedef HANDLE(WINAPI* BrandingLoadImage_t)(
 	LPCWSTR lpszModule,
@@ -616,7 +732,7 @@ typedef HANDLE(WINAPI* BrandingLoadImage_t)(
 	int     cx,
 	int     cy,
 	UINT    fuLoad
-);
+	);
 BrandingLoadImage_t BrandingLoadImage = nullptr;
 HANDLE WINAPI BrandingLoadImageNEW(
 	LPCWSTR lpszModule,
@@ -634,15 +750,15 @@ HANDLE WINAPI BrandingLoadImageNEW(
 	UINT uNewId = 0;
 	switch (uImageId)
 	{
-		case 1041:
-			uNewId = IDB_START;
-			break;
-		case 2041:
-			uNewId = IDB_START_125;
-			break;
-		case 3041:
-			uNewId = IDB_START_150;
-			break;
+	case 1041:
+		uNewId = IDB_START;
+		break;
+	case 2041:
+		uNewId = IDB_START_125;
+		break;
+	case 3041:
+		uNewId = IDB_START_150;
+		break;
 	}
 
 	if (uNewId)
@@ -658,22 +774,6 @@ HANDLE WINAPI BrandingLoadImageNEW(
 		);
 }
 
-//Ittr: Consolidated function for pattern byte replacements.
-void ChangeImportedPattern(void* dllPattern, const char* newBytes, bool isGuid) //thank you wiktor
-{
-	if (dllPattern)
-	{
-		SIZE_T size;
-		if (isGuid == true) { size = sizeof(GUID); } else { size = sizeof(newBytes); }
-
-		//Magical byte replacement code
-		DWORD old;
-		VirtualProtect(dllPattern, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(dllPattern, newBytes, size);
-		VirtualProtect(dllPattern, size, old, 0);
-	}
-}
-
 //Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
 //Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
 void ShowWin32Menus()
@@ -682,9 +782,9 @@ void ShowWin32Menus()
 	char* immersiveBytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
 
 	//Load and patch both DLLs. ExplorerFrame gets called in later so we have to account for that
-	char bytes[] = { 0xB0, 0x00, 0xC3 };
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, false);
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, false);
+	unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, sizeof(bytes));
+	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, sizeof(bytes));
 }
 
 void FixAuthUI()
@@ -692,77 +792,57 @@ void FixAuthUI()
 	// Newer explorer versions use this
 	// CLogoffPane::_InitShutdownObjects
 	const char* bytes = "48 8B ?? 98 00 00 00 48 8B ?? 40 45 33 C0 48 8B 01 FF 50 18 "
-						"48 8B ?? 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
-						"85 C0 ?? ?? "
-						"48 8B ?? 98 00 00 00 48 8D ?? A0 00 00 00 48 8B 01 FF 50 20";
+		"48 8B ?? 98 00 00 00 48 8B 01 FF 50 30 8B D8 "
+		"85 C0 ?? ?? "
+		"48 8B ?? 98 00 00 00 48 8D ?? A0 00 00 00 48 8B 01 FF 50 20";
 
 	// Older explorer versions use this
 	// CLogoffPane::_OnCreate
 	const char* bytesOld = "48 8B 8B 98 00 00 00 48 8B 53 40 45 33 C0 48 8B 01 FF 50 18 "
-							"48 8B 8B 98 00 00 00 48 8B 01 FF 50 30 44 8B C8 "
-							"85 C0 ?? ?? ?? ?? ?? ?? "
-							"48 8B 8B 98 00 00 00 48 8D 93 A0 00 00 00 48 8B 01 FF 50 20";
+		"48 8B 8B 98 00 00 00 48 8B 01 FF 50 30 44 8B C8 "
+		"85 C0 ?? ?? ?? ?? ?? ?? "
+		"48 8B 8B 98 00 00 00 48 8D 93 A0 00 00 00 48 8B 01 FF 50 20";
 
 	char* pattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytes);
 	char* pattern1 = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), bytesOld);
 
+	DWORD old;
+	unsigned char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+	SIZE_T size = sizeof(patch1);
 	if (pattern)
 	{
-		DWORD old;
-		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-		SIZE_T size = sizeof(patch1);
-
 		// mov rax, [rcx]
 		// call qword ptr [rax+18h]
 		char* inst1 = pattern + 14;
-		VirtualProtect(inst1, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst1, patch1, size);
-		VirtualProtect(inst1, size, old, 0);
+		ChangeImportedPattern(inst1, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+30h]
 		char* inst2 = pattern + 27;
-		VirtualProtect(inst2, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst2, patch1, size);
-		VirtualProtect(inst2, size, old, 0);
+		ChangeImportedPattern(inst2, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+20h]
 		char* inst3 = pattern + 53;
-		VirtualProtect(inst3, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst3, patch1, size);
-		VirtualProtect(inst3, size, old, 0);
-
+		ChangeImportedPattern(inst3, patch1, size);
 	}
 
 	if (pattern1 && !pattern) //Ittr: Only apply to CLogoffPane::_OnCreate if we need to, otherwise this causes crashing on later 7 explorer.
 	{
-		DWORD old;
-		char patch1[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-		SIZE_T size = sizeof(patch1);
-
 		// mov rax, [rcx]
 		// call qword ptr [rax+18h]
 		char* inst1 = pattern1 + 14;
-		VirtualProtect(inst1, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst1, patch1, size);
-		VirtualProtect(inst1, size, old, 0);
+		ChangeImportedPattern(inst1, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+30h]
 		char* inst2 = pattern1 + 27;
-		old = NULL;
-		VirtualProtect(inst2, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst2, patch1, size);
-		VirtualProtect(inst2, size, old, 0);
+		ChangeImportedPattern(inst2, patch1, size);
 
 		// mov rax, [rcx]
 		// call qword ptr [rax+20h]
 		char* inst3 = pattern1 + 58;
-		old = NULL;
-		VirtualProtect(inst3, size, PAGE_EXECUTE_READWRITE, &old);
-		memcpy(inst3, patch1, size);
-		VirtualProtect(inst3, size, old, 0);
+		ChangeImportedPattern(inst3, patch1, size);
 	}
 }
 
@@ -822,13 +902,13 @@ HTHEME __stdcall OpenThemeData_Hook(HWND hwnd, LPCWSTR pszClassList)
 		flags |= 1u;
 
 	if (g_loadedTheme)
-		theme = OpenThemeDataFromFile(g_loadedTheme,hwnd, pszClassList, flags);
+		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, flags);
 	else
 		theme = fOpenThemeData(hwnd, pszClassList);
 
 	if (theme == nullptr)
 		dbgprintf(L"OPENTHEMEDATA FAILED %s", pszClassList);
-
+	themeHandles->push_back(theme);
 	return theme;
 }
 
@@ -848,11 +928,11 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 	if (g_loadedTheme)
 		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, flags);
 	else
-		theme = fOpenThemeDataForDpi(hwnd, pszClassList,dpi);
+		theme = fOpenThemeDataForDpi(hwnd, pszClassList, dpi);
 
 	if (theme == nullptr)
 		dbgprintf(L"OPENTHEMEDATAFORDPI FAILED %s", pszClassList);
-
+	themeHandles->push_back(theme);
 	return theme;
 }
 
@@ -872,11 +952,11 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 	if (g_loadedTheme)
 		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, dwFlags | flags);
 	else
-		theme = fOpenThemeDataEx(hwnd, pszClassList,dwFlags);
+		theme = fOpenThemeDataEx(hwnd, pszClassList, dwFlags);
 
 	if (theme == nullptr)
 		dbgprintf(L"OPENTHEMEDATAEX FAILED %s", pszClassList);
-
+	themeHandles->push_back(theme);
 	return theme;
 }
 
@@ -902,15 +982,15 @@ void HookTrayThread(void)
 	if (CTray__SyncThreadProc_orig)
 	{
 		MH_CreateHook(
-			(void *)CTray__SyncThreadProc_orig,
-			(void *)CTray__SyncThreadProc_hook,
-			(void **)&CTray__SyncThreadProc_orig
+			(void*)CTray__SyncThreadProc_orig,
+			(void*)CTray__SyncThreadProc_hook,
+			(void**)&CTray__SyncThreadProc_orig
 		);
 	}
 }
 
 /* Adjust a window's position to be pushed away from the taskbar */
-SIZE AdjustWindowRectForTaskbar(RECT *lprc)
+SIZE AdjustWindowRectForTaskbar(RECT* lprc)
 {
 	HMONITOR hm = MonitorFromRect(lprc, MONITOR_DEFAULTTONEAREST);
 	HDC hDC = GetDC(NULL);
@@ -930,7 +1010,7 @@ SIZE AdjustWindowRectForTaskbar(RECT *lprc)
 
 		if (curOffset < offset)
 		{
-			int *set = (i % 2 == 0) ? &dx : &dy;
+			int* set = (i % 2 == 0) ? &dx : &dy;
 			if (i > 1)
 			{
 				*set -= offset - curOffset;
@@ -1013,7 +1093,7 @@ HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3,
 	HWND ret = CreateWindowInBandExOrig(exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 & 1, dwTypeFlags);
 	dbgprintf(L"%p: CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, ret, GetLastError());
 	dbgprintf(L"CreateWindowInBandExOrig %i", p13);
-	
+
 	SetProp(ret, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
 	SetProp(ret, L"explorer7.WindowBand", (HANDLE)p13);
 	return ret;
@@ -1043,10 +1123,93 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 	return TRUE;
 }
 
+BOOL FileExists(LPCTSTR szPath)
+{
+	DWORD dwAttrib = GetFileAttributes(szPath);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+void GetOrbDPIAndPos(LPWSTR fName)
+{
+	APPBARDATA abd;
+	abd.cbSize = sizeof(APPBARDATA);
+	SHAppBarMessage(ABM_GETTASKBARPOS, &abd);
+
+	HDC screen = GetDC(NULL);
+	double hPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSX);
+	double vPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSY);
+	ReleaseDC(NULL, screen);
+	double dpi = (hPixelsPerInch + vPixelsPerInch) * 0.5;
+
+	if (dpi >= 120)
+	{
+		if (dpi >= 144)
+		{
+			if (dpi >= 192)
+			{
+				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6808");
+				else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6812");
+				else StringCchCopyW(fName, MAX_PATH, L"6804");
+			}
+			else
+			{
+				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6807");
+				else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6811");
+				else StringCchCopyW(fName, MAX_PATH, L"6803");
+			}
+		}
+		else
+		{
+			if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6806");
+			else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6810");
+			else StringCchCopyW(fName, MAX_PATH, L"6802");
+		}
+	}
+	else
+	{
+		if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6805");
+		else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6809");
+		else StringCchCopyW(fName, MAX_PATH, L"6801");
+	}
+}
+
 HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
 {
 	dbgprintf(L"LoadImageW_CallHook has been called!");
-	return LoadImageW(hInst,name,type,cx,cy,fuLoad);
+
+	WCHAR szExeDir[MAX_PATH];
+	GetModuleFileNameW(NULL, szExeDir, MAX_PATH);
+	WCHAR* backslash = StrRChrW(szExeDir, NULL, L'\\');
+	if (*backslash == L'\\')
+		*backslash = L'\0';
+
+	WCHAR szOrbDir[MAX_PATH];
+	LSTATUS res = g_registry.QueryValue(L"OrbDirectory", (LPBYTE)szOrbDir, sizeof(szOrbDir));
+	if (!*szOrbDir || ERROR_SUCCESS != res)
+		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
+
+	WCHAR szOrbFile[MAX_PATH];
+	GetOrbDPIAndPos(szOrbFile);
+
+	WCHAR szOrbPath[MAX_PATH * 3];
+	wsprintfW(
+		szOrbPath,
+		L"%s\\orbs\\%s\\%s.bmp",
+		szExeDir,
+		szOrbDir,
+		szOrbFile
+	);
+
+	if (FileExists(szOrbPath) == FALSE)
+	{
+		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
+	}
+	else
+	{
+		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, 0, 0, fuLoad | LR_LOADFROMFILE);
+	}
 }
 
 void HookLoadImageForSizeAndFont()
@@ -1065,8 +1228,29 @@ void HookLoadImageForSizeAndFont()
 		// write a call to our function
 		DetourCall((void*)callLoadImage, LoadImageW_CallHook);
 
-		
+
 	}
+
+	char* callDrawExtended = (char*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 57 48 83 EC 30 33 DB 48 8B F9 48 39 59 40");
+	if (!callDrawExtended) return;
+
+	if (callDrawExtended)
+	{
+		unsigned char bytes[] = { 0xB0,0x01,0xC3 };
+		ChangeImportedPattern(callDrawExtended, bytes, sizeof(bytes));
+	}
+}
+
+HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnknown* pUnkOuter, IID& riid, void** ppv)
+{
+	HRESULT res = SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter, riid, ppv);
+	if (res != S_OK && riid == GUID_88df9332_6adb_4604_8218_508673ef7f8a)
+	{
+		IShellURL10* shellurl10;
+		res = SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter, GUID_4f33718d_bae1_4f9b_96f2_d2a16e683346, (void**)&shellurl10);
+		*ppv = new CShellURLWrapper(shellurl10);
+	}
+	return res;
 }
 
 void HookShell32();
@@ -1076,20 +1260,22 @@ void HookAPIs()
 	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD)); // Ittr: shortened the name for convenience but still not sure on it at the moment. TODO determine name before release
 	g_enableImmersiveShellStack = (dwEnableUWP != 0);
 
-	hEvent_DesktopVisible = CreateEvent(NULL,TRUE,FALSE,L"ShellDesktopVisibleEvent");
+	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	//change desktop
-	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)200);
-	ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll",SHCreateDesktopOrig,SHCreateDesktopNEW);
-	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)201);
-	ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll",SHDesktopMessageLoop,SHDesktopMessageLoopNEW);
+	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHCreateDesktopOrig, SHCreateDesktopNEW);
+	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)201);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHDesktopMessageLoop, SHDesktopMessageLoopNEW);
+
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "SHCoCreateInstance"), SHCoCreateInstanceNew);
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)902), GetProcAddress(GetModuleHandle(L"shunimpl.dll"),(LPSTR)473));
 	//change appid
-	ChangeImportedAddress(GetModuleHandle(NULL),"kernel32.dll",SetErrorMode,SetErrorModeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
-	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",IsCompositionActive,IsCompositionActiveNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
 
-	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"),L"AMAP");
+	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
 	if (LoadAnimationDataMap)
 	{
 		LoadAnimationDataMap = (void*)GetFunctionStart((uintptr_t)LoadAnimationDataMap, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
@@ -1101,15 +1287,33 @@ void HookAPIs()
 		VirtualProtect(LoadAnimationDataMap, 1, old, 0);
 	}
 	else
-		MessageBox(0,L"SHite",L"FUck",0);
+		MessageBox(0, L"SHite", L"FUck", 0);
+
+	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
+	if (GetClassIdForShellTarget)
+	{
+		GetClassIdForShellTarget = (void*)GetFunctionStart((uintptr_t)GetClassIdForShellTarget, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
+
+		//byebye
+		DWORD old;
+		VirtualProtect(GetClassIdForShellTarget, 1, PAGE_EXECUTE_READWRITE, &old);
+		*reinterpret_cast<char*>(GetClassIdForShellTarget) = 0xC3;
+		VirtualProtect(GetClassIdForShellTarget, 1, old, 0);
+	}
 
 	ThemeManagerInitialize();
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
 
+	void* _ctaskbandadd = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "FF F3 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F8 06 00 00");
+	//void* _ctaskbandclasscb = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B F1 48 8B 0A 49 8B F8 48 8B DA");
+	//addIcon_orig = (addIcon_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 18 56 57 41 54 48 83 EC 20 45 33 E4");
+	void* _cthumbnailUpdate = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 30 48 8B 81 B0 00 00 00");
+	SetIconThumb = (setIconThumb_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 63 D8 4C 8B 81 B0 00 00 00");
+
 	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
-	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
 	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
 
@@ -1126,6 +1330,15 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
+
+
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
+	{
+		// This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
+		MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&SetIcon));
+		MH_CreateHook(static_cast<LPVOID>(_cthumbnailUpdate), UpdateItemIcon, reinterpret_cast<LPVOID*>(&UpdateItem));
+		//MH_CreateHook(static_cast<LPVOID>(_ctaskbandclasscb), GetClassIconCB, reinterpret_cast<LPVOID*>(&GetClassIconCB_orig));
+	}
 
 
 	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
@@ -1169,28 +1382,28 @@ void HookAPIs()
 
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
 	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "CloseThemeData"), CloseThemeDataNEW);
-	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmIsCompositionEnabled,DwmIsCompositionEnabledNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmIsCompositionEnabled, DwmIsCompositionEnabledNEW);
 	//adapt colorization api
-	DwmGetColorizationParametersOrig = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"dwmapi.dll"),(LPSTR)127);
-	DwmpActivateLivePreview = (decltype(DwmpActivateLivePreview))GetProcAddress(GetModuleHandle(L"dwmapi.dll"),(LPSTR)113);
-	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll", DwmpActivateLivePreview, DwmpActivateLivePreviewNEW);
-	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmGetColorizationParametersOrig,DwmGetColorizationParametersNEW);
+	DwmGetColorizationParametersOrig = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)127);
+	DwmpActivateLivePreview = (decltype(DwmpActivateLivePreview))GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)113);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmpActivateLivePreview, DwmpActivateLivePreviewNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmGetColorizationParametersOrig, DwmGetColorizationParametersNEW);
 
 	//8RTM - composition
 	//Ittr: Restore active DWM "colorization" to previews, taskbar and start menu (how this renders is theme-dependent)
-	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"),"SetWindowCompositionAttribute");
-	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowCompositionAttribute,SetWindowCompositionAttributeNEW);
-	ChangeImportedAddress(GetModuleHandle(NULL),"dwmapi.dll",DwmEnableBlurBehindWindow,DwmEnableBlurBehindWindowNEW);
-	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",SetWindowRgn,SetWindowRgnNEW);
+	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowCompositionAttribute");
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowCompositionAttribute, SetWindowCompositionAttributeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmEnableBlurBehindWindow, DwmEnableBlurBehindWindowNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowRgn, SetWindowRgnNEW);
 	//load functions needed for task enum hook
 	HMODULE user32 = LoadLibrary(L"user32.dll");
 	IsShellFrameWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2573);
 	//IsShellManagedWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2574);
 	GhostWindowFromHungWindow = (GhostWindowFromHungWindow_t)GetProcAddress(user32, "GhostWindowFromHungWindow");
 	//perform the actual hook
-	ChangeImportedAddress(GetModuleHandle(NULL),"user32.dll",IsWindowVisible,IsWindowVisibleNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", IsWindowVisible, IsWindowVisibleNEW);
 	//change show desktop btn
-	ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll",SetWindowTheme,SetWindowThemeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", SetWindowTheme, SetWindowThemeNEW);
 	//overflow positioning if user is using TH1 or higher
 	if (g_osVersion.BuildNumber() >= 10240)
 		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
@@ -1199,7 +1412,7 @@ void HookAPIs()
 	BrandingLoadImage = (BrandingLoadImage_t)GetProcAddress(winbrand, "BrandingLoadImage");
 	if (BrandingLoadImage)
 		ChangeImportedAddress(GetModuleHandle(NULL),"winbrand.dll",BrandingLoadImage,BrandingLoadImageNEW);*/
-	//shell32 - hack created startmenupin instance		
+		//shell32 - hack created startmenupin instance		
 	StartMenuPin_PatchShell32();
 	//shell32 - patch delayload shit
 	HookShell32();
@@ -1229,43 +1442,43 @@ void HookAPIs()
 }
 
 
-BOOL WINAPI GetUserObjectInformationNew( HANDLE hObj, int nIndex, PVOID pvInfo, DWORD nLength, LPDWORD lpnLengthNeeded )
-{	
-	lstrcpy(LPWSTR(pvInfo),L"Winlogon");
+BOOL WINAPI GetUserObjectInformationNew(HANDLE hObj, int nIndex, PVOID pvInfo, DWORD nLength, LPDWORD lpnLengthNeeded)
+{
+	lstrcpy(LPWSTR(pvInfo), L"Winlogon");
 	return TRUE;
 }
 
-BOOL WINAPI GetWindowBandNew(HWND hwnd,DWORD* out)
+BOOL WINAPI GetWindowBandNew(HWND hwnd, DWORD* out)
 {
-	BOOL ret = GetWindowBandOrig(hwnd,out);
-	DWORD origband = (DWORD)GetProp(GetAncestor(hwnd,GA_ROOTOWNER),L"explorer7.WindowBand");
+	BOOL ret = GetWindowBandOrig(hwnd, out);
+	DWORD origband = (DWORD)GetProp(GetAncestor(hwnd, GA_ROOTOWNER), L"explorer7.WindowBand");
 	//dbgprintf(L"GetWindowBand %p %p %p",hwnd,*out,origband);
-	if (origband && out) *out = origband;	
+	if (origband && out) *out = origband;
 	return ret;
 }
 
-UINT_PTR WINAPI SetTimer_WUI( HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERPROC lpTimerFunc )
+UINT_PTR WINAPI SetTimer_WUI(HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERPROC lpTimerFunc)
 {
-	if ( nIDEvent == 0x2252CE37 )
-		ShowWindow(hWnd,SW_HIDE);
-	return SetTimer(hWnd,nIDEvent,uElapse,lpTimerFunc);
+	if (nIDEvent == 0x2252CE37)
+		ShowWindow(hWnd, SW_HIDE);
+	return SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc);
 }
 
 
 void HookImmersive()
 {
-	HMODULE immersiveui = LoadLibrary(L"Windows.UI.Immersive.dll");	
+	HMODULE immersiveui = LoadLibrary(L"Windows.UI.Immersive.dll");
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
-	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32,"CreateWindowInBand");
+	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
 	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
-	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32,"GetWindowBand");
-	ChangeImportedAddress(immersiveui,"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);
-	ChangeImportedAddress(immersiveui,"user32.dll",GetWindowBandOrig,GetWindowBandNew);
-	ChangeImportedAddress(immersiveui,"user32.dll",GetUserObjectInformation,GetUserObjectInformationNew);
-	ChangeImportedAddress(immersiveui,"user32.dll",SetTimer,SetTimer_WUI);
+	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
+	ChangeImportedAddress(immersiveui, "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+	ChangeImportedAddress(immersiveui, "user32.dll", GetWindowBandOrig, GetWindowBandNew);
+	ChangeImportedAddress(immersiveui, "user32.dll", GetUserObjectInformation, GetUserObjectInformationNew);
+	ChangeImportedAddress(immersiveui, "user32.dll", SetTimer, SetTimer_WUI);
 
 	if (!g_enableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
 	{
@@ -1287,7 +1500,7 @@ GetProcAddress_Hook(
 )
 {
 	//dbgprintf(L"GetProcAddress Hook\n");
-	return GetProcAddress(hModule,lpProcName);
+	return GetProcAddress(hModule, lpProcName);
 }
 
 //TODO: Migrate to use ChangeImportedPattern or equivalent when said function is finalised. Not migrated yet due to importance of shunimpl
@@ -1296,77 +1509,82 @@ void AssFuckShunimpl()
 {
 	uintptr_t shunImpl = (uintptr_t)GetModuleHandle(L"shunimpl.dll");
 	if (!shunImpl) return;
-	char* dllmainSHUNIMPL = (char*)FindPattern(shunImpl,"48 83 EC 28 83 FA 01");
+	char* dllmainSHUNIMPL = (char*)FindPattern(shunImpl, "48 83 EC 28 83 FA 01");
 
 	if (dllmainSHUNIMPL)
 	{
-		char bytes[] = { 0xB0,0x01,0xC3 };
-
-		DWORD old;
-		VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), PAGE_EXECUTE_READWRITE, &old);
-		memcpy(dllmainSHUNIMPL, bytes, sizeof(bytes));
-		VirtualProtect(dllmainSHUNIMPL, sizeof(bytes), old, 0);
+		unsigned char bytes[] = { 0xB0,0x01,0xC3 };
+		ChangeImportedPattern(dllmainSHUNIMPL, bytes, sizeof(bytes));
 	}
-	
+
 }
 
-BOOL APIENTRY DllMain( HMODULE hModule,
-                       DWORD  ul_reason_for_call,
-                       LPVOID lpReserved)
+BOOL APIENTRY DllMain(HMODULE hModule,
+	DWORD  ul_reason_for_call,
+	LPVOID lpReserved)
 {
 	CheckTimeBomb();
 
 	switch (ul_reason_for_call)
 	{
-		case DLL_PROCESS_ATTACH:
-			{
-				AssFuckShunimpl();
+	case DLL_PROCESS_ATTACH:
+	{
+		AssFuckShunimpl();
 
-				dbgprintf(L"Dll Attach\n");
-				g_hInstance = hModule;
-				if ( GetModuleHandle(L"DisplaySwitch.exe") )
-				{
-					dbgprintf(L"loaded into displayswitch %p %s!",GetCurrentProcessId(),GetCommandLine());
-					HookImmersive();
-				}
-				else
-				{
-					HookAPIs();
-				}
-			}
-			break;
-		case DLL_THREAD_ATTACH:
-			{			
-				if (!g_alttabhooked && GetModuleHandle(L"alttab.dll"))
-				{
-					CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(GetModuleHandle(L"user32.dll"),"CreateWindowInBand");
-					ChangeImportedAddress(GetModuleHandle(L"alttab.dll"),"user32.dll",CreateWindowInBandOrig,CreateWindowInBandNew);				
-					g_alttabhooked = TRUE;				
-				}
-			}
-			break;
-		case DLL_THREAD_DETACH:
-		case DLL_PROCESS_DETACH:
-			break;
+		themeHandles = new wiktorArray<HTHEME>();
+		themeHandles->data = 0;
+		themeHandles->size = 0;
+
+		dbgprintf(L"Dll Attach\n");
+		g_hInstance = hModule;
+		if (GetModuleHandle(L"DisplaySwitch.exe"))
+		{
+			dbgprintf(L"loaded into displayswitch %p %s!", GetCurrentProcessId(), GetCommandLine());
+			HookImmersive();
+		}
+		else
+		{
+			HookAPIs();
+		}
+	}
+	break;
+	case DLL_THREAD_ATTACH:
+	{
+		if (!g_alttabhooked && GetModuleHandle(L"alttab.dll"))
+		{
+			CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand");
+			ChangeImportedAddress(GetModuleHandle(L"alttab.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+			g_alttabhooked = TRUE;
+		}
+	}
+	break;
+	case DLL_THREAD_DETACH:
+		break;
+	case DLL_PROCESS_DETACH:
+		realloc(themeHandles->data, 0);
+		themeHandles->size = 0;
+		delete themeHandles;
+
+		break;
 	}
 	return TRUE;
 }
 
 extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
-  __in   REFCLSID rclsid,
-  __in   LPUNKNOWN pUnkOuter,
-  __in   DWORD dwClsContext,
-  __in   REFIID riid,
-  __out  LPVOID *ppv
+	__in   REFCLSID rclsid,
+	__in   LPUNKNOWN pUnkOuter,
+	__in   DWORD dwClsContext,
+	__in   REFIID riid,
+	__out  LPVOID* ppv
 )
 {
 	HRESULT result;
 	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
 
-	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK)
+	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK && g_osVersion.BuildNumber() >= 10074) //Ittr: as far as im aware doesnt cause crashing on 1507/11. needs further checking when im awake
 	{
 		auto shellItemFilter = new CStartMenuItemFilter();
-		result = shellItemFilter->QueryInterface(riid,ppv);
+		result = shellItemFilter->QueryInterface(riid, ppv);
 	}
 
 	if (rclsid == CLSID_SysTray) //create Metro before tray
@@ -1380,7 +1598,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
 	{
-		
+
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IRegTreeOptions8, ppv);
 		*ppv = new CRegTreeOptionsWrapper((IRegTreeOptions8*)*ppv);
 	}
@@ -1408,15 +1626,15 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		if (riid == IID_IAppResolver7)
 		{
-			dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
+			//dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
 			PVOID rslvr8 = NULL;
 			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IAppResolver8, &rslvr8);
 			//create our object
 
-			CStartMenuResolver *resolver7 = new CStartMenuResolver((IAppResolver8 *)rslvr8);
+			CStartMenuResolver* resolver7 = new CStartMenuResolver((IAppResolver8*)rslvr8);
 			result = resolver7->QueryInterface(riid, ppv);
-			if (result == S_OK)
-				dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
+			//if (result == S_OK)
+				//dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 		}
 		else if (riid == IID_IStartMenuItemsCache7)
 		{
@@ -1425,14 +1643,14 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			if (build >= 14393)
 				iid = IID_IStartMenuItemsCache10;
 
-			void *newcache = nullptr;
+			void* newcache = nullptr;
 			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, iid, &newcache);
 
-			CStartMenuResolver *resolver7 = nullptr;
+			CStartMenuResolver* resolver7 = nullptr;
 			if (build >= 14393)
-				resolver7 = new CStartMenuResolver((IStartMenuItemsCache10 *)newcache);
+				resolver7 = new CStartMenuResolver((IStartMenuItemsCache10*)newcache);
 			else
-				resolver7 = new CStartMenuResolver((IStartMenuItemsCache8 *)newcache);
+				resolver7 = new CStartMenuResolver((IStartMenuItemsCache8*)newcache);
 
 			result = resolver7->QueryInterface(riid, ppv);
 			if (result == S_OK)
@@ -1443,7 +1661,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	{
 		int build = g_osVersion.BuildNumber();
 		IID id = IID_IPinnedList25;
-		
+
 		if (build >= 14393 && build < 17763)
 			id = IID_IFlexibleTaskbarPinnedList;
 		else if (build >= 17763)
@@ -1512,14 +1730,14 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 }
 
 extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
-  REFCLSID rclsid,     //Class identifier (CLSID) to be registered
-  IUnknown * pUnk,     //Pointer to the class object
-  DWORD dwClsContext,  //Context for running executable code
-  DWORD flags,         //How to connect to the class object
-  LPDWORD  lpdwRegister
+	REFCLSID rclsid,     //Class identifier (CLSID) to be registered
+	IUnknown* pUnk,     //Pointer to the class object
+	DWORD dwClsContext,  //Context for running executable code
+	DWORD flags,         //How to connect to the class object
+	LPDWORD  lpdwRegister
 )
 {
-	if ( rclsid == CLSID_TrayNotify)
+	if (rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
 		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - TODO re-enable for non
@@ -1531,16 +1749,16 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 		}
 	}
 
-	HRESULT rslt = CoRegisterClassObject(rclsid,pUnk,dwClsContext,flags,lpdwRegister);
+	HRESULT rslt = CoRegisterClassObject(rclsid, pUnk, dwClsContext, flags, lpdwRegister);
 
-	if ( rclsid == CLSID_TrayNotify)
+	if (rclsid == CLSID_TrayNotify)
 		dwRegisterNotify = *lpdwRegister;
 
 	return rslt;
 }
 
-extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject( DWORD dwRegister )
-{	
+extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject(DWORD dwRegister)
+{
 	if (dwRegister == dwRegisterNotify)
 	{
 		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
