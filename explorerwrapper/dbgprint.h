@@ -203,12 +203,12 @@ static uintptr_t GetFunctionStart(uintptr_t address, uintptr_t BaseAddress)
 {
 	DWORD64 ImgBase = 0;
 	PRUNTIME_FUNCTION Function = nullptr;
-	for (auto Func = RtlLookupFunctionEntry(address, &ImgBase, NULL); Func; Func = RtlLookupFunctionEntry(BaseAddress + (Func->BeginAddress - 1), &ImgBase, NULL))
+	for (auto Func = RtlLookupFunctionEntry(address, &ImgBase, NULL); Func; 
+		Func = RtlLookupFunctionEntry(BaseAddress + (Func->BeginAddress - 1), &ImgBase, NULL))
 	{
-		if (reinterpret_cast<PUNWIND_INFO>(BaseAddress + Func->UnwindInfoAddress)->Flags & UNW_FLAG_CHAININFO)
-		{
+		auto UnwindInfo = reinterpret_cast<PUNWIND_INFO>(BaseAddress + Func->UnwindInfoAddress);
+		if (UnwindInfo->Flags & UNW_FLAG_CHAININFO)
 			continue;
-		}
 
 		Function = Func;
 		break;
@@ -248,20 +248,32 @@ inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 		}
 	}
 
+	size_t refStrLen = wcslen(RefStr) * sizeof(wchar_t);
+	uint64_t* refStr64 = (uint64_t*)RefStr;
+
 	for (size_t i = 0; i < DataSize; i++)
 	{
-		if (wcscmp((const wchar_t*)RefStr, (const wchar_t*)(DataSection + i)) == 0)
+		if (*((uint64_t*)(DataSection + i)) == *refStr64)
 		{
-			StringAddress = DataSection + i;
+			if (memcmp(RefStr, DataSection + i, refStrLen) == 0)
+			{
+				StringAddress = DataSection + i;
+				break;
+			}
 		}
 	}
+
 	if (!StringAddress)
 	{
 		for (size_t i = 0; i < TextSize; i++)
 		{
-			if (wcscmp((const wchar_t*)RefStr, (const wchar_t*)(TextSection + i)) == 0)
+			if (*((uint64_t*)(TextSection + i)) == *refStr64)
 			{
-				StringAddress = TextSection + i;
+				if (memcmp(RefStr, TextSection + i, refStrLen) == 0)
+				{
+					StringAddress = TextSection + i;
+					break;
+				}
 			}
 		}
 	}
