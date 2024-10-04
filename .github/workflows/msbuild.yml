@@ -7,9 +7,9 @@ name: MSBuild
 
 on:
   push:
-    branches: [ "main", "misha/uwp-work" ]
+    branches: [ "main", "misha/uwp-work", "vista" ]
   pull_request:
-    branches: [ "main", "misha/uwp-work" ]
+    branches: [ "main", "misha/uwp-work", "vista" ]
 
 env:
   # Path to the solution file relative to the root of the project.
