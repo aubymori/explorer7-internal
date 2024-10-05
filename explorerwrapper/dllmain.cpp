@@ -1065,6 +1065,14 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
 		HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam);
 
+		// Ittr: We do this to eliminate the ghost window. The power of trans rights compelled me to fix this :3
+		BOOL shouldCloak = true;
+		WCHAR titleBuffer[MAX_PATH];
+		GetClassName(ret, titleBuffer, sizeof(titleBuffer));
+		WCHAR afwTitle[23] = L"ApplicationFrameWindow";
+		if (strcmp((char*)titleBuffer, (char*)afwTitle) == 0)
+			DwmSetWindowAttribute(ret, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
+
 		dbgprintf(L"CREATEWINDOWINBANDNEW %i", dwBand);
 
 		if (ret)
@@ -1091,6 +1099,15 @@ HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3,
 	DWORD p0 = (DWORD)_ReturnAddress();
 	exStyle = exStyle | WS_EX_TOOLWINDOW;
 	HWND ret = CreateWindowInBandExOrig(exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 & 1, dwTypeFlags);
+
+	// Ittr: We do this to eliminate the ghost window. The power of trans rights compelled me to fix this :3
+	BOOL shouldCloak = true;
+	WCHAR titleBuffer[MAX_PATH];
+	GetClassName(ret, titleBuffer, sizeof(titleBuffer));
+	WCHAR afwTitle[23] = L"ApplicationFrameWindow";
+	if (strcmp((char*)titleBuffer, (char*)afwTitle) == 0)
+		DwmSetWindowAttribute(ret, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
+
 	dbgprintf(L"%p: CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, ret, GetLastError());
 	dbgprintf(L"CreateWindowInBandExOrig %i", p13);
 
