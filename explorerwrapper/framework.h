@@ -12,6 +12,7 @@
 #include <winscard.h>
 #include <propkey.h>
 #include <DocObj.h>
+#include <KnownFolders.h>
 #include <bcrypt.h>
 #include <propvarutil.h>
 #include <strsafe.h>

@@ -97,7 +97,7 @@ strtoulCUSTOM(const char* nptr, char** endptr, int base)
 		//errno = ERANGE;
 	}
 	else if (neg)
-		acc = -acc;
+		acc = -(long)acc;
 	if (endptr != 0)
 		*endptr = (char*)(any ? s - 1 : nptr);
 	return (acc);
@@ -167,10 +167,10 @@ static uintptr_t FindPattern(uintptr_t baseAddress, const char* signature)
 	const auto s = patternBytes->size;
 	const auto d = patternBytes->data;
 
-	for (auto i = 0ul; i < sizeOfImage - s; ++i)
+	for (size_t i = 0; i < sizeOfImage - s; ++i)
 	{
 		bool found = true;
-		for (auto j = 0ul; j < s; ++j)
+		for (size_t j = 0; j < s; ++j)
 		{
 			if (scanBytes[i + j] != d[j] && d[j] != -1)
 			{
@@ -203,12 +203,12 @@ static uintptr_t GetFunctionStart(uintptr_t address, uintptr_t BaseAddress)
 {
 	DWORD64 ImgBase = 0;
 	PRUNTIME_FUNCTION Function = nullptr;
-	for (auto Func = RtlLookupFunctionEntry(address, &ImgBase, NULL); Func; Func = RtlLookupFunctionEntry(BaseAddress + (Func->BeginAddress - 1), &ImgBase, NULL))
+	for (auto Func = RtlLookupFunctionEntry(address, &ImgBase, NULL); Func; 
+		Func = RtlLookupFunctionEntry(BaseAddress + (Func->BeginAddress - 1), &ImgBase, NULL))
 	{
-		if (reinterpret_cast<PUNWIND_INFO>(BaseAddress + Func->UnwindInfoAddress)->Flags & UNW_FLAG_CHAININFO)
-		{
+		auto UnwindInfo = reinterpret_cast<PUNWIND_INFO>(BaseAddress + Func->UnwindInfoAddress);
+		if (UnwindInfo->Flags & UNW_FLAG_CHAININFO)
 			continue;
-		}
 
 		Function = Func;
 		break;
@@ -248,15 +248,37 @@ inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 		}
 	}
 
-	for (int i = 0; i < DataSize; i++)
+	size_t refStrLen = wcslen(RefStr) * sizeof(wchar_t);
+	uint64_t* refStr64 = (uint64_t*)RefStr;
+
+	for (size_t i = 0; i < DataSize; i++)
 	{
-		if (wcscmp((const wchar_t*)RefStr, (const wchar_t*)(DataSection + i)) == 0)
+		if (*((uint64_t*)(DataSection + i)) == *refStr64)
 		{
-			StringAddress = DataSection + i;
+			if (memcmp(RefStr, DataSection + i, refStrLen) == 0)
+			{
+				StringAddress = DataSection + i;
+				break;
+			}
 		}
 	}
 
-	for (int i = 0; i < TextSize; i++)
+	if (!StringAddress)
+	{
+		for (size_t i = 0; i < TextSize; i++)
+		{
+			if (*((uint64_t*)(TextSection + i)) == *refStr64)
+			{
+				if (memcmp(RefStr, TextSection + i, refStrLen) == 0)
+				{
+					StringAddress = TextSection + i;
+					break;
+				}
+			}
+		}
+	}
+
+	for (size_t i = 0; i < TextSize; i++)
 	{
 		// opcode: lea
 		if ((TextSection[i] == uint8_t(0x4C) || TextSection[i] == uint8_t(0x48)) && TextSection[i + 1] == uint8_t(0x8D))
@@ -271,4 +293,102 @@ inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 	}
 
 	return nullptr;
+}
+
+//allocates memory close enough to the provided targetAddr argument to be reachable
+	//from the targetAddr by a 32 bit jump instruction
+static void* _AllocatePageNearAddress(void* targetAddr)
+{
+	SYSTEM_INFO sysInfo;
+	GetSystemInfo(&sysInfo);
+	const uint64_t PAGE_SIZE = sysInfo.dwPageSize;
+
+	uint64_t startAddr = (uint64_t(targetAddr) & ~(PAGE_SIZE - 1)); //round down to nearest page boundary
+	uint64_t minAddr = min(startAddr - 0x7FFFFF00, (uint64_t)sysInfo.lpMinimumApplicationAddress);
+	uint64_t maxAddr = max(startAddr + 0x7FFFFF00, (uint64_t)sysInfo.lpMaximumApplicationAddress);
+
+	uint64_t startPage = (startAddr - (startAddr % PAGE_SIZE));
+
+	uint64_t pageOffset = 1;
+	while (1)
+	{
+		uint64_t byteOffset = pageOffset * PAGE_SIZE;
+		uint64_t highAddr = startPage + byteOffset;
+		uint64_t lowAddr = (startPage > byteOffset) ? startPage - byteOffset : 0;
+
+		bool needsExit = highAddr > maxAddr && lowAddr < minAddr;
+
+		if (highAddr < maxAddr)
+		{
+			void* outAddr = VirtualAlloc((void*)highAddr, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+			if (outAddr)
+				return outAddr;
+		}
+
+		if (lowAddr > minAddr)
+		{
+			void* outAddr = VirtualAlloc((void*)lowAddr, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+			if (outAddr != nullptr)
+				return outAddr;
+		}
+
+		pageOffset++;
+
+		if (needsExit)
+		{
+			break;
+		}
+	}
+
+	return nullptr;
+}
+
+static uint32_t _WriteAbsoluteJump64(void* absJumpMemory, void* addrToJumpTo)
+{
+	//this writes the absolute jump instructions into the memory allocated near the target
+	//the E8 jump installed in the target function will jump to here
+
+	//r10 is chosen here because it's a volatile register according to the windows x64 calling convention, 
+	//but is not used for return values (like rax) or function arguments (like rcx, rdx, r8, r9)
+	uint8_t absJumpInstructions[] = { 0x49, 0xBA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, //mov 64 bit value into r10
+										0x41, 0xFF, 0xE2 }; //jmp r10
+
+	uint64_t addrToJumpTo64 = (uint64_t)addrToJumpTo;
+	memcpy(&absJumpInstructions[2], &addrToJumpTo64, sizeof(addrToJumpTo64));
+	memcpy(absJumpMemory, absJumpInstructions, sizeof(absJumpInstructions));
+	return sizeof(absJumpInstructions);
+}
+
+inline void DetourCall(void* Target, void* Detour)
+{
+	void* relayFuncMemory = _AllocatePageNearAddress(Target);
+
+	_WriteAbsoluteJump64(relayFuncMemory, Detour); //write relay func instructions
+
+	DWORD oldProtect;
+	BOOL success = VirtualProtect(Target, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
+
+	//32 bit relative call opcode is E8, takes 1 32 bit operand for jump offset
+	uint8_t jmpInstruction[5] = { 0xE8, 0x0, 0x0, 0x0, 0x0 };
+
+	//to fill out the last 4 bytes of callInstruction, we need the offset between 
+	//the relay function and the instruction immediately AFTER the jmp instruction
+	const uint64_t relAddr = (uint64_t)relayFuncMemory - ((uint64_t)Target + sizeof(jmpInstruction));
+	memcpy(jmpInstruction + 1, &relAddr, 4);
+
+	//install the hook
+	memcpy(Target, jmpInstruction, sizeof(jmpInstruction));
+}
+
+
+//Ittr: Consolidated function for pattern byte replacements.
+static void ChangeImportedPattern(void* dllPattern, const unsigned char* newBytes, SIZE_T size) //thank you wiktor
+{
+	if (dllPattern)
+	{
+		DWORD old;
+		VirtualProtect(dllPattern, size, PAGE_EXECUTE_READWRITE, &old);
+		memcpy(dllPattern, newBytes, size);
+		VirtualProtect(dllPattern, size, old, 0);
+	}
 }

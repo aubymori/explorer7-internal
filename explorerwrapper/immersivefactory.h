@@ -2,6 +2,7 @@
 #define INITGUID
 #include "framework.h"
 
+#pragma region GUID definitions
 DEFINE_GUID(CLSID_ImmersiveShell,0xc2f03a33, 0x21f5, 0x47fa, 0xb4,0xbb,0x15,0x63,0x62,0xa2,0xf2,0x39); //c2f03a33_21f5_47fa_b4bb_156362a2f239
 DEFINE_GUID(IID_ImmersiveShellProvider,0x6D5140C1, 0x7436, 0x11CE, 0x80,0x34,0x00,0xaa,0x00,0x60,0x09,0xfa);
 
@@ -17,19 +18,19 @@ DEFINE_GUID(IID_IIWpnPlatform,0x9FA045CB, 0xB9B3, 0x47BA, 0x84,0x2F,0xE2,0xAB,0x
 
 DEFINE_GUID(CLSID_PushNotificationPlatformCF,0x4655840e, 0xAB1A, 0x49D0, 0xA4,0xC4,0x26,0x1F,0xA1,0xC2,0x0E,0x86); //{4655840e-ab1a-49d0-a4c4-261fa1c20e86}
 DEFINE_GUID(CLSID_PushNotificationPlatform,0x0C9281F9, 0x6DA1, 0x4006, 0x87,0x29,0xDE,0x6E,0x6B,0x61,0x58,0x1C);
-
+#pragma endregion
 
 class CImmersiveFactory : public IClassFactory
 {
 public:
 	//IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
-    ULONG STDMETHODCALLTYPE AddRef( void);    
-    ULONG STDMETHODCALLTYPE Release( void);
+    STDMETHODIMP QueryInterface(REFIID riid,void **ppvObject);    
+	STDMETHODIMP_(ULONG) AddRef( void);
+	STDMETHODIMP_(ULONG) Release( void);
 
 	//IClassFactory
-	HRESULT STDMETHODCALLTYPE CreateInstance( IUnknown * pUnkOuter, REFIID riid, void ** ppvObject );
-	HRESULT STDMETHODCALLTYPE LockServer( BOOL fLock );
+	STDMETHODIMP CreateInstance( IUnknown * pUnkOuter, REFIID riid, void ** ppvObject );
+	STDMETHODIMP LockServer( BOOL fLock );
 };
 
 class CImmersiveProvider : public IServiceProvider
@@ -38,12 +39,13 @@ public:
 	CImmersiveProvider();
 
 	//IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
-    ULONG STDMETHODCALLTYPE AddRef( void);    
-    ULONG STDMETHODCALLTYPE Release( void);
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
 
 	//IServiceProvider
-	HRESULT STDMETHODCALLTYPE QueryService( REFGUID guidService, REFIID riid, void **ppv );
+	STDMETHODIMP QueryService( REFGUID guidService, REFIID riid, void **ppv );
+
 private:
 	long m_cRef;
 };
@@ -52,18 +54,18 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IImmersiveMonitorManager: public IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE GetCount(UINT*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetConnectedCount(UINT*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetAt(UINT,IUnknown**) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetFromHandle(HMONITOR,IUnknown**) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetFromIdentity(ULONG,IUnknown**) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetImmersiveProxyMonitor(IUnknown**) = 0;
-	virtual HRESULT STDMETHODCALLTYPE QueryService(HMONITOR, REFGUID guidService, REFIID riid, void **ppv ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE QueryServiceByIdentity(ULONG, REFGUID guidService, REFIID riid, void **ppv ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE QueryServiceFromWindow(HWND, REFGUID guidService, REFIID riid, void **ppv ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE QueryServiceFromPoint(tagPOINT*, REFGUID guidService, REFIID riid, void **ppv ) = 0;
-	virtual HRESULT STDMETHODCALLTYPE MoveImmersiveMonitor(int) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetImmersiveMonitor(IUnknown*) = 0;
+	STDMETHOD(GetCount)(UINT*) PURE;
+	STDMETHOD(GetConnectedCount)(UINT*) PURE;
+	STDMETHOD(GetAt)(UINT,IUnknown**) PURE;
+	STDMETHOD(GetFromHandle)(HMONITOR,IUnknown**) PURE;
+	STDMETHOD(GetFromIdentity)(ULONG,IUnknown**) PURE;
+	STDMETHOD(GetImmersiveProxyMonitor)(IUnknown**) PURE;
+	STDMETHOD(QueryService)(HMONITOR, REFGUID guidService, REFIID riid, void **ppv ) PURE;
+	STDMETHOD(QueryServiceByIdentity)(ULONG, REFGUID guidService, REFIID riid, void **ppv ) PURE;
+	STDMETHOD(QueryServiceFromWindow)(HWND, REFGUID guidService, REFIID riid, void **ppv ) PURE;
+	STDMETHOD(QueryServiceFromPoint)(tagPOINT*, REFGUID guidService, REFIID riid, void **ppv ) PURE;
+	STDMETHOD(MoveImmersiveMonitor)(int) PURE;
+	STDMETHOD(SetImmersiveMonitor)(IUnknown*) PURE;
 };
 
 class CImmersiveMonitorManager : public IImmersiveMonitorManager
@@ -72,23 +74,23 @@ public:
 	CImmersiveMonitorManager();
 
 	//IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
-    ULONG STDMETHODCALLTYPE AddRef( void);    
-    ULONG STDMETHODCALLTYPE Release( void);
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
 
 	//IImmersiveMonitorManager
-	HRESULT STDMETHODCALLTYPE GetCount(UINT*);
-	HRESULT STDMETHODCALLTYPE GetConnectedCount(UINT*);
-	HRESULT STDMETHODCALLTYPE GetAt(UINT,IUnknown**);
-	HRESULT STDMETHODCALLTYPE GetFromHandle(HMONITOR,IUnknown**);
-	HRESULT STDMETHODCALLTYPE GetFromIdentity(ULONG,IUnknown**);
-	HRESULT STDMETHODCALLTYPE GetImmersiveProxyMonitor(IUnknown**);
-	HRESULT STDMETHODCALLTYPE QueryService(HMONITOR, REFGUID guidService, REFIID riid, void **ppv );
-	HRESULT STDMETHODCALLTYPE QueryServiceByIdentity(ULONG, REFGUID guidService, REFIID riid, void **ppv );
-	HRESULT STDMETHODCALLTYPE QueryServiceFromWindow(HWND, REFGUID guidService, REFIID riid, void **ppv );
-	HRESULT STDMETHODCALLTYPE QueryServiceFromPoint(tagPOINT*, REFGUID guidService, REFIID riid, void **ppv );
-	HRESULT STDMETHODCALLTYPE MoveImmersiveMonitor(int);
-	HRESULT STDMETHODCALLTYPE SetImmersiveMonitor(IUnknown*);
+	STDMETHODIMP GetCount(UINT*);
+	STDMETHODIMP GetConnectedCount(UINT*);
+	STDMETHODIMP GetAt(UINT,IUnknown**);
+	STDMETHODIMP GetFromHandle(HMONITOR,IUnknown**);
+	STDMETHODIMP GetFromIdentity(ULONG,IUnknown**);
+	STDMETHODIMP GetImmersiveProxyMonitor(IUnknown**);
+	STDMETHODIMP QueryService(HMONITOR, REFGUID guidService, REFIID riid, void **ppv );
+	STDMETHODIMP QueryServiceByIdentity(ULONG, REFGUID guidService, REFIID riid, void **ppv );
+	STDMETHODIMP QueryServiceFromWindow(HWND, REFGUID guidService, REFIID riid, void **ppv );
+	STDMETHODIMP QueryServiceFromPoint(tagPOINT*, REFGUID guidService, REFIID riid, void **ppv );
+	STDMETHODIMP MoveImmersiveMonitor(int);
+	STDMETHODIMP SetImmersiveMonitor(IUnknown*);
 private:
 	long m_cRef;
 };
@@ -97,16 +99,16 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IImmersiveLayout: public IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE RegisterLayoutClient(UINT,IUnknown*,ULONG*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE UnregisterLayoutClient(ULONG) = 0;
-	virtual HRESULT STDMETHODCALLTYPE RegisterForLayoutChanges(UINT,IUnknown*,ULONG*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE UnregisterForLayoutChanges(ULONG) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetOuterWorkAreaForBand(ULONG,tagRECT*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetInnerWorkAreaForBand(ULONG,tagRECT*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetImmersiveShellWorkArea(tagRECT*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE InvalidateWorkArea(ULONG) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetBandWorkAreaCount(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetBandWorkAreaAt(UINT,IUnknown**) = 0;
+	STDMETHOD(RegisterLayoutClient)(UINT,IUnknown*,ULONG*) PURE;
+	STDMETHOD(UnregisterLayoutClient)(ULONG) PURE;
+	STDMETHOD(RegisterForLayoutChanges)(UINT,IUnknown*,ULONG*) PURE;
+	STDMETHOD(UnregisterForLayoutChanges)(ULONG) PURE;
+	STDMETHOD(GetOuterWorkAreaForBand)(ULONG,tagRECT*) PURE;
+	STDMETHOD(GetInnerWorkAreaForBand)(ULONG,tagRECT*) PURE;
+	STDMETHOD(GetImmersiveShellWorkArea)(tagRECT*) PURE;
+	STDMETHOD(InvalidateWorkArea)(ULONG) PURE;
+	STDMETHOD(GetBandWorkAreaCount)(void) PURE;
+	STDMETHOD(GetBandWorkAreaAt)(UINT,IUnknown**) PURE;
 };
 
 class CImmersiveLayout : public IImmersiveLayout
@@ -115,21 +117,21 @@ public:
 	CImmersiveLayout(HMONITOR hMonitor);
 
 	//IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
-    ULONG STDMETHODCALLTYPE AddRef( void);    
-    ULONG STDMETHODCALLTYPE Release( void);
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
 
 	//IImmersiveMonitorManager
-	HRESULT STDMETHODCALLTYPE RegisterLayoutClient(UINT,IUnknown*,ULONG*);
-	HRESULT STDMETHODCALLTYPE UnregisterLayoutClient(ULONG);
-	HRESULT STDMETHODCALLTYPE RegisterForLayoutChanges(UINT,IUnknown*,ULONG*);
-	HRESULT STDMETHODCALLTYPE UnregisterForLayoutChanges(ULONG);
-	HRESULT STDMETHODCALLTYPE GetOuterWorkAreaForBand(ULONG,tagRECT*);
-	HRESULT STDMETHODCALLTYPE GetInnerWorkAreaForBand(ULONG,tagRECT*);
-	HRESULT STDMETHODCALLTYPE GetImmersiveShellWorkArea(tagRECT*);
-	HRESULT STDMETHODCALLTYPE InvalidateWorkArea(ULONG);
-	HRESULT STDMETHODCALLTYPE GetBandWorkAreaCount(void);
-	HRESULT STDMETHODCALLTYPE GetBandWorkAreaAt(UINT,IUnknown**);
+	STDMETHODIMP RegisterLayoutClient(UINT,IUnknown*,ULONG*);
+	STDMETHODIMP UnregisterLayoutClient(ULONG);
+	STDMETHODIMP RegisterForLayoutChanges(UINT,IUnknown*,ULONG*);
+	STDMETHODIMP UnregisterForLayoutChanges(ULONG);
+	STDMETHODIMP GetOuterWorkAreaForBand(ULONG,tagRECT*);
+	STDMETHODIMP GetInnerWorkAreaForBand(ULONG,tagRECT*);
+	STDMETHODIMP GetImmersiveShellWorkArea(tagRECT*);
+	STDMETHODIMP InvalidateWorkArea(ULONG);
+	STDMETHODIMP GetBandWorkAreaCount(void);
+	STDMETHODIMP GetBandWorkAreaAt(UINT,IUnknown**);
 private:
 	HMONITOR m_hMonitor;
 	long m_cRef;
@@ -139,8 +141,8 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IImmersiveMode: public IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE GetMode(DWORD*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetMode(DWORD) = 0;
+	STDMETHOD(GetMode)(DWORD*) PURE;
+	STDMETHOD(SetMode)(DWORD) PURE;
 };
 
 class CImmersiveMode : public IImmersiveMode
@@ -149,13 +151,13 @@ public:
 	CImmersiveMode();
 
 	//IUnknown
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid,void **ppvObject);    
-    ULONG STDMETHODCALLTYPE AddRef( void);    
-    ULONG STDMETHODCALLTYPE Release( void);
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
 
 	//IImmersiveMonitorManager
-	HRESULT STDMETHODCALLTYPE GetMode(DWORD*);
-	HRESULT STDMETHODCALLTYPE SetMode(DWORD);
+	STDMETHODIMP GetMode(DWORD*);
+	STDMETHODIMP SetMode(DWORD);
 private:
 	long m_cRef;
 };

@@ -157,7 +157,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;EXPLORERWRAPPER_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;EXPLORERWRAPPER_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <ExceptionHandling>false</ExceptionHandling>
       <BufferSecurityCheck>false</BufferSecurityCheck>
@@ -209,6 +209,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="shell32_wrappers.h" />
     <ClInclude Include="shellitemfilter.h" />
+    <ClInclude Include="shellurl.h" />
     <ClInclude Include="startmenupin.h" />
     <ClInclude Include="startmenuresolver.h" />
     <ClInclude Include="systraywrapper.h" />
@@ -253,6 +254,7 @@
     <ClCompile Include="registry.cpp" />
     <ClCompile Include="shell32_wrappers.cpp" />
     <ClCompile Include="shellitemfilter.cpp" />
+    <ClCompile Include="shellurl.cpp" />
     <ClCompile Include="startmenupin.cpp" />
     <ClCompile Include="startmenuresolver.cpp">
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</WholeProgramOptimization>
@@ -270,6 +272,12 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wrapper.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\icon1.ico" />
+    <Image Include="res\start%401.25x.bmp" />
+    <Image Include="res\start%401.5x.bmp" />
+    <Image Include="res\start.bmp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

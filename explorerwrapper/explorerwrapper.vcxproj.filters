@@ -108,6 +108,9 @@
     <ClInclude Include="shellitemfilter.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="shellurl.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -183,6 +186,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="shellitemfilter.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="shellurl.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>
