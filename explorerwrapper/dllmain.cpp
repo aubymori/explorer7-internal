@@ -26,10 +26,7 @@
 #include "shellitemfilter.h"
 #include "shell32_wrappers.h"
 #include "shellurl.h"
-#include <gdiplus.h>
-
-using namespace Gdiplus;
-ULONG_PTR g_ulGdipToken = 0;
+#include <wincodec.h>
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -1278,31 +1275,108 @@ HRESULT WINAPI SHGetUserPicturePathNEW(LPCWSTR pszUsername, DWORD dwFlags, LPWST
 // This hook resizes it to 48x48 using a better scaling algorithm.
 HANDLE WINAPI LoadImageWNEW(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
 {
-	HANDLE hImage = LoadImageW(hInst, name, type, cx, cy, fuLoad);
+	IWICImagingFactory *factory = nullptr;
+	IWICBitmapDecoder *decoder = nullptr;
+	IWICBitmapFrameDecode *frameDecode = nullptr;
+	IWICBitmapScaler *scaler = nullptr;
+	IWICBitmapSource *convertedBitmap = nullptr;
+	HBITMAP hbmUser = NULL;
+
+	dbgprintf(L"LoadImageW call");
 	// The user bitmap is the only one in explorer.exe that is loaded from file.
 	if (fuLoad & LR_LOADFROMFILE)
 	{
-		if (!g_ulGdipToken)
+		dbgprintf(L"Load from file: %s", name);
+		HRESULT hr = CoCreateInstance(
+			CLSID_WICImagingFactory,
+			NULL,
+			CLSCTX_INPROC_SERVER,
+			IID_PPV_ARGS(&factory)
+		);
+		if (SUCCEEDED(hr))
 		{
-			GdiplusStartupInput startup;
-			GdiplusStartup(&g_ulGdipToken, &startup, nullptr);
-		}
-
-		Bitmap destBitmap(48, 48, PixelFormat24bppRGB);
-		Graphics destGraphics(&destBitmap);
-		Bitmap srcBitmap((HBITMAP)hImage, NULL);
-		Rect destRect(0, 0, 48, 48);
-		destGraphics.DrawImage(&srcBitmap, destRect);
-		
-		HBITMAP hbmOut = NULL;
-		destBitmap.GetHBITMAP(Color(0, 0, 0), &hbmOut);
-		if (hbmOut)
-		{
-			DeleteObject(hImage);
-			return hbmOut;
+			dbgprintf(L"Create factory succeeded");
+			hr = factory->CreateDecoderFromFilename(
+				name,
+				NULL,
+				GENERIC_READ,
+				WICDecodeMetadataCacheOnDemand,
+				&decoder
+			);
+			if (SUCCEEDED(hr))
+			{
+				dbgprintf(L"Create decoder succeeded");
+				hr = decoder->GetFrame(0, &frameDecode);
+				if (SUCCEEDED(hr))
+				{
+					dbgprintf(L"Create frameDecode succeeded");
+					hr = factory->CreateBitmapScaler(&scaler);
+					if (SUCCEEDED(hr))
+					{
+						dbgprintf(L"Create scaler succeeded");
+						hr = WICConvertBitmapSource(
+							GUID_WICPixelFormat32bppPBGRA,
+							frameDecode,
+							&convertedBitmap
+						);
+						if (SUCCEEDED(hr))
+						{
+							dbgprintf(L"Convert bitmap succeeded");
+							hr = scaler->Initialize(
+								convertedBitmap,
+								48, 48, WICBitmapInterpolationModeFant
+							);
+							if (SUCCEEDED(hr))
+							{
+								dbgprintf(L"Scaler init succeeded");
+								UINT width = 0;
+								UINT height = 0;
+								scaler->GetSize(&width, &height);
+								dbgprintf(L"w: %u h: %u", width, height);
+								size_t bufferSize = width * height * 4;
+								BYTE *buffer = new BYTE[bufferSize];
+								ZeroMemory(buffer, bufferSize);
+								hr = scaler->CopyPixels(
+									nullptr,
+									width * 4,
+									bufferSize,
+									buffer
+								);
+								if (SUCCEEDED(hr))
+								{
+									dbgprintf(L"Copy pixels succeeded");
+									hbmUser = CreateBitmap(width, height, 1, 32, buffer);
+								}
+								else
+									dbgprintf(L"Copy pixels failed with HR 0x%X", hr);
+								delete[] buffer;
+								if (hbmUser)
+									dbgprintf(L"Create HBITMAP succeeded");
+							}
+						}
+					}
+				}
+			}
 		}
 	}
-	return hImage;
+
+	// Cleanup
+	if (factory)
+		factory->Release();
+	if (decoder)
+		decoder->Release();
+	if (frameDecode)
+		frameDecode->Release();
+	if (scaler)
+		scaler->Release();
+	if (convertedBitmap)
+		convertedBitmap->Release();
+
+	if (hbmUser)
+		return hbmUser;
+
+	dbgprintf(L"Returning original");
+	return LoadImageW(hInst, name, type, cx, cy, fuLoad);
 }
 
 // Fix user pic in XP Explorer
@@ -1637,8 +1711,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	}
 	break;
 	case DLL_THREAD_DETACH:
-		if (g_ulGdipToken)
-			GdiplusShutdown(g_ulGdipToken);
 		break;
 	case DLL_PROCESS_DETACH:
 		realloc(themeHandles->data, 0);
