@@ -1253,6 +1253,44 @@ HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnkn
 	return res;
 }
 
+typedef HRESULT(WINAPI *SHGetUserPicturePath_t)(LPCWSTR pszUsername, DWORD dwFlags, LPWSTR pszPath, DWORD cchPathMax);
+SHGetUserPicturePath_t SHGetUserPicturePath = nullptr;
+
+// The XP version of this func assumes MAX_PATH, so just pass that to the new one.
+HRESULT WINAPI SHGetUserPicturePathNEW(LPCWSTR pszUsername, DWORD dwFlags, LPWSTR pszPath)
+{
+	DWORD dwHideUserPic = 0;
+	g_registry.QueryValue(L"HideUserPicture", (LPBYTE)&dwHideUserPic, sizeof(DWORD));
+	if (dwHideUserPic)
+	{
+		*pszPath = L'\0';
+		return E_FAIL;
+	}
+	return SHGetUserPicturePath(pszUsername, dwFlags, pszPath, MAX_PATH);
+}
+
+// Fix user pic in XP Explorer
+void FixWinXPUserPic()
+{
+	BYTE *UpdateUserInfo = (BYTE *)FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 9C 24 B8 02 00 00 75 1B 85 C0 0F 84 97 01 00 00 B9 1B 00 00 00 FF 15 E5 B0 FE FF 85 C0 0F 84 84 01 00 00");
+	const BYTE Patch[] = { 0xB8, 0x01, 0x00, 0x00, 0x00, 0x90 };
+	if (UpdateUserInfo)
+	{
+		ChangeImportedPattern(
+			UpdateUserInfo + 23,
+			Patch, sizeof(Patch)
+		);
+		dbgprintf(L"Found the pattern");
+	}
+	else
+		dbgprintf(L"Did not Found the pattern");
+
+	// This is the 10 SHGetUserPicturePath,
+	SHGetUserPicturePath = (SHGetUserPicturePath_t)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPCSTR)261);
+	// shunimpl'd
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPCSTR)233), SHGetUserPicturePathNEW);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1274,6 +1312,8 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
 	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
+
+	FixWinXPUserPic();
 
 	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
 	if (LoadAnimationDataMap)
