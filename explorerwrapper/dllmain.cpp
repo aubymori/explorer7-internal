@@ -26,6 +26,10 @@
 #include "shellitemfilter.h"
 #include "shell32_wrappers.h"
 #include "shellurl.h"
+#include <gdiplus.h>
+
+using namespace Gdiplus;
+ULONG_PTR g_ulGdipToken = 0;
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -1256,7 +1260,6 @@ HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnkn
 typedef HRESULT(WINAPI *SHGetUserPicturePath_t)(LPCWSTR pszUsername, DWORD dwFlags, LPWSTR pszPath, DWORD cchPathMax);
 SHGetUserPicturePath_t SHGetUserPicturePath = nullptr;
 
-// The XP version of this func assumes MAX_PATH, so just pass that to the new one.
 HRESULT WINAPI SHGetUserPicturePathNEW(LPCWSTR pszUsername, DWORD dwFlags, LPWSTR pszPath)
 {
 	DWORD dwHideUserPic = 0;
@@ -1266,7 +1269,40 @@ HRESULT WINAPI SHGetUserPicturePathNEW(LPCWSTR pszUsername, DWORD dwFlags, LPWST
 		*pszPath = L'\0';
 		return E_FAIL;
 	}
+	// The XP version of this func assumes MAX_PATH, so just pass that to the new one.
 	return SHGetUserPicturePath(pszUsername, dwFlags, pszPath, MAX_PATH);
+}
+
+// Windows 10 gives the user pic path to a 126x126 bitmap. XP gave a 48x48 bitmap.
+// XP uses nearest neighbor scaling, so the 126x126 bitmap looks pretty awful.
+// This hook resizes it to 48x48 using a better scaling algorithm.
+HANDLE WINAPI LoadImageWNEW(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
+{
+	HANDLE hImage = LoadImageW(hInst, name, type, cx, cy, fuLoad);
+	// The user bitmap is the only one in explorer.exe that is loaded from file.
+	if (fuLoad & LR_LOADFROMFILE)
+	{
+		if (!g_ulGdipToken)
+		{
+			GdiplusStartupInput startup;
+			GdiplusStartup(&g_ulGdipToken, &startup, nullptr);
+		}
+
+		Bitmap destBitmap(48, 48, PixelFormat24bppRGB);
+		Graphics destGraphics(&destBitmap);
+		Bitmap srcBitmap((HBITMAP)hImage, NULL);
+		Rect destRect(0, 0, 48, 48);
+		destGraphics.DrawImage(&srcBitmap, destRect);
+		
+		HBITMAP hbmOut = NULL;
+		destBitmap.GetHBITMAP(Color(0, 0, 0), &hbmOut);
+		if (hbmOut)
+		{
+			DeleteObject(hImage);
+			return hbmOut;
+		}
+	}
+	return hImage;
 }
 
 // Fix user pic in XP Explorer
@@ -1289,6 +1325,8 @@ void FixWinXPUserPic()
 	SHGetUserPicturePath = (SHGetUserPicturePath_t)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPCSTR)261);
 	// shunimpl'd
 	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPCSTR)233), SHGetUserPicturePathNEW);
+	// Fix bad scaling
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", LoadImageW, LoadImageWNEW);
 }
 
 void HookShell32();
@@ -1599,6 +1637,8 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	}
 	break;
 	case DLL_THREAD_DETACH:
+		if (g_ulGdipToken)
+			GdiplusShutdown(g_ulGdipToken);
 		break;
 	case DLL_PROCESS_DETACH:
 		realloc(themeHandles->data, 0);
