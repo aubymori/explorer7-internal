@@ -1270,6 +1270,19 @@ HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnkn
 	return res;
 }
 
+void DisableWin11AltTab()
+{
+	if (g_osVersion.BuildNumber() >= 21996) // build check because this is unnecessary for windows 10
+	{
+		//Ittr: Why? Because it causes it to crash and its stupid
+		char* immersiveBytes = "40 53 48 83 EC 20 83 79 ?? 02 74 17";
+
+		//Load and patch DLL
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"twinui.pcshell.dll"), immersiveBytes), bytes, sizeof(bytes)); //byebye
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1435,6 +1448,7 @@ void HookAPIs()
 	HookShell32();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 	FixAuthUI();
+	DisableWin11AltTab();
 
 	// query disable comp value
 	DWORD dwDisableComposition = 0;
@@ -1536,17 +1550,37 @@ void AssFuckShunimpl()
 
 }
 
+void CrashError()
+{
+	WCHAR errorText[71] = L"An unexpected error occurred and explorer7 needs to quit. We're sorry!"; // Funny brick game message go haha
+	WCHAR errorTitle[16] = L"explorer7 Crash";
+
+	MessageBoxW(NULL, errorText, errorTitle, MB_ICONERROR); // the actual error box lol
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
 {
 	CheckTimeBomb();
 
+	// Ittr: We initialise values for closing program if shitblinds is present
+	WCHAR programPath[MAX_PATH] = L"\\Stardock\\WindowBlinds 11\\unins000.exe";
+	WCHAR blacklistPath[MAX_PATH];
+	ExpandEnvironmentStringsW(L"%ProgramFiles%", (LPWSTR)blacklistPath, sizeof(blacklistPath));
+	lstrcat(blacklistPath, programPath);
+
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
 	{
 		AssFuckShunimpl();
+
+		if (GetFileAttributesW((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
+		{
+			// we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
+			CrashError(); // user-facing crash message
+		}
 
 		themeHandles = new wiktorArray<HTHEME>();
 		themeHandles->data = 0;
@@ -1572,6 +1606,14 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 			CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand");
 			ChangeImportedAddress(GetModuleHandle(L"alttab.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
 			g_alttabhooked = TRUE;
+		}
+
+		if (GetFileAttributes((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 2 - actually stops the program from running
+		{
+			// we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
+			LPDWORD exitCode;
+			GetExitCodeProcess(L"explorer.exe", exitCode);
+			ExitProcess((UINT)exitCode); // exit explorer
 		}
 	}
 	break;
