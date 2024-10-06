@@ -1403,6 +1403,57 @@ void FixWinXPUserPic()
 	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", LoadImageW, LoadImageWNEW);
 }
 
+HRESULT(WINAPI* DrawThemeText_orig)(HTHEME hTheme,
+	HDC hdc,
+	int iPartId,
+	int iStateId,
+	LPCWSTR pszText,
+	int cchText,
+	DWORD dwTextFlags,
+	DWORD dwTextFlags2,
+	LPCRECT pRect);
+HRESULT
+WINAPI
+DrawThemeText_hook(
+	HTHEME hTheme,
+	HDC hdc,
+	int iPartId,
+	int iStateId,
+	LPCWSTR pszText,
+	int cchText,
+	DWORD dwTextFlags,
+	DWORD dwTextFlags2,
+	LPRECT pRect)
+{
+	//RECT    rc;
+	//GetClientRect(WindowFromDC(hdc), &rc);
+	//GetThemeBackgroundContentRect(hTheme, hdc, iPartId, iStateId, pRect, pRect);
+	//TCHAR className[256];
+	//if (GetClassName(WindowFromDC(hdc), className, 256))
+
+	/*
+	left;
+	top;
+	right;
+	bottom;
+	*/
+
+	if (pRect)
+	{
+		dbgprintf(L"rect: %p %p %i %i %s %i %i %i %i %i %i %i",hTheme,hdc,iPartId,iStateId,pszText,cchText,dwTextFlags,dwTextFlags2,pRect->left,pRect->top,pRect->right,pRect->bottom);
+		pRect->right *= 2;
+	}
+	//if (wcscmp(className, L"Start::Button") == 0)
+	//{
+	//	pRect->left = 10;
+	//	pRect->top = 2;
+	//	pRect->right = 24;
+	//	pRect->bottom = 4;
+	//}
+
+	return DrawThemeText_orig(hTheme,hdc,iPartId,iStateId,pszText,cchText,dwTextFlags, dwTextFlags2, pRect);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1482,6 +1533,7 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
+	MH_CreateHook(static_cast<LPVOID>(DrawThemeText), DrawThemeText_hook, reinterpret_cast<LPVOID*>(&DrawThemeText_orig));
 
 
 	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
