@@ -1283,6 +1283,26 @@ void DisableWin11AltTab()
 	}
 }
 
+void FixWin11SearchIcon()
+{
+	// Ittr: An accidental change that actually works. Not complaining at all
+	// Tested on 22000 and 26100
+	// Not yet tested on Nickel (226xx)
+	if (g_osVersion.BuildNumber() >= 21996) // build check because this is unnecessary for windows 10
+	{
+		char* searchBytes;
+
+		if (g_osVersion.BuildNumber() >= 26100)
+			searchBytes = "40 55 48 8B EC 48 83 EC 40"; // SHIsFileExplorerInTabletMode()
+		else
+			searchBytes = "48 89 5C 24 20 55 48 8B EC"; // SHIsFileExplorerInTabletMode()
+
+
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), searchBytes), bytes, sizeof(bytes));
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1448,7 +1468,8 @@ void HookAPIs()
 	HookShell32();
 	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
 	FixAuthUI();
-	DisableWin11AltTab();
+	DisableWin11AltTab(); //disable because it crashes
+	FixWin11SearchIcon(); //stops icon getting mangled
 
 	// query disable comp value
 	DWORD dwDisableComposition = 0;
