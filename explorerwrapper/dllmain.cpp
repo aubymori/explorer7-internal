@@ -1382,7 +1382,7 @@ HANDLE WINAPI LoadImageWNEW(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, in
 // Fix user pic in XP Explorer
 void FixWinXPUserPic()
 {
-	BYTE *UpdateUserInfo = (BYTE *)FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 9C 24 B8 02 00 00 75 1B 85 C0 0F 84 97 01 00 00 B9 1B 00 00 00 FF 15 E5 B0 FE FF 85 C0 0F 84 84 01 00 00");
+	BYTE *UpdateUserInfo = (BYTE *)FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 9C 24 ?? ?? ?? ?? 75 1B 85 C0 0F 84 ?? ?? ?? ?? B9 1B 00 00 00 FF 15 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ??");
 	const BYTE Patch[] = { 0xB8, 0x01, 0x00, 0x00, 0x00, 0x90 };
 	if (UpdateUserInfo)
 	{
@@ -1441,7 +1441,7 @@ DrawThemeText_hook(
 	if (pRect)
 	{
 		dbgprintf(L"rect: %p %p %i %i %s %i %i %i %i %i %i %i",hTheme,hdc,iPartId,iStateId,pszText,cchText,dwTextFlags,dwTextFlags2,pRect->left,pRect->top,pRect->right,pRect->bottom);
-		pRect->right *= 2;
+		//pRect->right *= 2;
 	}
 	//if (wcscmp(className, L"Start::Button") == 0)
 	//{
