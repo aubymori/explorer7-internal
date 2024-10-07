@@ -1441,7 +1441,7 @@ DrawThemeText_hook(
 	if (pRect)
 	{
 		dbgprintf(L"rect: %p %p %i %i %s %i %i %i %i %i %i %i",hTheme,hdc,iPartId,iStateId,pszText,cchText,dwTextFlags,dwTextFlags2,pRect->left,pRect->top,pRect->right,pRect->bottom);
-		//pRect->right *= 2;
+		pRect->right *= 2;
 	}
 	//if (wcscmp(className, L"Start::Button") == 0)
 	//{
