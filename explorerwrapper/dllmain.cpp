@@ -1,4 +1,4 @@
-#define INITGUID
+﻿#define INITGUID
 #include "framework.h"
 #include "forwards.h"
 #include "startmenuresolver.h"
@@ -27,6 +27,7 @@
 #include "shell32_wrappers.h"
 #include "shellurl.h"
 #include <wincodec.h>
+#include <winternl.h>
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -86,6 +87,8 @@ typedef LONG(WINAPI* setIconThumb_t)(PVOID pThis, HICON a2, int a3, unsigned int
 static  setIconThumb_t SetIconThumb;
 
 wiktorArray<HTHEME>* themeHandles;
+
+HWND g_hWndStartButton = nullptr;
 
 // 7 {4376df10-a662-420b-b30d-958881461ef9}
 // 8 {7A5FCA8A-76B1-44C8-A97C-E7173CCA5F4F}
@@ -356,6 +359,12 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 	//Ittr: Temporarily comment these out as unneeded - we want original 7 theme classes to be used where appropriate!
 	//if ( lstrcmp(pszSubAppName,L"VerticalShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"VerticalShowDesktop8",pszSubIdList);
 	//if ( lstrcmp(pszSubAppName,L"ShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"ShowDesktop8",pszSubIdList);
+	if (pszSubAppName && wcscmp(pszSubAppName, L"Start") == 0)
+	{
+		dbgprintf(L"Start button HWND: %p", hwnd);
+		g_hWndStartButton = hwnd;
+	}
+
 	return SetWindowTheme(hwnd, pszSubAppName, pszSubIdList);
 }
 
@@ -1403,6 +1412,64 @@ void FixWinXPUserPic()
 	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", LoadImageW, LoadImageWNEW);
 }
 
+HRESULT(WINAPI* CloseThemeData_orig)(HTHEME hTheme);
+
+bool g_fEnableStartFix = false;
+DWORD g_dwStartFixThreadId = 0;
+
+// comctl32!Button_DrawThemed:
+HRESULT(WINAPI* Button_DrawThemed_orig)(void *pButton, HDC hdc, int iPartId, int iStateId);
+
+HRESULT
+WINAPI
+Button_DrawThemed_hook(void *pButton, HDC hdc, int iPartId, int iStateId)
+{
+	dbgprintf(L"Button_DrawThemed\n");
+
+	// First member of the button struct is always its HWND.
+	if (*(HWND *)pButton == g_hWndStartButton)
+	{
+		// If we're the start button, then toggle the start text fix:
+		g_dwStartFixThreadId = GetCurrentThreadId();
+		g_fEnableStartFix = true;
+	}
+
+	HRESULT hr = Button_DrawThemed_orig(pButton, hdc, iPartId, iStateId);
+
+	g_dwStartFixThreadId = 0;
+	g_fEnableStartFix = false;
+
+	return hr;
+}
+
+BOOL(*GetTextExtentPoint32W_orig)(
+	HDC     hdc,
+	LPCWSTR lpString,
+	int     c,
+	LPSIZE  psizl
+	);
+BOOL GetTextExtentPoint32W_hook(
+	HDC     hdc,
+	LPCWSTR lpString,
+	int     c,
+	LPSIZE  psizl
+)
+{
+	BOOL result = GetTextExtentPoint32W_orig(hdc, lpString, c, psizl);
+
+	if (g_fEnableStartFix)
+	{
+		dbgprintf(L"Performing start fix\n");
+		if (GetCurrentThreadId() == g_dwStartFixThreadId)
+		{
+			// Fix bounding size for drawing start text:
+			psizl->cx *= 2;
+		}
+	}
+
+	return result;
+}
+
 HRESULT(WINAPI* DrawThemeText_orig)(HTHEME hTheme,
 	HDC hdc,
 	int iPartId,
@@ -1425,33 +1492,62 @@ DrawThemeText_hook(
 	DWORD dwTextFlags2,
 	LPRECT pRect)
 {
-	//RECT    rc;
-	//GetClientRect(WindowFromDC(hdc), &rc);
-	//GetThemeBackgroundContentRect(hTheme, hdc, iPartId, iStateId, pRect, pRect);
-	//TCHAR className[256];
-	//if (GetClassName(WindowFromDC(hdc), className, 256))
-
-	/*
-	left;
-	top;
-	right;
-	bottom;
-	*/
-
-	if (pRect)
-	{
-		dbgprintf(L"rect: %p %p %i %i %s %i %i %i %i %i %i %i",hTheme,hdc,iPartId,iStateId,pszText,cchText,dwTextFlags,dwTextFlags2,pRect->left,pRect->top,pRect->right,pRect->bottom);
-		pRect->right *= 2;
-	}
-	//if (wcscmp(className, L"Start::Button") == 0)
-	//{
-	//	pRect->left = 10;
-	//	pRect->top = 2;
-	//	pRect->right = 24;
-	//	pRect->bottom = 4;
-	//}
-
 	return DrawThemeText_orig(hTheme,hdc,iPartId,iStateId,pszText,cchText,dwTextFlags, dwTextFlags2, pRect);
+}
+
+/* Load the ComCtl32 module */
+HMODULE LoadComCtlModule(void)
+{
+	HMODULE hComCtl = LoadLibraryW(L"comctl32.dll");
+	if (!hComCtl)
+	{
+		return NULL;
+	}
+
+	return hComCtl;
+}
+
+HRESULT HookCommonControlsV6(HMODULE hMod)
+{
+	WCHAR szName[MAX_PATH];
+	GetModuleFileNameW(hMod, szName, MAX_PATH);
+	dbgprintf(L"Loadec comctl v6: %s", szName);
+	//MessageBoxW(NULL, szName, L"FUCK FUCK FUCK IT LOADS", MB_OK);
+
+	//void* fComCtl32_Button_DrawThemed = (void*)FindPattern((uintptr_t)hMod, "55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 48 8B 05");
+	void* fComCtl32_Button_DrawThemed = (void*)FindPattern((uintptr_t)hMod,   "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 45 70 45 33 E4 44 89 4C 24 58");
+
+	dbgprintf(L"Address of comctl32!Button_DrawThemed %p", (uintptr_t)fComCtl32_Button_DrawThemed - (uintptr_t)hMod);
+
+	if (fComCtl32_Button_DrawThemed)
+	{
+		MH_CreateHook(static_cast<LPVOID>(fComCtl32_Button_DrawThemed), Button_DrawThemed_hook, reinterpret_cast<LPVOID*>(&Button_DrawThemed_orig));
+		MH_EnableHook(fComCtl32_Button_DrawThemed);
+
+		return S_OK;
+	}
+
+	return E_FAIL;
+}
+
+HMODULE(WINAPI* LoadLibraryW_orig)(LPCWSTR lpLibFileName);
+HMODULE WINAPI LoadLibraryW_hook(LPCWSTR lpLibFileName)
+{
+	HMODULE result = LoadLibraryW_orig(lpLibFileName);
+
+	if (lpLibFileName && wcsstr(lpLibFileName, L"comctl32.dll"))
+	{
+		WCHAR szComCtlName[MAX_PATH];
+		GetModuleFileNameW(result, szComCtlName, MAX_PATH);
+
+		// The below identifier is a constant segment.
+		if (wcsstr(szComCtlName, L"microsoft.windows.common-controls_6595b64144ccf1df_6.0"))
+		{
+			HookCommonControlsV6(result);
+		}
+	}
+
+	return result;
 }
 
 void HookShell32();
@@ -1527,14 +1623,14 @@ void HookAPIs()
 		v_hwndDesktop = (HWND*)(desktopHwnd + 7 + *reinterpret_cast<signed int*>(desktopHwnd + 3));
 	}
 
-	MH_Initialize();
+	MH_CreateHook(static_cast<LPVOID>(LoadLibraryW), LoadLibraryW_hook, reinterpret_cast<LPVOID*>(&LoadLibraryW_orig));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
 	MH_CreateHook(static_cast<LPVOID>(DrawThemeText), DrawThemeText_hook, reinterpret_cast<LPVOID*>(&DrawThemeText_orig));
-
+	MH_CreateHook(static_cast<LPVOID>(GetTextExtentPoint32W), GetTextExtentPoint32W_hook, reinterpret_cast<LPVOID*>(&GetTextExtentPoint32W_orig));
 
 	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
 	{
@@ -1668,7 +1764,6 @@ UINT_PTR WINAPI SetTimer_WUI(HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERPR
 	return SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc);
 }
 
-
 void HookImmersive()
 {
 	HMODULE immersiveui = LoadLibrary(L"Windows.UI.Immersive.dll");
@@ -1733,6 +1828,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	{
 	case DLL_PROCESS_ATTACH:
 	{
+		MH_Initialize();
 		AssFuckShunimpl();
 
 		themeHandles = new wiktorArray<HTHEME>();
