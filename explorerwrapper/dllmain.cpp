@@ -1550,6 +1550,20 @@ HMODULE WINAPI LoadLibraryW_hook(LPCWSTR lpLibFileName)
 	return result;
 }
 
+// Lags startup and resets system metrics.
+void (*ChangeUIfontsToNewDPI_orig)() = nullptr;
+void ChangeUIfontsToNewDPI_hook()
+{
+	return;
+}
+
+// Lags startup and resets system metrics.
+void (*CheckDefaultUIFonts_orig)() = nullptr;
+void CheckDefaultUIFonts_hook()
+{
+	return;
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1615,6 +1629,8 @@ void HookAPIs()
 	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
 	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
+	void* _CheckDefaultUIFonts = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "53 48 81 EC 80 00 00 00 48 8B 05 ?? ?? ?? ?? 48 89 44 24 ?? 48 8D 44 24 ?? 4C 8D 05");
+	void* _ChangeUIfontsToNewDPI = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 83 EC 38 33 C9 48 5C 24 ?? 48 89 7C 24 ?? FF 15 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8B C8 48 8B D8");
 
 	uintptr_t desktopHwnd = FindPattern((uintptr_t)GetModuleHandle(0), "74 ?? 48 3B 3D ?? ?? ?? ?? 8D 43 01 0F 45 D8");
 	if (desktopHwnd)
@@ -1631,6 +1647,8 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
 	MH_CreateHook(static_cast<LPVOID>(DrawThemeText), DrawThemeText_hook, reinterpret_cast<LPVOID*>(&DrawThemeText_orig));
 	MH_CreateHook(static_cast<LPVOID>(GetTextExtentPoint32W), GetTextExtentPoint32W_hook, reinterpret_cast<LPVOID*>(&GetTextExtentPoint32W_orig));
+	MH_CreateHook(static_cast<LPVOID>(_CheckDefaultUIFonts), CheckDefaultUIFonts_hook, reinterpret_cast<LPVOID*>(&CheckDefaultUIFonts_orig));
+	MH_CreateHook(static_cast<LPVOID>(_ChangeUIfontsToNewDPI), ChangeUIfontsToNewDPI_hook, reinterpret_cast<LPVOID*>(&ChangeUIfontsToNewDPI_orig));
 
 	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
 	{
