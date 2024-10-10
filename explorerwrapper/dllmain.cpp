@@ -986,7 +986,7 @@ void HookTrayThread(void)
 {
 	CTray__SyncThreadProc_orig = (LPTHREAD_START_ROUTINE)FindPattern(
 		(uintptr_t)GetModuleHandle(NULL),
-		"48 81 EC 88 00 00 00 83 3D 02 70 06 00 00 E9 5A 2D 01 00"
+		"48 81 EC 88 00 00 00 83 3D ?? ?? ?? ?? 00 E9"
 	);
 
 	if (CTray__SyncThreadProc_orig)
