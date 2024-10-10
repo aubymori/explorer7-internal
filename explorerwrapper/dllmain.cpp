@@ -1564,6 +1564,40 @@ void CheckDefaultUIFonts_hook()
 	return;
 }
 
+// shell32!CMenuBand::Initialize
+// Fixes grouped app menu popup click hittesting
+HRESULT (*CMenuBand__Initialize_orig)(void *pThis, struct IShellMenuCallback *a2, int a3, int a4, unsigned int a5);
+HRESULT CMenuBand__Initialize_hook(void *pThis, struct IShellMenuCallback *a2, int a3, int a4, unsigned int a5)
+{
+	/*
+	 * Windows XP creates one of these as a base class for grouped app menus. It
+	 * passes the flag SMINIT_USEMESSAGEFILTER to the initialiser for the menu
+	 * band, which causes the OS to install a message filter hook on the menu
+	 * window.
+	 * 
+	 * The filter is implemented in shell32!CMBMsgFilter::_HandleMouseMsgs. The
+	 * implementation of this function differs between Windows XP and Windows 10.
+	 * The Windows 10 implementation breaks things with this control in XP
+	 * explorer.
+	 * 
+	 * As an easy hack, I simply strip this flag when initialising any control
+	 * from the Explorer GUI thread. This should ensure correct behaviour from
+	 * standard XP controls, while not affecting the file explorer view hosted
+	 * by explorer.exe.
+	 * 
+	 * This does not appear to have any adverse effects, but please feel free
+	 * to mess with this code if you suspect breakage.
+	 */
+
+	if (GetCurrentThreadId() != g_dwTrayThreadId)
+	{
+		return CMenuBand__Initialize_orig(pThis, a2, a3, a4, a5);
+	}
+
+	a5 &= ~0x20; // SMINIT_USEMESSAGEFILTER
+	return CMenuBand__Initialize_orig(pThis, a2, a3, a4, a5);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1631,6 +1665,7 @@ void HookAPIs()
 	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
 	void* _CheckDefaultUIFonts = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "53 48 81 EC 80 00 00 00 48 8B 05 ?? ?? ?? ?? 48 89 44 24 ?? 48 8D 44 24 ?? 4C 8D 05");
 	void* _ChangeUIfontsToNewDPI = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 83 EC 38 33 C9 48 5C 24 ?? 48 89 7C 24 ?? FF 15 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8B C8 48 8B D8");
+	void* _CMenuBand__Initialize = (void*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 18 48 89 78 20 41 54 41 56 41 57 48 83 EC 20 44 8B 54 24 60");
 
 	uintptr_t desktopHwnd = FindPattern((uintptr_t)GetModuleHandle(0), "74 ?? 48 3B 3D ?? ?? ?? ?? 8D 43 01 0F 45 D8");
 	if (desktopHwnd)
@@ -1649,6 +1684,7 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(GetTextExtentPoint32W), GetTextExtentPoint32W_hook, reinterpret_cast<LPVOID*>(&GetTextExtentPoint32W_orig));
 	MH_CreateHook(static_cast<LPVOID>(_CheckDefaultUIFonts), CheckDefaultUIFonts_hook, reinterpret_cast<LPVOID*>(&CheckDefaultUIFonts_orig));
 	MH_CreateHook(static_cast<LPVOID>(_ChangeUIfontsToNewDPI), ChangeUIfontsToNewDPI_hook, reinterpret_cast<LPVOID*>(&ChangeUIfontsToNewDPI_orig));
+	MH_CreateHook(static_cast<LPVOID>(_CMenuBand__Initialize), CMenuBand__Initialize_hook, reinterpret_cast<LPVOID*>(&CMenuBand__Initialize_orig));
 
 	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
 	{
