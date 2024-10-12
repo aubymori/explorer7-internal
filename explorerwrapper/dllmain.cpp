@@ -284,8 +284,21 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 //Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
 void ForceActiveWindowAppearance(HWND hwnd)
 {
-	ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
-	WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
+	DWMCOLORIZATIONPARAMS colors;
+	CHAR buffer[0x28];
+	memset(buffer, 0, 0x28);
+	DwmGetColorizationParametersOrig(&buffer);
+	memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+
+	int a = (colors.ColorizationColor >> 24) & 0xFF;
+	int r = (colors.ColorizationColor >> 16) & 0xFF;
+	int g = (colors.ColorizationColor >> 8) & 0xFF;
+	int b = (colors.ColorizationColor) & 0xFF;
+
+	DWORD newc = (a << 24) | (b << 16) | (g << 8) | r;
+	ACCENT_POLICY policy = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 19, newc, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
+	WINCOMPATTRDATA data = { 13, &policy, 0x10};
+	//WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
 	SetWindowCompositionAttribute(hwnd, &data);
 }
 
@@ -315,16 +328,22 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 				DWORD p4;
 			};
 			ATTR13DATA attr13 = { 0 };
-			attr13.p1 = 4; // used for both - for some reason, translucency only without the other values. possibly to preserve compatibility as acrylic didn't exist in winapi in 2012
+			attr13.p1 = 2; // used for both - for some reason, translucency only without the other values. possibly to preserve compatibility as acrylic didn't exist in winapi in 2012
 
-			if (g_bColorizationOptions == 2) // acrylic
 			{
-				if (hwnd == GetStartMenuWnd()) // hack to stop start menu looking bad (still lags behind on expand. nothing can be done about this yet
-					attr13.p2 = -1;
-				else
-					attr13.p2 = 1;
+				DWMCOLORIZATIONPARAMS colors;
+				CHAR buffer[0x28];
+				memset(buffer, 0, 0x28);
+				DwmGetColorizationParametersOrig(&buffer);
+				memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
 
-				attr13.p3 = 1;
+				int a = (colors.ColorizationColor >> 24) & 0xFF;
+				int r = (colors.ColorizationColor >> 16) & 0xFF;
+				int g = (colors.ColorizationColor >> 8) & 0xFF;
+				int b = (colors.ColorizationColor) & 0xFF;
+
+				attr13.p2 = 19;
+				attr13.p3 = (a<<24) | (b<<16) | (g<<8)| r;
 				attr13.p4 = sizeof(attr13.p3);
 			}
 
@@ -380,41 +399,6 @@ GhostWindowFromHungWindow_t GhostWindowFromHungWindow = nullptr;
 ATOM g_SecondaryTaskbarAtom;
 
 HWND* v_hwndDesktop;
-
-
-
-//bool IsValidTabWindowForTray(HWND hwnd)
-//{
-//	bool bValidTabWindow = false;
-//
-//	if (hwnd)
-//	{
-//		HWND hwndA920 = (HWND)GetPropW(hwnd, (LPCWSTR)0xA920);
-//		IPropertyStore* propertyStore;
-//		//wil::unique_cotaskmem_string appId;
-//		if (hwndA920)
-//		{
-//			if (SUCCEEDED(SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&propertyStore))))
-//			{
-//				wil::PropertyStoreHelper propertyStoreHelper(propertyStore.get());
-//				if (SUCCEEDED(propertyStoreHelper.GetString(PKEY_AppUserModel_ID, appId.put())) && appId)
-//				{
-//					wil::com_ptr<IShellItem2> shellItem2;
-//					if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_AppsFolder, KF_FLAG_DONT_VERIFY, appId.get(), IID_PPV_ARGS(&shellItem2))))
-//					{
-//						bValidTabWindow = true;
-//					}
-//				}
-//			}
-//		}
-//		else
-//		{
-//			bValidTabWindow = true;
-//		}
-//	}
-//
-//	return bValidTabWindow;
-//}
 
 BOOL ShouldAddWindowToTrayHelper(HWND hwnd)
 {
