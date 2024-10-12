@@ -27,12 +27,6 @@
 #include "shell32_wrappers.h"
 #include "shellurl.h"
 
-#define _WIN_BLUE 1 //Win8.1-specific changes
-#define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
-#define _WIN_RS1 0 //Win10RS1-specific changes - currently unused
-#define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
-#define _WIN_VB 0 //Win10VB-specific changes - currently unused
-
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
 HWND hwnd_taskbar;
@@ -47,7 +41,8 @@ DWORD g_dwTrayThreadId = 0;
 
 bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
-bool g_enableImmersiveShellStack = false;
+bool g_bEnableImmersiveShellStack = false;
+int g_bColorizationOptions = 0;
 
 static WNDPROC g_prevTrayProc;
 typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
@@ -199,7 +194,7 @@ BOOL CALLBACK RefreshWindows(HWND wnd, LPARAM prm)
 
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
 
 	if (uMsg == 0x56D) return 0;
@@ -294,26 +289,21 @@ void ForceActiveWindowAppearance(HWND hwnd)
 	SetWindowCompositionAttribute(hwnd, &data);
 }
 
-BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData)
+BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData) // Ittr: re-organised 12/10/24
 {
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->attribute, *(DWORD*)pAttrData->pData);
-	if (_WIN_BLUE && IsCompositionActive()) //If we are 8.1 or higher for some reason Tihiy's original hack doesn't work so we forcefully run this instead
+	if (IsCompositionActive() && g_bColorizationOptions == 0) // solid glass colour
 	{
-		/*
-			NOTE TO SELF (AND OTHERS):
-			PSEUDO-AERO STILL WORKS ON 8.1 AND 10.
-			TRANSPARENCY MAKES IT WORK JUST FINE.
-		*/
 		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) //enable rtm pseudo-aero
 		{
 			ForceActiveWindowAppearance(hwnd);
 			return SetWindowCompositionAttribute(hwnd, pAttrData);
 		}
 	}
-	else if (!_WIN_BLUE && pAttrData->attribute == 0x10) //changed in 7->8
+	if (IsCompositionActive() && pAttrData->attribute == 0x10 && g_bColorizationOptions != 0) // translucent glass AND acrylic- DOES NOT APPLY TO THUMBNAILs
 	{
 		pAttrData->attribute = 0xF;
-		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero
+		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
 		{
 			SetWindowCompositionAttribute(hwnd, pAttrData);
 			WINCOMPATTRDATA rtm;
@@ -325,7 +315,19 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 				DWORD p4;
 			};
 			ATTR13DATA attr13 = { 0 };
-			attr13.p1 = 4;
+			attr13.p1 = 4; // used for both - for some reason, translucency only without the other values. possibly to preserve compatibility as acrylic didn't exist in winapi in 2012
+
+			if (g_bColorizationOptions == 2) // acrylic
+			{
+				if (hwnd == GetStartMenuWnd()) // hack to stop start menu looking bad (still lags behind on expand. nothing can be done about this yet
+					attr13.p2 = -1;
+				else
+					attr13.p2 = 1;
+
+				attr13.p3 = 1;
+				attr13.p4 = sizeof(attr13.p3);
+			}
+
 			rtm.attribute = 0x13;
 			rtm.pData = &attr13;
 			rtm.dataSize = 0x10;
@@ -338,8 +340,8 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
 	if(hwnd == GetTaskListThumbWnd()) ForceActiveWindowAppearance(hwnd);
-	//if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
-		//pBlurBehind->fEnable = 0;
+	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
+		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
 
@@ -362,7 +364,7 @@ UINT WINAPI SetErrorModeNEW(UINT uMode)
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
 		CreateTwinUI_UWP();
 
 	return SetErrorMode(uMode);
@@ -1059,7 +1061,7 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	if (g_enableImmersiveShellStack) // UWP enabled
+	if (g_bEnableImmersiveShellStack) // UWP enabled
 	{
 		DWORD p0 = (DWORD)_ReturnAddress();
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
@@ -1308,7 +1310,7 @@ void HookAPIs()
 {
 	DWORD dwEnableUWP = 1;
 	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD)); // Ittr: shortened the name for convenience but still not sure on it at the moment. TODO determine name before release
-	g_enableImmersiveShellStack = (dwEnableUWP != 0);
+	g_bEnableImmersiveShellStack = (dwEnableUWP != 0);
 
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	//change desktop
@@ -1382,7 +1384,7 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
 
 
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
 	{
 		// This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
 		MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&SetIcon));
@@ -1393,7 +1395,7 @@ void HookAPIs()
 
 	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// UWP stuff
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
 	{
 		CreateWindowInBandOrig = decltype(CreateWindowInBandOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand"));
 		CreateWindowInBandExOrig = decltype(CreateWindowInBandExOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBandEx"));
@@ -1487,6 +1489,22 @@ void HookAPIs()
 		SetThemeAppProperties(NULL);
 	}
 
+	DWORD dwColorizationOptions = 0; // default - same as milestone 1
+	g_registry.QueryValue(L"ColorizationOptions", (LPBYTE)&dwColorizationOptions, sizeof(DWORD));
+	if (dwColorizationOptions != 0)
+	{
+		if (dwColorizationOptions != 1)
+		{
+			dbgprintf(L"setting acrylic");
+			g_bColorizationOptions = 2; // experimental acrylic state
+		}
+		else
+		{
+			dbgprintf(L"setting pseudo-aero");
+			g_bColorizationOptions = 1; // tihiy pseudo-aero
+		}
+	}
+
 	HookLoadImageForSizeAndFont();
 
 	//enable hooks at end
@@ -1523,7 +1541,7 @@ void HookImmersive()
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
@@ -1532,7 +1550,7 @@ void HookImmersive()
 	ChangeImportedAddress(immersiveui, "user32.dll", GetUserObjectInformation, GetUserObjectInformationNew);
 	ChangeImportedAddress(immersiveui, "user32.dll", SetTimer, SetTimer_WUI);
 
-	if (!g_enableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
+	if (!g_bEnableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
 	{
 		//bugbug!!!
 		ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
@@ -1726,7 +1744,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 
-		if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+		if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
 			CreateTwinUI_UWP();
 
 	}
