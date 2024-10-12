@@ -284,24 +284,9 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 //Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
 void ForceActiveWindowAppearance(HWND hwnd)
 {
-	DWMCOLORIZATIONPARAMS colors;
-	CHAR buffer[0x28];
-	memset(buffer, 0, 0x28);
-	DwmGetColorizationParametersOrig(&buffer);
-	memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
-
-	int a = (colors.ColorizationColor >> 24) & 0xFF;
-	int r = (colors.ColorizationColor >> 16) & 0xFF;
-	int g = (colors.ColorizationColor >> 8) & 0xFF;
-	int b = (colors.ColorizationColor) & 0xFF;
-
-	DWORD newc = (a << 24) | (b << 16) | (g << 8) | r;
-	ACCENT_POLICY policy = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 19, newc, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
-	WINCOMPATTRDATA data = { 13, &policy, 0x10};
-	SetWindowCompositionAttribute(hwnd, &data);
-
-	data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
-	SetWindowCompositionAttribute(hwnd, &data);
+    ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
+    WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
+    SetWindowCompositionAttribute(hwnd, &data);
 }
 
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData) // Ittr: re-organised 12/10/24
