@@ -1579,6 +1579,32 @@ void CrashError()
 	MessageBoxW(NULL, errorText, errorTitle, MB_ICONERROR); // the actual error box lol
 }
 
+static LRESULT RegGetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	DWORD sz = 4;
+	return SHRegGetValueW(key, subkey, value, SRRF_RT_REG_DWORD, NULL, dwVal, &sz);
+}
+
+static LRESULT RegSetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	return SHSetValueW(key, subkey, value, REG_DWORD, dwVal, 4);
+}
+
+static LRESULT RegSetSZ(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	return SHSetValueW(key, subkey, value, REG_SZ, dwVal, (DWORD)wcslen((wchar_t*)dwVal) * sizeof(dwVal[0]));
+}
+
+static LRESULT RegSetExpandSZ(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	return SHSetValueW(key, subkey, value, REG_EXPAND_SZ, dwVal, 2*((DWORD)wcslen((wchar_t*)dwVal) * sizeof(dwVal[0])));
+}
+
+const LPWSTR sz_SettingsKey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced"; // already defined in registry.cpp, should really be accessed better sorry! intention to remove this one after m2 and we officially support win11.
+const LPWSTR sz_ShellFolder = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a109-50dc2113ce9a}"; // used for shellfolder creation
+const LPWSTR sz_ShellFolder2 = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a109-50dc2113ce9a}\\InProcServer32"; // used for shellfolder creation
+const LPWSTR sz_ShellFolder3 = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a109-50dc2113ce9a}\\ShellFolder"; // used for shellfolder creation
+
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
@@ -1601,6 +1627,34 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		{
 			// we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
 			CrashError(); // user-facing crash message
+		}
+
+		if (g_osVersion.BuildNumber() >= 14393) // Ittr: byebye shellfolder.reg
+		{
+			DWORD value = 0; // initialise in memory
+			DWORD attrVal = 0x28100000; // doesn't work when reduced to a single string, annoying but atleast we can use it here
+			RegGetDWORD(HKEY_LOCAL_MACHINE, sz_ShellFolder3, L"Attributes", &value); // output the data from attributes key...
+
+			if (value != attrVal) // basically if the attribute value doesn't exist or is the wrong value...
+			{
+				// we create all the relevant values. issue solved for new users - program list works out of the box now
+				RegSetSZ(HKEY_LOCAL_MACHINE, sz_ShellFolder, NULL, (DWORD*)L"Programs Folder and Fast Items"); // create clsid name
+				RegSetExpandSZ(HKEY_LOCAL_MACHINE, sz_ShellFolder2, NULL, (DWORD*)L"%SystemRoot%\system32\shell32.dll"); // point it to shell32
+				RegSetSZ(HKEY_LOCAL_MACHINE, sz_ShellFolder2, L"ThreadingModel", (DWORD*)L"Apartment"); // regular threading model criteria...
+				RegSetDWORD(HKEY_LOCAL_MACHINE, sz_ShellFolder3, L"Attributes", &attrVal); // apply folder attributes, arguably the most important part
+			}
+		}
+
+		if (g_osVersion.BuildNumber() >= 21996) // temporary one-off M2 warning for win11 users
+		{
+			DWORD value = 0;
+			RegGetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunVersionCheck", &value);
+			if (value != 1)
+			{
+				MessageBoxW(NULL, L"This build of Windows is not currently supported.\n\nYou may encounter usability issues.", L"explorer7", MB_ICONEXCLAMATION);
+				DWORD newValue = 1;
+				RegSetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunVersionCheck", &newValue);
+			}
 		}
 
 		themeHandles = new wiktorArray<HTHEME>();
@@ -1678,7 +1732,6 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
 	{
-
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IRegTreeOptions8, ppv);
 		*ppv = new CRegTreeOptionsWrapper((IRegTreeOptions8*)*ppv);
 	}
