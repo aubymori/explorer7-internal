@@ -298,7 +298,9 @@ void ForceActiveWindowAppearance(HWND hwnd)
 	DWORD newc = (a << 24) | (b << 16) | (g << 8) | r;
 	ACCENT_POLICY policy = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 19, newc, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
 	WINCOMPATTRDATA data = { 13, &policy, 0x10};
-	//WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
+	SetWindowCompositionAttribute(hwnd, &data);
+
+	data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
 	SetWindowCompositionAttribute(hwnd, &data);
 }
 
