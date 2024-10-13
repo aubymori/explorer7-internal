@@ -281,6 +281,21 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 	return ret;
 }
 
+//Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
+BOOL WINAPI IsCompositionActiveNEW()
+{
+	if (g_bDisableComposition) { return FALSE; }
+
+	return IsCompositionActive();
+}
+
+HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
+{
+	if (g_bDisableComposition) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
+
+	return DwmIsCompositionEnabled(pfEnabled);
+}
+
 //Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
 void ForceActiveWindowAppearance(HWND hwnd)
 {
@@ -289,18 +304,43 @@ void ForceActiveWindowAppearance(HWND hwnd)
     SetWindowCompositionAttribute(hwnd, &data);
 }
 
+void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name used by win8.1
+{
+	if (IsCompositionActiveNEW() && g_bColorizationOptions != 0)
+	{
+		DWMCOLORIZATIONPARAMS colors;
+		CHAR buffer[0x28];
+		memset(buffer, 0, 0x28);
+		DwmGetColorizationParametersOrig(&buffer);
+		memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+
+		int a = (colors.ColorizationColor >> 24) & 0xFF;
+		int r = (colors.ColorizationColor >> 16) & 0xFF;
+		int g = (colors.ColorizationColor >> 8) & 0xFF;
+		int b = (colors.ColorizationColor) & 0xFF;
+
+		DWORD newc = (a << 24) | (b << 16) | (g << 8) | r;
+		ACCENT_POLICY policy = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 19, newc, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
+		WINCOMPATTRDATA data = { 13, &policy, 0x10 };
+		SetWindowCompositionAttribute(hwnd, &data);
+
+		data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
+		SetWindowCompositionAttribute(hwnd, &data);
+	}
+}
+
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData) // Ittr: re-organised 12/10/24
 {
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->attribute, *(DWORD*)pAttrData->pData);
-	if (IsCompositionActive() && g_bColorizationOptions == 0) // solid glass colour
+	if (IsCompositionActiveNEW() && g_bColorizationOptions == 0) // solid glass colour - default behaviour (same as milestone 1)
 	{
-		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) //enable rtm pseudo-aero
+		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd())
 		{
 			ForceActiveWindowAppearance(hwnd);
 			return SetWindowCompositionAttribute(hwnd, pAttrData);
 		}
 	}
-	if (IsCompositionActive() && pAttrData->attribute == 0x10 && g_bColorizationOptions != 0) // translucent glass AND acrylic- DOES NOT APPLY TO THUMBNAILs
+	if (IsCompositionActiveNEW() && pAttrData->attribute == 0x10 && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
 	{
 		pAttrData->attribute = 0xF;
 		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
@@ -315,25 +355,29 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 				DWORD p4;
 			};
 			ATTR13DATA attr13 = { 0 };
-			attr13.p1 = 2; // used for both - for some reason, translucency only without the other values. possibly to preserve compatibility as acrylic didn't exist in winapi in 2012
 
-			{
-				DWMCOLORIZATIONPARAMS colors;
-				CHAR buffer[0x28];
-				memset(buffer, 0, 0x28);
-				DwmGetColorizationParametersOrig(&buffer);
-				memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+			if (g_bColorizationOptions == 3) // acrylic (1709-)
+				attr13.p1 = 4;
+			else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
+				attr13.p1 = 3;
+			else // pseudo-aero (all versions)
+				attr13.p1 = 2;
+			
+			DWMCOLORIZATIONPARAMS colors;
+			CHAR buffer[0x28];
+			memset(buffer, 0, 0x28);
+			DwmGetColorizationParametersOrig(&buffer);
+			memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
 
-				int a = (colors.ColorizationColor >> 24) & 0xFF;
-				int r = (colors.ColorizationColor >> 16) & 0xFF;
-				int g = (colors.ColorizationColor >> 8) & 0xFF;
-				int b = (colors.ColorizationColor) & 0xFF;
+			int a = (colors.ColorizationColor >> 24) & 0xFF;
+			int r = (colors.ColorizationColor >> 16) & 0xFF;
+			int g = (colors.ColorizationColor >> 8) & 0xFF;
+			int b = (colors.ColorizationColor) & 0xFF;
 
-				attr13.p2 = 19;
-				attr13.p3 = (a<<24) | (b<<16) | (g<<8)| r;
-				attr13.p4 = sizeof(attr13.p3);
-			}
-
+			attr13.p2 = 19; // values 19 and 16 work for taskbar and start menu
+			attr13.p3 = ((a << 24) | (b << 16) | (g << 8) | r);
+			attr13.p4 = sizeof(attr13.p3);
+			
 			rtm.attribute = 0x13;
 			rtm.pData = &attr13;
 			rtm.dataSize = 0x10;
@@ -345,7 +389,14 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
-	if(hwnd == GetTaskListThumbWnd()) ForceActiveWindowAppearance(hwnd);
+	if (hwnd == GetTaskListThumbWnd())
+	{
+		if (g_bColorizationOptions != 0)
+			UpdateTransparencyProperties(hwnd, NULL, NULL);
+		
+		ForceActiveWindowAppearance(hwnd);
+		
+	}
 	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
 		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
@@ -582,21 +633,6 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 	if (a5 && IsBadReadPtr(a5, 0x8))
 		a5 = 0;
 	return DwmpActivateLivePreview(a1, a2, a3, a4, a5);
-}
-
-//Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
-BOOL WINAPI IsCompositionActiveNEW()
-{
-	if (g_bDisableComposition) { return FALSE; }
-
-	return IsCompositionActive();
-}
-
-HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
-{
-	if (g_bDisableComposition) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
-
-	return DwmIsCompositionEnabled(pfEnabled);
 }
 
 HICON GetUWPIcon(HWND a2)
@@ -1462,18 +1498,9 @@ void HookAPIs()
 
 	DWORD dwColorizationOptions = 0; // default - same as milestone 1
 	g_registry.QueryValue(L"ColorizationOptions", (LPBYTE)&dwColorizationOptions, sizeof(DWORD));
-	if (dwColorizationOptions != 0)
+	if (dwColorizationOptions != 0 && dwColorizationOptions < 4)
 	{
-		if (dwColorizationOptions != 1)
-		{
-			dbgprintf(L"setting acrylic");
-			g_bColorizationOptions = 2; // experimental acrylic state
-		}
-		else
-		{
-			dbgprintf(L"setting pseudo-aero");
-			g_bColorizationOptions = 1; // tihiy pseudo-aero
-		}
+		g_bColorizationOptions = dwColorizationOptions;
 	}
 
 	HookLoadImageForSizeAndFont();
@@ -1634,7 +1661,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 			}
 		}
 
-		if (g_osVersion.BuildNumber() >= 21996) // temporary one-off M2 warning for win11 users
+		if (g_osVersion.BuildNumber() >= 21996 || g_osVersion.BuildNumber() == 20348) // temporary one-off M2 warning for win11 users, permanent for iron users
 		{
 			DWORD value = 0;
 			RegGetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunVersionCheck", &value);
