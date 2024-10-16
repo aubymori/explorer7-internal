@@ -1748,19 +1748,21 @@ void CrashError()
 // Create all programs shellfolder on 1607+ where it doesn't already exist
 void CreateShellFolder()
 {
+	//addendum: using the regular HKLM location is not viable for non-administrator users so we store in HKCU, which causes it to turn up in HKEY_USERS somewhere. 
+	//this shouldn't work, but it does :P
 	if (g_osVersion.BuildNumber() >= 14393) // Ittr: byebye shellfolder.reg
 	{
 		DWORD value = 0; // initialise in memory
 		DWORD attrVal = 0x28100000; // doesn't work when reduced to a single string, annoying but atleast we can use it here
-		RegGetDWORD(HKEY_LOCAL_MACHINE, sz_ShellFolder3, L"Attributes", &value); // output the data from attributes key...
+		RegGetDWORD(HKEY_CURRENT_USER, sz_ShellFolder3, L"Attributes", &value); // output the data from attributes key...
 
 		if (value != attrVal) // basically if the attribute value doesn't exist or is the wrong value...
 		{
 			// we create all the relevant values. issue solved for new users - program list works out of the box now
-			RegSetSZ(HKEY_LOCAL_MACHINE, sz_ShellFolder, NULL, (DWORD*)L"Programs Folder and Fast Items"); // create clsid name
-			RegSetExpandSZ(HKEY_LOCAL_MACHINE, sz_ShellFolder2, NULL, (DWORD*)L"%SystemRoot%\system32\shell32.dll"); // point it to shell32
-			RegSetSZ(HKEY_LOCAL_MACHINE, sz_ShellFolder2, L"ThreadingModel", (DWORD*)L"Apartment"); // regular threading model criteria...
-			RegSetDWORD(HKEY_LOCAL_MACHINE, sz_ShellFolder3, L"Attributes", &attrVal); // apply folder attributes, arguably the most important part
+			RegSetSZ(HKEY_CURRENT_USER, sz_ShellFolder, NULL, (DWORD*)L"Programs Folder and Fast Items"); // create clsid name
+			RegSetExpandSZ(HKEY_CURRENT_USER, sz_ShellFolder2, NULL, (DWORD*)L"%SystemRoot%\system32\shell32.dll"); // point it to shell32
+			RegSetSZ(HKEY_CURRENT_USER, sz_ShellFolder2, L"ThreadingModel", (DWORD*)L"Apartment"); // regular threading model criteria...
+			RegSetDWORD(HKEY_CURRENT_USER, sz_ShellFolder3, L"Attributes", &attrVal); // apply folder attributes, arguably the most important part
 		}
 	}
 }
