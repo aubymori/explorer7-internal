@@ -115,6 +115,14 @@ enum WINDOWCOMPOSITIONATTRIB : INT {	// Determines what attribute is being manip
 	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 0xF				// The attribute being get or set is an accent policy.
 };
 
+struct ATTR13DATA // Used for SetWindowCompositionAttribute
+{
+	DWORD p1; // Type (same as ACCENT_STATE)
+	DWORD p2; // Controls where/how it is applied. Values 16 and 19 work for our purposes. 16 is used by Windows 10.
+	DWORD p3; // Colorization value, determined by DWM or CImmersiveColor API
+	DWORD p4; // sizeof p3
+};
+
 typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
@@ -415,9 +423,21 @@ HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 //Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
 void ForceActiveWindowAppearance(HWND hwnd)
 {
-    ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
-    WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
-    SetWindowCompositionAttribute(hwnd, &data);
+	if (true) // test
+	{
+		BOOL bForceActiveWindowAppearance = true;
+		WINCOMPATTRDATA attrData;
+		attrData.attribute = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
+		attrData.pData = &bForceActiveWindowAppearance;
+		attrData.dataSize = sizeof(bForceActiveWindowAppearance);
+		SetWindowCompositionAttribute(hwnd, &attrData);
+	}
+	else
+	{
+		ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
+		WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
+		SetWindowCompositionAttribute(hwnd, &data);
+	}
 }
 
 void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name used by win8.1 - added for rounak's benefit on 1607
@@ -463,16 +483,11 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 		{
 			SetWindowCompositionAttribute(hwnd, pAttrData);
 			WINCOMPATTRDATA rtm;
-			struct ATTR13DATA
-			{
-				DWORD p1;
-				DWORD p2;
-				DWORD p3;
-				DWORD p4;
-			};
 			ATTR13DATA attr13 = { 0 };
 
-			if (g_bColorizationOptions == 3) // acrylic (1709-)
+			if (g_bColorizationOptions == 4) // solid-color (all versions) - eventual replacement for legacy
+				attr13.p1 = 1;
+			else if (g_bColorizationOptions == 3) // acrylic (1803-)
 				attr13.p1 = 4;
 			else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
 				attr13.p1 = 3;
@@ -489,6 +504,10 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 			int r = (colors.ColorizationColor >> 16) & 0xFF;
 			int g = (colors.ColorizationColor >> 8) & 0xFF;
 			int b = (colors.ColorizationColor) & 0xFF;
+
+			// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
+			if (g_osVersion.BuildNumber() >= 10240 && g_bColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
+				a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
 
 			if (g_bColorizationOptions == 3)
 			{
@@ -1643,7 +1662,7 @@ void HookAPIs()
 	// Query registry for colorization option selected by the user
 	DWORD dwColorizationOptions = 0; // default to "legacy" mode - same as milestone 1
 	g_registry.QueryValue(L"ColorizationOptions", (LPBYTE)&dwColorizationOptions, sizeof(DWORD));
-	if (dwColorizationOptions != 0 && dwColorizationOptions < 4)
+	if (dwColorizationOptions != 0 && dwColorizationOptions < 5)
 	{
 		// BlurBehind is broken for Nickel onwards, so we enforce acrylic instead...
 		if (dwColorizationOptions == 2 && g_osVersion.BuildNumber() >= 22621)
