@@ -1502,9 +1502,9 @@ void HookShell32();
 void HookAPIs()
 {
 	// Before doing anything else, initialize the registry switch for immersive shell as this determines what hooks and changes are needed
-	DWORD dwEnableUWP = 1;
+	DWORD dwEnableUWP = 0;
 	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
-	g_bEnableImmersiveShellStack = (dwEnableUWP != 0);
+	g_bEnableImmersiveShellStack = dwEnableUWP;
 
 	// Change and fix core desktop components
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
