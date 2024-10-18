@@ -86,13 +86,6 @@ wiktorArray<HTHEME>* themeHandles;
 DEFINE_GUID(IID_TrayClock7, 0x4376df10, 0xa662, 0x420b, 0xb3, 0x0d, 0x95, 0x88, 0x81, 0x46, 0x1e, 0xf9);
 DEFINE_GUID(IID_TrayClock8, 0x7A5FCA8A, 0x76B1, 0x44C8, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F);
 
-struct WINCOMPATTRDATA
-{
-	DWORD attribute; // the attribute to query, see below
-	PVOID pData; // buffer to store the result
-	ULONG dataSize; // size of the pData buffer
-};
-
 enum ACCENT_STATE : INT {				// Affects the rendering of the background of a window. These names are only for ACCENT_POLICY purposes 
 	ACCENT_DISABLED = 0,					// Default value. Background is black.
 	ACCENT_ENABLE_GRADIENT = 1,				// Background is GradientColor, alpha channel ignored.
@@ -111,10 +104,51 @@ struct ACCENT_POLICY {			// Determines how a window's background is rendered.
 };
 
 enum WINDOWCOMPOSITIONATTRIB : INT {	// Determines what attribute is being manipulated.
-	WCA_ACCENT_POLICY = 0x13,
-	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 0xF				// The attribute being get or set is an accent policy.
+	WCA_UNDEFINED = 0,
+	WCA_NCRENDERING_ENABLED = 1,
+	WCA_NCRENDERING_POLICY = 2,
+	WCA_TRANSITIONS_FORCEDISABLED = 3,
+	WCA_ALLOW_NCPAINT = 4,
+	WCA_CAPTION_BUTTON_BOUNDS = 5,
+	WCA_NONCLIENT_RTL_LAYOUT = 6,
+	WCA_FORCE_ICONIC_REPRESENTATION = 7,
+	WCA_EXTENDED_FRAME_BOUNDS = 8,
+	WCA_HAS_ICONIC_BITMAP = 9,
+	WCA_THEME_ATTRIBUTES = 10,
+	WCA_NCRENDERING_EXILED = 11,
+	WCA_NCADORNMENTINFO = 12,
+	WCA_EXCLUDED_FROM_LIVEPREVIEW = 13,
+	WCA_VIDEO_OVERLAY_ACTIVE = 14,
+	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 15,
+	WCA_DISALLOW_PEEK = 16,
+	WCA_CLOAK = 17,
+	WCA_CLOAKED = 18,
+	WCA_ACCENT_POLICY = 19,
+	WCA_FREEZE_REPRESENTATION = 20,
+	WCA_EVER_UNCLOAKED = 21,
+	WCA_VISUAL_OWNER = 22,
+	WCA_HOLOGRAPHIC = 23,
+	WCA_EXCLUDED_FROM_DDA = 24,
+	WCA_PASSIVEUPDATEMODE = 25,
+	WCA_USEDARKMODECOLORS = 26,
+	WCA_CORNER_STYLE = 27,
+	WCA_PART_COLOR = 28,
+	WCA_DISABLE_MOVESIZE_FEEDBACK = 29,
+	WCA_SYSTEMBACKDROP_TYPE = 30,
+	WCA_SET_TAGGED_WINDOW_RECT = 31,
+	WCA_CLEAR_TAGGED_WINDOW_RECT = 32,
+	WCA_LAST = 33
 };
 
+struct WINDOWCOMPOSITIONATTRIBDATA
+{
+	WINDOWCOMPOSITIONATTRIB Attrib; // the attribute to query, see below
+	void* pvData; // buffer to store the result
+	UINT cbData; // size of the pData buffer
+};
+
+////////////
+// DEPRECATED
 struct ATTR13DATA // Used for SetWindowCompositionAttribute
 {
 	DWORD p1; // Type (same as ACCENT_STATE)
@@ -122,8 +156,16 @@ struct ATTR13DATA // Used for SetWindowCompositionAttribute
 	DWORD p3; // Colorization value, determined by DWM or CImmersiveColor API
 	DWORD p4; // sizeof p3
 };
+struct WINCOMPATTRDATA
+{
+	DWORD attribute; // the attribute to query, see below
+	PVOID pData; // buffer to store the result
+	ULONG dataSize; // size of the pData buffer
+};
+////////////
 
-typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
+
+typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
 //////////////// WITH THANKS AND CREDITS TO EXPLORERPATCHER ////////////////
@@ -423,21 +465,12 @@ HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 //Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
 void ForceActiveWindowAppearance(HWND hwnd)
 {
-	if (true) // test
-	{
-		BOOL bForceActiveWindowAppearance = true;
-		WINCOMPATTRDATA attrData;
-		attrData.attribute = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
-		attrData.pData = &bForceActiveWindowAppearance;
-		attrData.dataSize = sizeof(bForceActiveWindowAppearance);
-		SetWindowCompositionAttribute(hwnd, &attrData);
-	}
-	else
-	{
-		ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
-		WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
-		SetWindowCompositionAttribute(hwnd, &data);
-	}
+	BOOL bForceActiveWindowAppearance = true;
+	WINDOWCOMPOSITIONATTRIBDATA attrData;
+	attrData.Attrib = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
+	attrData.pvData = &bForceActiveWindowAppearance;
+	attrData.cbData = sizeof(bForceActiveWindowAppearance);
+	SetWindowCompositionAttribute(hwnd, &attrData);
 }
 
 void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name used by win8.1 - added for rounak's benefit on 1607
@@ -457,7 +490,7 @@ void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name u
 
 		DWORD newc = (a << 24) | (b << 16) | (g << 8) | r;
 		ACCENT_POLICY policy = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 19, newc, 1 }; 
-		WINCOMPATTRDATA data = { 13, &policy, 0x10 };
+		WINDOWCOMPOSITIONATTRIBDATA data = { WCA_ACCENT_POLICY, &policy, 0x10 };
 		SetWindowCompositionAttribute(hwnd, &data);
 
 		data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
@@ -465,9 +498,9 @@ void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name u
 	}
 }
 
-BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData) // Ittr: re-organised 12/10/24
+BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised 12/10/24
 {
-	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->attribute, *(DWORD*)pAttrData->pData);
+	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
 	if (IsCompositionActiveNEW() && g_bColorizationOptions == 0) // solid glass colour - default behaviour (same as milestone 1)
 	{
 		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd())
@@ -476,23 +509,23 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 			return SetWindowCompositionAttribute(hwnd, pAttrData);
 		}
 	}
-	if (IsCompositionActiveNEW() && pAttrData->attribute == 0x10 && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
+	if (IsCompositionActiveNEW() && pAttrData->Attrib == 0x10 && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
 	{
-		pAttrData->attribute = 0xF;
-		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
+		pAttrData->Attrib = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
+		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
 		{
 			SetWindowCompositionAttribute(hwnd, pAttrData);
-			WINCOMPATTRDATA rtm;
-			ATTR13DATA attr13 = { 0 };
+			WINDOWCOMPOSITIONATTRIBDATA wndCompositionData;
+			ACCENT_POLICY wndAccentPolicy = { ACCENT_DISABLED };
 
 			if (g_bColorizationOptions == 4) // solid-color (all versions) - eventual replacement for legacy
-				attr13.p1 = 1;
+				wndAccentPolicy.AccentState = ACCENT_ENABLE_GRADIENT;
 			else if (g_bColorizationOptions == 3) // acrylic (1803-)
-				attr13.p1 = 4;
+				wndAccentPolicy.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
 			else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
-				attr13.p1 = 3;
+				wndAccentPolicy.AccentState = ACCENT_ENABLE_BLURBEHIND;
 			else // pseudo-aero (all versions)
-				attr13.p1 = 2;
+				wndAccentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
 			
 			DWMCOLORIZATIONPARAMS colors;
 			CHAR buffer[0x28];
@@ -520,14 +553,14 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrDa
 
 			DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor(IMCLR_SystemAccentDark2) & 0xFFFFFF));
 
-			attr13.p2 = 19; // values 19 and 16 work for taskbar and start menu
-			attr13.p3 = color;
-			attr13.p4 = sizeof(attr13.p3);
+			wndAccentPolicy.AccentFlags = 19; // values 19 and 16 work for taskbar and start menu
+			wndAccentPolicy.GradientColor = color;
+			wndAccentPolicy.AnimationId = 1; // definitely wrong, idk
 			
-			rtm.attribute = 0x13;
-			rtm.pData = &attr13;
-			rtm.dataSize = 0x10;
-			return SetWindowCompositionAttribute(hwnd, &rtm);
+			wndCompositionData.Attrib = WCA_ACCENT_POLICY;
+			wndCompositionData.pvData = &wndAccentPolicy;
+			wndCompositionData.cbData = 0x10;
+			return SetWindowCompositionAttribute(hwnd, &wndCompositionData);
 		}
 	}
 	return SetWindowCompositionAttribute(hwnd, pAttrData);
@@ -541,7 +574,6 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 			UpdateTransparencyProperties(hwnd, NULL, NULL);
 		
 		ForceActiveWindowAppearance(hwnd);
-		
 	}
 	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
 		pBlurBehind->fEnable = 0;
@@ -552,6 +584,13 @@ int WINAPI SetWindowRgnNEW(HWND hWnd, HRGN hRgn, BOOL bRedraw)
 {
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
 	if (hRgn == NULL && hWnd == GetStartMenuWnd()) return 0;
+	if (hWnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
+	{
+		RECT lprc;
+		GetRgnBox(hRgn, &lprc);
+		SetRectRgn(hRgn, lprc.left + 13, lprc.top + 12, lprc.right - 18, lprc.bottom - 18);
+		return SetWindowRgn(hWnd, hRgn, bRedraw);
+	}
 	return SetWindowRgn(hWnd, hRgn, bRedraw);
 }
 
