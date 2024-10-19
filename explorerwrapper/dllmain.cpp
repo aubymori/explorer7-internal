@@ -43,6 +43,7 @@ bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
 bool g_bEnableImmersiveShellStack = false;
 int g_bColorizationOptions = 0;
+bool g_bRPEnabled = false; // Lol
 
 static WNDPROC g_prevTrayProc;
 typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
@@ -503,16 +504,16 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
 	if (IsCompositionActiveNEW() && g_bColorizationOptions == 0) // solid glass colour - default behaviour (same as milestone 1)
 	{
-		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd())
+		if (pAttrData->Attrib == WCA_DISALLOW_PEEK)
 		{
 			ForceActiveWindowAppearance(hwnd);
 			return SetWindowCompositionAttribute(hwnd, pAttrData);
 		}
 	}
-	if (IsCompositionActiveNEW() && pAttrData->Attrib == 0x10 && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
+	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
 	{
 		pAttrData->Attrib = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
-		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
+		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
 		{
 			SetWindowCompositionAttribute(hwnd, pAttrData);
 			WINDOWCOMPOSITIONATTRIBDATA wndCompositionData;
@@ -570,8 +571,8 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 {
 	if (hwnd == GetTaskListThumbWnd())
 	{
-		if (g_bColorizationOptions != 0)
-			UpdateTransparencyProperties(hwnd, NULL, NULL);
+		//if (g_bColorizationOptions != 0)
+			//UpdateTransparencyProperties(hwnd, NULL, NULL);
 		
 		ForceActiveWindowAppearance(hwnd);
 	}
@@ -580,25 +581,43 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
 
-int WINAPI SetWindowRgnNEW(HWND hWnd, HRGN hRgn, BOOL bRedraw)
+int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 {
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
-	if (hRgn == NULL && hWnd == GetStartMenuWnd()) return 0;
-	if (hWnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
-	{
-		RECT lprc;
-		GetRgnBox(hRgn, &lprc);
-		SetRectRgn(hRgn, lprc.left + 13, lprc.top + 12, lprc.right - 18, lprc.bottom - 18);
-		return SetWindowRgn(hWnd, hRgn, bRedraw);
-	}
-	return SetWindowRgn(hWnd, hRgn, bRedraw);
+	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
+
+	//Disabled - shadows get cut off...
+	//if (hwnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
+	//{
+	//	RECT lprc;
+	//	GetRgnBox(hRgn, &lprc);
+	//	SetRectRgn(hRgn, lprc.left + 13, lprc.top + 12, lprc.right - 18, lprc.bottom - 18);
+	//	return SetWindowRgn(hwnd, hRgn, bRedraw);
+	//}
+	//else if (hwnd == GetTaskListThumbWnd() && hRgn == NULL) return 0;
+	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
 HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
 {
-	//Ittr: Temporarily comment these out as unneeded - we want original 7 theme classes to be used where appropriate!
-	//if ( lstrcmp(pszSubAppName,L"VerticalShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"VerticalShowDesktop8",pszSubIdList);
-	//if ( lstrcmp(pszSubAppName,L"ShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"ShowDesktop8",pszSubIdList);
+	if (g_bRPEnabled)
+	{
+		if (lstrcmp(pszSubAppName, L"VerticalShowDesktop") == 0) return SetWindowTheme(hwnd, L"VerticalShowDesktop8", pszSubIdList);
+		if (lstrcmp(pszSubAppName, L"ShowDesktop") == 0) return SetWindowTheme(hwnd, L"ShowDesktop8", pszSubIdList);
+
+		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedVertical") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedVertical8", pszSubIdList);
+		if (lstrcmp(pszSubAppName, L"TaskBand2Composited") == 0) return SetWindowTheme(hwnd, L"TaskBand2Composited8", pszSubIdList);
+		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIconsVertical") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIconsVertical8", pszSubIdList);
+		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIcons") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIcons8", pszSubIdList);
+
+		if (hwnd == GetTaskListThumbWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0))
+			return SetWindowTheme(hwnd, L"W8", pszSubIdList);
+		else if (hwnd == GetTaskListThumbWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0))
+			return SetWindowTheme(hwnd, L"W8Vertical", pszSubIdList);
+
+
+	}
+
 	return SetWindowTheme(hwnd, pszSubAppName, pszSubIdList);
 }
 
@@ -1386,6 +1405,13 @@ void GetOrbDPIAndPos(LPWSTR fName)
 	}
 }
 
+HMODULE GetCurrentModuleHandle()
+{
+	HMODULE hMod = NULL;
+	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&GetCurrentModuleHandle), &hMod);
+	return hMod;
+}
+
 HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
 {
 	dbgprintf(L"LoadImageW_CallHook has been called!");
@@ -1398,8 +1424,14 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 
 	WCHAR szOrbDir[MAX_PATH];
 	LSTATUS res = g_registry.QueryValue(L"OrbDirectory", (LPBYTE)szOrbDir, sizeof(szOrbDir));
+
 	if (!*szOrbDir || ERROR_SUCCESS != res)
+	{
+		if (g_bRPEnabled)
+			return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(6801), 0, 0, 0, fuLoad);
+
 		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
+	}
 
 	WCHAR szOrbFile[MAX_PATH];
 	GetOrbDPIAndPos(szOrbFile);
@@ -1415,6 +1447,9 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 
 	if (FileExists(szOrbPath) == FALSE)
 	{
+		if (g_bRPEnabled)
+			return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(6801), 0, 0, 0, fuLoad);
+
 		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
 	}
 	else
@@ -1544,6 +1579,12 @@ void HookAPIs()
 	DWORD dwEnableUWP = 0;
 	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
 	g_bEnableImmersiveShellStack = dwEnableUWP;
+
+	// Windows 8-esque mode. Lol
+	DWORD dwRPEnabled = 0;
+	g_registry.QueryValue(L"RPEnabled", (LPBYTE)&dwRPEnabled, sizeof(DWORD));
+	g_bRPEnabled = dwRPEnabled;
+
 
 	// Change and fix core desktop components
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
