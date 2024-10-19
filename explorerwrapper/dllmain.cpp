@@ -502,6 +502,21 @@ void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name u
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised 12/10/24
 {
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
+
+	if (!IsThemeActive() || g_bClassicTheme || !IsCompositionActive() || g_bDisableComposition) // we do funny things so explorer works properly for classic/basic.
+	{
+		int bNCRenderingEnabled = DWMNCRP_DISABLED;
+
+		// Disable DWM frames - thank FUCK this works
+		WINDOWCOMPOSITIONATTRIBDATA attrData;
+		attrData.Attrib = WCA_NCRENDERING_POLICY;
+		attrData.pvData = &bNCRenderingEnabled;
+		attrData.cbData = sizeof(bNCRenderingEnabled);
+
+		SetWindowCompositionAttribute(hwnd, &attrData); //byebye
+		return SetWindowCompositionAttribute(hwnd, pAttrData);
+	}
+
 	if (IsCompositionActiveNEW() && g_bColorizationOptions == 0) // solid glass colour - default behaviour (same as milestone 1)
 	{
 		if (pAttrData->Attrib == WCA_DISALLOW_PEEK)
@@ -1752,7 +1767,13 @@ void HookAPIs()
 
 	}
 
-	// Handle custom start orb feature
+	//fix classic start menu icon (pls fix)
+	/*HMODULE winbrand = LoadLibrary(L"winbrand.dll");
+	BrandingLoadImage = (BrandingLoadImage_t)GetProcAddress(winbrand, "BrandingLoadImage");
+	if (BrandingLoadImage)
+		ChangeImportedAddress(GetModuleHandle(NULL),"winbrand.dll",BrandingLoadImage,BrandingLoadImageNEW);*/
+
+	// Handle custom start orb feature & RP orb
 	HookLoadImageForSizeAndFont();
 
 	// Enable MinHook hooks at the end
