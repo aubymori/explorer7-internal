@@ -42,8 +42,9 @@ DWORD g_dwTrayThreadId = 0;
 bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
 bool g_bEnableImmersiveShellStack = false;
-int g_bColorizationOptions = 0;
 bool g_bRPEnabled = false; // Lol
+bool g_bAcrylicAlt = false;
+int g_bColorizationOptions = 0;
 
 static WNDPROC g_prevTrayProc;
 typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
@@ -173,6 +174,7 @@ static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 typedef enum IMMERSIVE_COLOR_TYPE
 {
 	// Defining only used ones
+	IMCLR_SystemAccentLight2 = 0x2,
 	IMCLR_SystemAccentDark2 = 0x6
 } IMMERSIVE_COLOR_TYPE;
 
@@ -534,14 +536,12 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 			WINDOWCOMPOSITIONATTRIBDATA wndCompositionData;
 			ACCENT_POLICY wndAccentPolicy = { ACCENT_DISABLED };
 
-			if (g_bColorizationOptions == 4) // solid-color (all versions) - eventual replacement for legacy
-				wndAccentPolicy.AccentState = ACCENT_ENABLE_GRADIENT;
-			else if (g_bColorizationOptions == 3) // acrylic (1803-)
+			if (g_bColorizationOptions == 3) // acrylic (1803-)
 				wndAccentPolicy.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
 			else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
 				wndAccentPolicy.AccentState = ACCENT_ENABLE_BLURBEHIND;
-			else // pseudo-aero (all versions)
-				wndAccentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
+			else // pseudo-aero & solid-color (all versions) - the replacements for option 0 & fallback for other values entered > 4
+				wndAccentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT; // we use transparentgradient for both 1 and 4, as gradient has some weird hrgn side-effects on start menu
 			
 			DWMCOLORIZATIONPARAMS colors;
 			CHAR buffer[0x28];
@@ -558,6 +558,9 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 			if (g_osVersion.BuildNumber() >= 10240 && g_bColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
 				a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
 
+			if (g_bColorizationOptions == 4)
+				a = 0xFF;
+
 			if (g_bColorizationOptions == 3)
 			{
 				GetThemeName = (GetThemeName_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)74);
@@ -567,7 +570,7 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 				GetColorFromPreference = (GetColorFromPreference_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)121);
 			}
 
-			DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor(IMCLR_SystemAccentDark2) & 0xFFFFFF));
+			DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
 
 			wndAccentPolicy.AccentFlags = 19; // values 19 and 16 work for taskbar and start menu
 			wndAccentPolicy.GradientColor = color;
@@ -1600,7 +1603,6 @@ void HookAPIs()
 	g_registry.QueryValue(L"RPEnabled", (LPBYTE)&dwRPEnabled, sizeof(DWORD));
 	g_bRPEnabled = dwRPEnabled;
 
-
 	// Change and fix core desktop components
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
@@ -1766,6 +1768,10 @@ void HookAPIs()
 			g_bColorizationOptions = dwColorizationOptions;
 
 	}
+
+	DWORD dwAcrylicAlt = 0;
+	g_registry.QueryValue(L"AcrylicColorization", (LPBYTE)&dwAcrylicAlt, sizeof(DWORD));
+	g_bAcrylicAlt = dwAcrylicAlt;
 
 	//fix classic start menu icon (pls fix)
 	/*HMODULE winbrand = LoadLibrary(L"winbrand.dll");
