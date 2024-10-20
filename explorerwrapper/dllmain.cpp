@@ -1759,12 +1759,13 @@ void HookAPIs()
 	// Query registry for colorization option selected by the user
 	DWORD dwColorizationOptions = 0; // default to "legacy" mode - same as milestone 1
 	g_registry.QueryValue(L"ColorizationOptions", (LPBYTE)&dwColorizationOptions, sizeof(DWORD));
-	if (dwColorizationOptions != 0 && dwColorizationOptions < 5)
+	if (dwColorizationOptions != 0 && dwColorizationOptions < 5) // if outside the boundaries, defaults back to 0
 	{
-		// BlurBehind is broken for Nickel onwards, so we enforce acrylic instead...
-		if (dwColorizationOptions == 2 && g_osVersion.BuildNumber() >= 22621)
+		if (dwColorizationOptions == 2 && g_osVersion.BuildNumber() >= 22621) // BlurBehind is broken from Nickel onwards, so we enforce acrylic instead as an alternative blur effect...
 			g_bColorizationOptions = 3;
-		else
+		else if (dwColorizationOptions == 3 && g_osVersion.BuildNumber() < 17134) // Acrylic is not added to Win32 api until 1803, so fall back to pseudo-aero for wider OS consistency...
+			g_bColorizationOptions = 1;
+		else // e.g. you're using a supported mode on your OS
 			g_bColorizationOptions = dwColorizationOptions;
 
 	}
