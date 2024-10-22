@@ -7,6 +7,7 @@ DEFINE_GUID(IID_IPinnedList2, 0xBBD20037, 0xBC0E, 0x42F1, 0x91, 0x3F, 0xE2, 0x93
 DEFINE_GUID(IID_IPinnedList25, 0x446BC432, 0x57E9, 0x4B72, 0x8E, 0x0F1, 0x0AF, 0x27, 0x11, 0x3D, 0x0CF, 0x9C);
 DEFINE_GUID(IID_IFlexibleTaskbarPinnedList, 0x60274fa2, 0x611f, 0x4b8a, 0xa2, 0x93, 0xf2, 0x7b, 0xf1, 0x03, 0xd1, 0x48);
 DEFINE_GUID(IID_IPinnedList3, 0x0dd79ae2, 0xd156, 0x45d4, 0x9e, 0xeb, 0x3b, 0x54, 0x97, 0x69, 0xe9, 0x40);
+DEFINE_GUID(IID_IStartMenuPin, 0xEC35E37A, 0x6579, 0x4F3C, 0x93,0xCD, 0x6E,0x62,0xC4,0xEF,0x76,0x36);
 #pragma endregion
 
 MIDL_INTERFACE("BBD20037-BC0E-42F1-913F-E2936BB0EA0C")
@@ -84,6 +85,17 @@ public:
 	STDMETHOD(Modify)(PCIDLIST_ABSOLUTE, PCIDLIST_ABSOLUTE, int) PURE;
 };
 
+MIDL_INTERFACE("EC35E37A-6579-4F3C-93CD-6E62C4EF7636")
+IStartMenuPin : public IUnknown
+{
+public:
+	STDMETHOD(EnumObjects)(IEnumIDList **) PURE;
+	STDMETHOD(Modify)(LPCITEMIDLIST, LPCITEMIDLIST) PURE;
+	STDMETHOD(GetChangeCount)(ULONG *) PURE;
+	STDMETHOD(IsPinnable)(IDataObject *, DWORD, LPITEMIDLIST *) PURE;
+	STDMETHOD(Resolve)(HWND, DWORD, LPCITEMIDLIST, LPITEMIDLIST *) PURE;
+};
+
 class CPinnedListWrapper : public IPinnedList2
 {
 public:
@@ -114,3 +126,27 @@ private:
 	int m_build = 0;
 };
 
+class CStartMenuPinWrapper : public IStartMenuPin
+{
+private:
+	IFlexibleTaskbarPinnedList *m_flexList = 0;
+	IPinnedList3 *m_pinnedList3 = 0;
+	IPinnedList25 *m_pinnedList25 = 0;
+	int m_build = 0;
+
+public:
+	CStartMenuPinWrapper(IUnknown *, int);
+	~CStartMenuPinWrapper();
+
+	//IUnknown
+	STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
+
+	//IStartMenuPin
+	STDMETHODIMP EnumObjects(IEnumIDList **ppenumIDList);
+	STDMETHODIMP Modify(LPCITEMIDLIST pidlFrom, LPCITEMIDLIST pidlTo);
+	STDMETHODIMP GetChangeCount(ULONG *pulOut);
+	STDMETHODIMP IsPinnable(IDataObject *, DWORD, LPITEMIDLIST *);
+	STDMETHODIMP Resolve(HWND, DWORD, LPCITEMIDLIST, LPITEMIDLIST *);
+};

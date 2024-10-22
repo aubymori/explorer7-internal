@@ -1,6 +1,7 @@
 #include "pinnedlist.h"
 #include "dbgprint.h"
 
+#pragma region "CPinnedListWrapper"
 CPinnedListWrapper::CPinnedListWrapper(IUnknown* flex, int build)
 {
 	m_build = build;
@@ -188,3 +189,128 @@ HRESULT __stdcall CPinnedListWrapper::UpdateForRemovedItemsAsNecessary(VOID)
 		return m_pinnedList3->UpdateForRemovedItemsAsNecessary();
 	return S_OK;
 }
+#pragma endregion // "CPinnedListWrapper"
+
+#pragma region "CStartMenuPinWrapper"
+CStartMenuPinWrapper::CStartMenuPinWrapper(IUnknown *punk, int build)
+{
+	m_build = build;
+	if (build >= 10240 && build < 14393)
+	{
+		m_pinnedList25 = (IPinnedList25 *)punk;
+		dbgprintf(L"using IPinnedList25");
+	}
+	else if (build >= 14393 && build < 17763)
+	{
+		m_flexList = (IFlexibleTaskbarPinnedList *)punk;
+		dbgprintf(L"using IFlexibleTaskbarPinnedList");
+	}
+	else if (build >= 17763)
+	{
+		m_pinnedList3 = (IPinnedList3 *)punk;
+		dbgprintf(L"using IPinnedlist3");
+	}
+}
+
+CStartMenuPinWrapper::~CStartMenuPinWrapper()
+{
+	if (m_pinnedList25)
+		m_pinnedList25->Release();
+	if (m_flexList)
+		m_flexList->Release();
+	if (m_pinnedList3)
+		m_pinnedList3->Release();
+}
+
+HRESULT __stdcall CStartMenuPinWrapper::QueryInterface(REFIID riid, void **ppvObject)
+{
+	if (m_pinnedList25)
+		return m_pinnedList25->QueryInterface(riid, ppvObject);
+	if (m_flexList)
+		return m_flexList->QueryInterface(riid, ppvObject);
+	if (m_pinnedList3)
+		return m_pinnedList3->QueryInterface(riid, ppvObject);
+	return S_OK;
+}
+
+ULONG __stdcall CStartMenuPinWrapper::AddRef(void)
+{
+	ULONG cref;
+	if (m_pinnedList25)
+		cref = m_pinnedList25->AddRef();
+	if (m_flexList)
+		cref = m_flexList->AddRef();
+	if (m_pinnedList3)
+		cref = m_pinnedList3->AddRef();
+	return cref;
+}
+
+ULONG __stdcall CStartMenuPinWrapper::Release(void)
+{
+	ULONG cref;
+	if (m_pinnedList25)
+		cref = m_pinnedList25->Release();
+	if (m_flexList)
+		cref = m_flexList->Release();
+	if (m_pinnedList3)
+		cref = m_pinnedList3->Release();
+	if (cref == 0)
+		free((void *)this);
+	return cref;
+}
+
+HRESULT __stdcall CStartMenuPinWrapper::EnumObjects(IEnumIDList **p1)
+{
+	if (m_pinnedList25)
+		return m_pinnedList25->EnumObjects((IEnumFullIDList **)p1);
+	if (m_flexList)
+		return m_flexList->EnumObjects((IEnumFullIDList **)p1);
+	if (m_pinnedList3)
+		return m_pinnedList3->EnumObjects((IEnumFullIDList **)p1);
+	return S_OK;
+}
+
+HRESULT __stdcall CStartMenuPinWrapper::Modify(PCIDLIST_ABSOLUTE p1, PCIDLIST_ABSOLUTE p2)
+{
+	if (m_pinnedList25)
+		return m_pinnedList25->Modify(p1, p2);
+	if (m_flexList)
+		return m_flexList->Modify(p1, p2);
+	if (m_pinnedList3)
+		return m_pinnedList3->Modify(p1, p2, 18);
+	return S_OK;
+}
+
+HRESULT __stdcall CStartMenuPinWrapper::GetChangeCount(ULONG *p1)
+{
+	if (m_pinnedList25)
+		return m_pinnedList25->GetChangeCount(p1);
+	if (m_flexList)
+		return m_flexList->GetChangeCount(p1);
+	if (m_pinnedList3)
+		return m_pinnedList3->GetChangeCount(p1);
+	return S_OK;
+}
+
+HRESULT __stdcall CStartMenuPinWrapper::IsPinnable(IDataObject *p1, DWORD p2, LPITEMIDLIST *)
+{
+	if (m_pinnedList25)
+		return m_pinnedList25->IsPinnable(p1, p2);
+	if (m_flexList)
+		return m_flexList->IsPinnable(p1, p2);
+	if (m_pinnedList3)
+		return m_pinnedList3->IsPinnable(p1, p2);
+	return S_OK;
+}
+
+HRESULT __stdcall CStartMenuPinWrapper::Resolve(HWND p1, DWORD p2, LPCITEMIDLIST p3, LPITEMIDLIST *p4)
+{
+	if (m_pinnedList25)
+		return m_pinnedList25->Resolve(p1, p2, p3, p4);
+	if (m_flexList)
+		return m_flexList->Resolve(p1, p2, p3, p4);
+	if (m_pinnedList3)
+		return m_pinnedList3->Resolve(p1, p2, p3, p4);
+	return S_OK;
+}
+#pragma endregion // "CStartMenuPinWrapper"

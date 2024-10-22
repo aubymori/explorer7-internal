@@ -2022,7 +2022,10 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			id = IID_IPinnedList3;
 
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+		if (riid == IID_IStartMenuPin)
+			*ppv = new CStartMenuPinWrapper((IUnknown *)*ppv, build);
+		else
+			*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
 	}
 
 	if (riid == IID_AutoDestList && result != S_OK)
