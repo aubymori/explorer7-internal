@@ -633,7 +633,6 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 		else if (hwnd == GetTaskListThumbWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0))
 			return SetWindowTheme(hwnd, L"W8Vertical", pszSubIdList);
 
-
 	}
 
 	return SetWindowTheme(hwnd, pszSubAppName, pszSubIdList);
@@ -1423,6 +1422,50 @@ void GetOrbDPIAndPos(LPWSTR fName)
 	}
 }
 
+int RP_GetOrbDPIAndPos() // for RP orb
+{
+	APPBARDATA abd;
+	abd.cbSize = sizeof(APPBARDATA);
+	SHAppBarMessage(ABM_GETTASKBARPOS, &abd);
+
+	HDC screen = GetDC(NULL);
+	double hPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSX);
+	double vPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSY);
+	ReleaseDC(NULL, screen);
+	double dpi = (hPixelsPerInch + vPixelsPerInch) * 0.5;
+
+	if (dpi >= 120)
+	{
+		if (dpi >= 144)
+		{
+			if (dpi >= 192)
+			{
+				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6808;
+				else if (abd.uEdge == ABE_TOP) return 6804;
+				else return 6804;
+			}
+			else
+			{
+				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6807;
+				else if (abd.uEdge == ABE_TOP) return 6803;
+				else return 6803;
+			}
+		}
+		else
+		{
+			if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6806;
+			else if (abd.uEdge == ABE_TOP) return 6802;
+			else return 6802;
+		}
+	}
+	else
+	{
+		if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6805;
+		else if (abd.uEdge == ABE_TOP || abd.uEdge == ABE_BOTTOM) return 6805;
+		else return 6805;
+	}
+}
+
 HMODULE GetCurrentModuleHandle()
 {
 	HMODULE hMod = NULL;
@@ -1443,10 +1486,12 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	WCHAR szOrbDir[MAX_PATH];
 	LSTATUS res = g_registry.QueryValue(L"OrbDirectory", (LPBYTE)szOrbDir, sizeof(szOrbDir));
 
+	int RP_ID = RP_GetOrbDPIAndPos();
+
 	if (!*szOrbDir || ERROR_SUCCESS != res)
 	{
-		if (g_bRPEnabled)
-			return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(6801), 0, 0, 0, fuLoad);
+		//if (g_bRPEnabled) -- DISABLE AS CHANGES WON'T BE SHIPPED IN M2.
+			//return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(RP_ID), 0, 0, 0, fuLoad);
 
 		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
 	}
@@ -1465,8 +1510,8 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 
 	if (FileExists(szOrbPath) == FALSE)
 	{
-		if (g_bRPEnabled)
-			return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(6801), 0, 0, 0, fuLoad);
+		//if (g_bRPEnabled) -- DISABLE AS CHANGES WON'T BE SHIPPED IN M2.
+			//return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(RP_ID), 0, 0, 0, fuLoad);
 
 		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
 	}
@@ -1491,8 +1536,6 @@ void HookLoadImageForSizeAndFont()
 
 		// write a call to our function
 		DetourCall((void*)callLoadImage, LoadImageW_CallHook);
-
-
 	}
 
 	char* callDrawExtended = (char*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 57 48 83 EC 30 33 DB 48 8B F9 48 39 59 40");
