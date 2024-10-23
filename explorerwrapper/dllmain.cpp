@@ -170,6 +170,10 @@ struct WINCOMPATTRDATA
 typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
+typedef HRESULT(WINAPI* DwmpUpdateAccentBlurRect_t)(HWND, LPRECT);
+static DwmpUpdateAccentBlurRect_t DwmpUpdateAccentBlurRect;
+
+
 //////////////// WITH THANKS AND CREDITS TO EXPLORERPATCHER ////////////////
 typedef enum IMMERSIVE_COLOR_TYPE
 {
@@ -476,31 +480,6 @@ void ForceActiveWindowAppearance(HWND hwnd)
 	SetWindowCompositionAttribute(hwnd, &attrData);
 }
 
-void UpdateTransparencyProperties(HWND hwnd, char a2, int a3) // function name used by win8.1 - added for rounak's benefit on 1607
-{
-	if (IsCompositionActiveNEW() && g_bColorizationOptions != 0)
-	{
-		DWMCOLORIZATIONPARAMS colors;
-		CHAR buffer[0x28];
-		memset(buffer, 0, 0x28);
-		DwmGetColorizationParametersOrig(&buffer);
-		memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
-
-		int a = (colors.ColorizationColor >> 24) & 0xFF;
-		int r = (colors.ColorizationColor >> 16) & 0xFF;
-		int g = (colors.ColorizationColor >> 8) & 0xFF;
-		int b = (colors.ColorizationColor) & 0xFF;
-
-		DWORD newc = (a << 24) | (b << 16) | (g << 8) | r;
-		ACCENT_POLICY policy = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 19, newc, 1 }; 
-		WINDOWCOMPOSITIONATTRIBDATA data = { WCA_ACCENT_POLICY, &policy, 0x10 };
-		SetWindowCompositionAttribute(hwnd, &data);
-
-		data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
-		SetWindowCompositionAttribute(hwnd, &data);
-	}
-}
-
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised 12/10/24
 {
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
@@ -530,7 +509,8 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
 	{
 		pAttrData->Attrib = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
-		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
+		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()
+			|| hwnd == GetTaskListThumbWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
 		{
 			SetWindowCompositionAttribute(hwnd, pAttrData);
 			WINDOWCOMPOSITIONATTRIBDATA wndCompositionData;
@@ -589,9 +569,6 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 {
 	if (hwnd == GetTaskListThumbWnd())
 	{
-		//if (g_bColorizationOptions != 0)
-			//UpdateTransparencyProperties(hwnd, NULL, NULL);
-		
 		ForceActiveWindowAppearance(hwnd);
 	}
 	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
@@ -604,15 +581,39 @@ int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
 	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
 
-	//Disabled - shadows get cut off...
-	//if (hwnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
-	//{
-	//	RECT lprc;
-	//	GetRgnBox(hRgn, &lprc);
-	//	SetRectRgn(hRgn, lprc.left + 13, lprc.top + 12, lprc.right - 18, lprc.bottom - 18);
-	//	return SetWindowRgn(hwnd, hRgn, bRedraw);
-	//}
-	//else if (hwnd == GetTaskListThumbWnd() && hRgn == NULL) return 0;
+	// optimize it
+	if (hwnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
+	{
+		DWMCOLORIZATIONPARAMS colors;
+		CHAR buffer[0x28];
+		memset(buffer, 0, 0x28);
+		DwmGetColorizationParametersOrig(&buffer);
+		memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+
+		int a = (colors.ColorizationColor >> 24) & 0xFF;
+		int r = (colors.ColorizationColor >> 16) & 0xFF;
+		int g = (colors.ColorizationColor >> 8) & 0xFF;
+		int b = (colors.ColorizationColor) & 0xFF;
+		DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
+
+		ACCENT_POLICY pl = { ACCENT_ENABLE_BLURBEHIND, 19, color, sizeof(color) };
+		WINDOWCOMPOSITIONATTRIBDATA comp = { WCA_ACCENT_POLICY, &pl, 0x10 };
+		SetWindowCompositionAttribute(hwnd, &comp);
+		RECT lprc;
+		GetRgnBox(hRgn, &lprc);
+		lprc.left += 13;
+		lprc.right -= 18;
+		lprc.top += 12;
+		lprc.bottom -= 18;
+		DwmpUpdateAccentBlurRect(hwnd, &lprc);
+		return SetWindowRgn(hwnd, hRgn, bRedraw);
+	}
+	else if (hwnd == GetTaskListThumbWnd() && hRgn == NULL)
+	{
+		ACCENT_POLICY pl = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 2, 0,0};
+		WINDOWCOMPOSITIONATTRIBDATA comp = { WCA_ACCENT_POLICY, &pl, 0x10 };
+		SetWindowCompositionAttribute(hwnd, &comp);
+	}
 	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
@@ -1755,6 +1756,7 @@ void HookAPIs()
 	// Add DWM colorization attributes to taskbar and start menu (depending on whether mode is 0 aka legacy or 1-3 aka new options) (how this renders is theme-dependent).
 	// Currently not working for taskbar thumbnails from 1809 onwards...
 	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowCompositionAttribute");
+	DwmpUpdateAccentBlurRect = (DwmpUpdateAccentBlurRect_t)GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)159);
 	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowCompositionAttribute, SetWindowCompositionAttributeNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmEnableBlurBehindWindow, DwmEnableBlurBehindWindowNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowRgn, SetWindowRgnNEW);
