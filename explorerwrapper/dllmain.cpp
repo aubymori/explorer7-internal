@@ -1598,6 +1598,47 @@ HRESULT CMenuBand__Initialize_hook(void *pThis, struct IShellMenuCallback *a2, i
 	return CMenuBand__Initialize_orig(pThis, a2, a3, a4, a5);
 }
 
+typedef HRESULT (WINAPI *SHMapIDListToSystemImageListIndexAsync_t)(
+	void *psts,
+	void *psf,
+	void *pidlChild,
+	void (CALLBACK *pfnCallback)(void *, void *, int, int),
+	void *pvCallbackData,
+	void *pvCallbackHint,
+	int *outIndex1,
+	int *outIndex2
+);
+
+HRESULT WINAPI SHMapIDListToSystemImageListIndexAsyncNEW(
+	void *psts,
+	void *psf,
+	void *pidlChild,
+	UINT flags,
+	void (CALLBACK *pfnCallback)(void *, void *, int, int),
+	void *pvCallbackData,
+	void *pvCallbackHint,
+	int *outIndex1,
+	int *outIndex2
+)
+{
+	static SHMapIDListToSystemImageListIndexAsync_t fn = nullptr;
+	if (!fn)
+	{
+		HMODULE hShell32 = GetModuleHandleW(L"shell32.dll");
+		if (hShell32)
+			fn = (SHMapIDListToSystemImageListIndexAsync_t)GetProcAddress(
+				hShell32, (LPCSTR)787
+			);
+
+		if (!fn)
+		{
+			dbgprintf(L"Failed to load SHMapIDListToSystemImageListIndexAsync.");
+			return E_FAIL;
+		}
+	}
+	return fn(psts, psf, pidlChild, pfnCallback, pvCallbackData, pvCallbackHint, outIndex1, outIndex2);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1612,9 +1653,9 @@ void HookAPIs()
 	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)201);
 	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHDesktopMessageLoop, SHDesktopMessageLoopNEW);
 
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPCSTR)148), SHMapIDListToSystemImageListIndexAsyncNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "SHCoCreateInstance"), SHCoCreateInstanceNew);
 
-	//ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)902), GetProcAddress(GetModuleHandle(L"shunimpl.dll"),(LPSTR)473));
 	//change appid
 	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
