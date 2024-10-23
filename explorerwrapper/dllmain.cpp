@@ -35,6 +35,9 @@
 #define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
 #define _WIN_VB 0 //Win10VB-specific changes - currently unused
 
+HMODULE g_hModExplorer = NULL;
+ULONGLONG g_uExplorerSize = 0;
+
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
 HWND hwnd_taskbar;
@@ -1424,7 +1427,6 @@ HRESULT
 WINAPI
 Button_DrawThemed_hook(void *pButton, HDC hdc, int iPartId, int iStateId)
 {
-	dbgprintf(L"Button_DrawThemed\n");
 
 	// First member of the button struct is always its HWND.
 	if (*(HWND *)pButton == g_hWndStartButton)
@@ -1975,6 +1977,18 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 {
 	HRESULT result;
 	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+
+	if (rclsid == CLSID_TrayNotify && riid == IID_ITrayNotify7 && result != S_OK)
+	{
+		ITrayNotify8 *notify8 = nullptr;
+		if (SUCCEEDED(CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_ITrayNotify8, (LPVOID *)&notify8)))
+		{
+			dbgprintf(L"itraynotify8 succeed");
+			*ppv = new CTrayNotifyWrapperXP(notify8);
+			result = S_OK;
+		}
+		return result;
+	}
 
 	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK && g_osVersion.BuildNumber() >= 10074) //Ittr: as far as im aware doesnt cause crashing on 1507/11. needs further checking when im awake
 	{

@@ -70,3 +70,23 @@ private:
 	ITrayNotify7* m_notify7;
 	long m_cRef;
 };
+
+class CTrayNotifyWrapperXP : public ITrayNotify7
+{
+private:
+	ITrayNotify8 *m_notify8;
+
+public:
+	CTrayNotifyWrapperXP(ITrayNotify8 *notify8);
+	~CTrayNotifyWrapperXP();
+	
+	//IUnknown
+	STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
+
+	//ITrayNotify7
+	STDMETHODIMP RegisterCallback(IUnknown *);
+	STDMETHODIMP SetPreference(PVOID *);
+	STDMETHODIMP EnableAutoTray(int);
+};

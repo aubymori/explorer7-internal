@@ -154,9 +154,11 @@ ULONG STDMETHODCALLTYPE CTrayNotifyWrapper::Release(void)
 
 HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1,ULONG* p2)
 {
+#if 0
 	*p2 = 0;
 	if (g_osVersion.BuildNumber() >= 10240)
 		return S_OK;
+#endif
 	return m_notify7->RegisterCallback(p1);
 }
 
@@ -185,4 +187,56 @@ HRESULT __stdcall CTrayNotifyWrapper::SetWindowingEnvironmentConfig(IUnknown*)
 {
 	dbgprintf(L"SetWindowingEnvironmentConfig");
 	return E_NOTIMPL;
+}
+
+CTrayNotifyWrapperXP::CTrayNotifyWrapperXP(ITrayNotify8 *notify8)
+	: m_notify8(notify8)
+{
+}
+
+CTrayNotifyWrapperXP::~CTrayNotifyWrapperXP()
+{
+	if (m_notify8)
+		m_notify8->Release();
+}
+
+STDMETHODIMP CTrayNotifyWrapperXP::QueryInterface(REFIID riid, void **ppvObject)
+{
+	if (ppvObject && riid == IID_ITrayNotify7)
+	{
+		*ppvObject = static_cast<ITrayNotify7 *>(this);
+		return S_OK;
+	}
+	return m_notify8->QueryInterface(riid, ppvObject);
+}
+
+STDMETHODIMP_(ULONG) CTrayNotifyWrapperXP::AddRef()
+{
+	return m_notify8->AddRef();
+}
+
+STDMETHODIMP_(ULONG) CTrayNotifyWrapperXP::Release()
+{
+	ULONG cRef = m_notify8->Release();
+	if (cRef == 0)
+		delete this;
+	return cRef;
+}
+
+STDMETHODIMP CTrayNotifyWrapperXP::RegisterCallback(IUnknown *p1)
+{
+	ULONG dummy;
+	HRESULT hr = m_notify8->RegisterCallback(p1, &dummy);
+	dbgprintf(L"registercallback hr: 0x%X", hr);
+	return hr;
+}
+
+STDMETHODIMP CTrayNotifyWrapperXP::SetPreference(PVOID *p1)
+{
+	return m_notify8->SetPreference(p1);
+}
+
+STDMETHODIMP CTrayNotifyWrapperXP::EnableAutoTray(int p1)
+{
+	return m_notify8->EnableAutoTray(p1);
 }
