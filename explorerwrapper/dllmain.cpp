@@ -149,30 +149,11 @@ struct WINDOWCOMPOSITIONATTRIBDATA
 	UINT cbData; // size of the pData buffer
 };
 
-////////////
-// DEPRECATED
-struct ATTR13DATA // Used for SetWindowCompositionAttribute
-{
-	DWORD p1; // Type (same as ACCENT_STATE)
-	DWORD p2; // Controls where/how it is applied. Values 16 and 19 work for our purposes. 16 is used by Windows 10.
-	DWORD p3; // Colorization value, determined by DWM or CImmersiveColor API
-	DWORD p4; // sizeof p3
-};
-struct WINCOMPATTRDATA
-{
-	DWORD attribute; // the attribute to query, see below
-	PVOID pData; // buffer to store the result
-	ULONG dataSize; // size of the pData buffer
-};
-////////////
-
-
 typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
 typedef HRESULT(WINAPI* DwmpUpdateAccentBlurRect_t)(HWND, LPRECT);
 static DwmpUpdateAccentBlurRect_t DwmpUpdateAccentBlurRect;
-
 
 //////////////// WITH THANKS AND CREDITS TO EXPLORERPATCHER ////////////////
 typedef enum IMMERSIVE_COLOR_TYPE
@@ -360,6 +341,65 @@ void EnsureWindowColorization()
 	}
 }
 
+DWORD GetColorizationColor(bool forceOpaque)
+{
+	DWMCOLORIZATIONPARAMS colors;
+	CHAR buffer[0x28];
+	memset(buffer, 0, 0x28);
+	DwmGetColorizationParametersOrig(&buffer);
+	memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+
+	int a = (colors.ColorizationColor >> 24) & 0xFF;
+	int r = (colors.ColorizationColor >> 16) & 0xFF;
+	int g = (colors.ColorizationColor >> 8) & 0xFF;
+	int b = (colors.ColorizationColor) & 0xFF;
+
+	// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
+	if (!forceOpaque && g_osVersion.BuildNumber() >= 10240 && g_bColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
+		a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
+
+	if (g_bColorizationOptions == 4 || forceOpaque) // mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
+		a = 0xFF;
+
+	if (g_bColorizationOptions == 3)
+	{
+		GetThemeName = (GetThemeName_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)74);
+		RefreshImmersiveColorPolicyState = (RefreshImmersiveColorPolicyState_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)104);
+		GetIsImmersiveColorUsingHighContrast = (GetIsImmersiveColorUsingHighContrast_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)106);
+		GetUserColorPreference = (GetUserColorPreference_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)120);
+		GetColorFromPreference = (GetColorFromPreference_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)121);
+	}
+
+	DWORD color = (g_bColorizationOptions != 3 || forceOpaque) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
+	return color;
+}
+
+ACCENT_STATE GetAccentState()
+{
+	if (g_bColorizationOptions == 3) // acrylic (1803-)
+		return ACCENT_ENABLE_ACRYLICBLURBEHIND;
+	else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
+		return ACCENT_ENABLE_BLURBEHIND;
+
+	// pseudo-aero & solid-color (all versions) - the replacements for option 0 & fallback for other values entered > 4
+	return ACCENT_ENABLE_TRANSPARENTGRADIENT; // we use transparentgradient for both 1 and 4, as gradient has some weird hrgn side-effects on start menu
+
+}
+
+WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
+{
+	WINDOWCOMPOSITIONATTRIBDATA attrData;
+	ACCENT_POLICY accentPolicy;
+	accentPolicy.AccentState = GetAccentState();
+	accentPolicy.AccentFlags = (isThumbnail) ? 0x200 : 0x13; // values 19 and 16 work for taskbar and start menu
+	accentPolicy.GradientColor = GetColorizationColor(false);
+
+	attrData.Attrib = WCA_ACCENT_POLICY;
+	attrData.pvData = &accentPolicy;
+	attrData.cbData = sizeof(accentPolicy);
+	return attrData;
+}
+
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
@@ -401,6 +441,12 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	if (uMsg == WM_THEMECHANGED)
 	{
 		EnsureWindowColorization(); // Ittr: Correct colorization enablement setting for Win10/11
+	}
+
+	if (uMsg == WM_SETTINGCHANGE) // Ittr: Fix taskbar colorization for non-legacy
+	{
+		if ((IsThemeActive() || !g_bClassicTheme || IsCompositionActive() || !g_bDisableComposition) && hwnd == GetTaskbarWnd() && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
+			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(false));
 	}
 
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
@@ -480,7 +526,7 @@ void ForceActiveWindowAppearance(HWND hwnd)
 	SetWindowCompositionAttribute(hwnd, &attrData);
 }
 
-BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised 12/10/24
+BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised again 25/10/24
 {
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
 
@@ -494,84 +540,26 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 		attrData.pvData = &bNCRenderingEnabled;
 		attrData.cbData = sizeof(bNCRenderingEnabled);
 
-		SetWindowCompositionAttribute(hwnd, &attrData); //byebye
-		return SetWindowCompositionAttribute(hwnd, pAttrData);
+		return SetWindowCompositionAttribute(hwnd, &attrData); //byebye
 	}
 
-	if (IsCompositionActiveNEW() && g_bColorizationOptions == 0) // solid glass colour - default behaviour (same as milestone 1)
+	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK) // if user has DWM enabled, and is not using basic/classic
 	{
-		if (pAttrData->Attrib == WCA_DISALLOW_PEEK)
-		{
-			ForceActiveWindowAppearance(hwnd);
-			return SetWindowCompositionAttribute(hwnd, pAttrData);
-		}
+		if (g_bColorizationOptions != 0) // for pseudo-aero, blurbehind, acrylic & solid modes
+			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties((hwnd == GetTaskListThumbWnd()) ? true : false));
+
+		ForceActiveWindowAppearance(hwnd); // mainly for legacy but doesn't seem to harm anything by applying anyway
 	}
-	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK && g_bColorizationOptions != 0) // translucent, blur AND acrylic- DOES NOT APPLY TO THUMBNAILs
-	{
-		pAttrData->Attrib = WCA_FORCE_ACTIVEWINDOW_APPEARANCE;
-		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()
-			|| hwnd == GetTaskListThumbWnd())) //enable rtm pseudo-aero - still works on post-8.0 but not quite the same
-		{
-			SetWindowCompositionAttribute(hwnd, pAttrData);
-			WINDOWCOMPOSITIONATTRIBDATA wndCompositionData;
-			ACCENT_POLICY wndAccentPolicy = { ACCENT_DISABLED };
 
-			if (g_bColorizationOptions == 3) // acrylic (1803-)
-				wndAccentPolicy.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
-			else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
-				wndAccentPolicy.AccentState = ACCENT_ENABLE_BLURBEHIND;
-			else // pseudo-aero & solid-color (all versions) - the replacements for option 0 & fallback for other values entered > 4
-				wndAccentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT; // we use transparentgradient for both 1 and 4, as gradient has some weird hrgn side-effects on start menu
-			
-			DWMCOLORIZATIONPARAMS colors;
-			CHAR buffer[0x28];
-			memset(buffer, 0, 0x28);
-			DwmGetColorizationParametersOrig(&buffer);
-			memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
-
-			int a = (colors.ColorizationColor >> 24) & 0xFF;
-			int r = (colors.ColorizationColor >> 16) & 0xFF;
-			int g = (colors.ColorizationColor >> 8) & 0xFF;
-			int b = (colors.ColorizationColor) & 0xFF;
-
-			// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
-			if (g_osVersion.BuildNumber() >= 10240 && g_bColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
-				a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
-
-			if (g_bColorizationOptions == 4)
-				a = 0xFF;
-
-			if (g_bColorizationOptions == 3)
-			{
-				GetThemeName = (GetThemeName_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)74);
-				RefreshImmersiveColorPolicyState = (RefreshImmersiveColorPolicyState_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)104);
-				GetIsImmersiveColorUsingHighContrast = (GetIsImmersiveColorUsingHighContrast_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)106);
-				GetUserColorPreference = (GetUserColorPreference_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)120);
-				GetColorFromPreference = (GetColorFromPreference_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)121);
-			}
-
-			DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
-
-			wndAccentPolicy.AccentFlags = 19; // values 19 and 16 work for taskbar and start menu
-			wndAccentPolicy.GradientColor = color;
-			wndAccentPolicy.AnimationId = 1; // definitely wrong, idk
-			
-			wndCompositionData.Attrib = WCA_ACCENT_POLICY;
-			wndCompositionData.pvData = &wndAccentPolicy;
-			wndCompositionData.cbData = 0x10;
-			return SetWindowCompositionAttribute(hwnd, &wndCompositionData);
-		}
-	}
 	return SetWindowCompositionAttribute(hwnd, pAttrData);
 }
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
-	if (hwnd == GetTaskListThumbWnd())
-	{
+	if (hwnd == GetTaskListThumbWnd()) // does this even do anything??
 		ForceActiveWindowAppearance(hwnd);
-	}
-	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
+
+	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
 		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
@@ -579,46 +567,57 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 {
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
+	// TODO in future: more sophisticated RGN fixes so this isn't necessary?
 	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
 
-	// optimize it
-	if (hwnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
+	// optimize thumbnails. still requires improvement, **ESPECIALLY FOR ROUNDED CORNERS**, but also box clipping reliability
+	if (IsCompositionActiveNEW() && g_bColorizationOptions != 0 && hwnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
 	{
-		DWMCOLORIZATIONPARAMS colors;
-		CHAR buffer[0x28];
-		memset(buffer, 0, 0x28);
-		DwmGetColorizationParametersOrig(&buffer);
-		memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
-
-		int a = (colors.ColorizationColor >> 24) & 0xFF;
-		int r = (colors.ColorizationColor >> 16) & 0xFF;
-		int g = (colors.ColorizationColor >> 8) & 0xFF;
-		int b = (colors.ColorizationColor) & 0xFF;
-		DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
-
-		ACCENT_POLICY pl = { ACCENT_ENABLE_BLURBEHIND, 19, color, sizeof(color) };
-		WINDOWCOMPOSITIONATTRIBDATA comp = { WCA_ACCENT_POLICY, &pl, 0x10 };
-		SetWindowCompositionAttribute(hwnd, &comp);
 		RECT lprc;
 		GetRgnBox(hRgn, &lprc);
+
 		lprc.left += 13;
 		lprc.right -= 18;
 		lprc.top += 12;
 		lprc.bottom -= 18;
+
 		DwmpUpdateAccentBlurRect(hwnd, &lprc);
+
+		ACCENT_POLICY accentPolicy;
+		accentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
+		accentPolicy.AccentFlags = 0x200;
+		accentPolicy.GradientColor = GetColorizationColor(true);
+
+		WINDOWCOMPOSITIONATTRIBDATA attrData;
+		attrData.Attrib = WCA_ACCENT_POLICY;
+		attrData.pvData = &accentPolicy;
+		attrData.cbData = sizeof(accentPolicy);
+
+		SetWindowCompositionAttribute(hwnd, &attrData);
+
 		return SetWindowRgn(hwnd, hRgn, bRedraw);
 	}
-	else if (hwnd == GetTaskListThumbWnd() && hRgn == NULL)
+	else if (IsCompositionActiveNEW() && g_bColorizationOptions != 0 && hwnd == GetTaskListThumbWnd() && hRgn == NULL)
 	{
-		ACCENT_POLICY pl = { ACCENT_ENABLE_TRANSPARENTGRADIENT, 2, 0,0};
-		WINDOWCOMPOSITIONATTRIBDATA comp = { WCA_ACCENT_POLICY, &pl, 0x10 };
-		SetWindowCompositionAttribute(hwnd, &comp);
+		ACCENT_POLICY accentPolicy;
+
+		accentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
+		accentPolicy.AccentFlags = 0x2;
+		accentPolicy.GradientColor = 0;
+
+		WINDOWCOMPOSITIONATTRIBDATA attrData;
+		attrData.Attrib = WCA_ACCENT_POLICY;
+		attrData.pvData = &accentPolicy;
+		attrData.cbData = 0x10;
+
+		SetWindowCompositionAttribute(hwnd, &attrData);
 	}
 	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
 HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
 {
+	// hook for enabling w8 theme classes. this is the limit of this feature due to backlash
 	if (g_bRPEnabled)
 	{
 		if (lstrcmp(pszSubAppName, L"VerticalShowDesktop") == 0) return SetWindowTheme(hwnd, L"VerticalShowDesktop8", pszSubIdList);
@@ -1423,51 +1422,7 @@ void GetOrbDPIAndPos(LPWSTR fName)
 	}
 }
 
-int RP_GetOrbDPIAndPos() // for RP orb
-{
-	APPBARDATA abd;
-	abd.cbSize = sizeof(APPBARDATA);
-	SHAppBarMessage(ABM_GETTASKBARPOS, &abd);
-
-	HDC screen = GetDC(NULL);
-	double hPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSX);
-	double vPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSY);
-	ReleaseDC(NULL, screen);
-	double dpi = (hPixelsPerInch + vPixelsPerInch) * 0.5;
-
-	if (dpi >= 120)
-	{
-		if (dpi >= 144)
-		{
-			if (dpi >= 192)
-			{
-				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6808;
-				else if (abd.uEdge == ABE_TOP) return 6804;
-				else return 6804;
-			}
-			else
-			{
-				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6807;
-				else if (abd.uEdge == ABE_TOP) return 6803;
-				else return 6803;
-			}
-		}
-		else
-		{
-			if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6806;
-			else if (abd.uEdge == ABE_TOP) return 6802;
-			else return 6802;
-		}
-	}
-	else
-	{
-		if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) return 6805;
-		else if (abd.uEdge == ABE_TOP || abd.uEdge == ABE_BOTTOM) return 6805;
-		else return 6805;
-	}
-}
-
-HMODULE GetCurrentModuleHandle()
+HMODULE GetCurrentModuleHandle() //use for internal resource calls... honestly i just wanted to show it could be done 
 {
 	HMODULE hMod = NULL;
 	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&GetCurrentModuleHandle), &hMod);
@@ -1487,15 +1442,8 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	WCHAR szOrbDir[MAX_PATH];
 	LSTATUS res = g_registry.QueryValue(L"OrbDirectory", (LPBYTE)szOrbDir, sizeof(szOrbDir));
 
-	int RP_ID = RP_GetOrbDPIAndPos();
-
 	if (!*szOrbDir || ERROR_SUCCESS != res)
-	{
-		//if (g_bRPEnabled) -- DISABLE AS CHANGES WON'T BE SHIPPED IN M2.
-			//return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(RP_ID), 0, 0, 0, fuLoad);
-
 		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
-	}
 
 	WCHAR szOrbFile[MAX_PATH];
 	GetOrbDPIAndPos(szOrbFile);
@@ -1510,16 +1458,9 @@ HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, i
 	);
 
 	if (FileExists(szOrbPath) == FALSE)
-	{
-		//if (g_bRPEnabled) -- DISABLE AS CHANGES WON'T BE SHIPPED IN M2.
-			//return LoadImageW(GetCurrentModuleHandle(), MAKEINTRESOURCE(RP_ID), 0, 0, 0, fuLoad);
-
 		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
-	}
 	else
-	{
 		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, 0, 0, fuLoad | LR_LOADFROMFILE);
-	}
 }
 
 void HookLoadImageForSizeAndFont()
@@ -1771,7 +1712,7 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", SetWindowTheme, SetWindowThemeNEW);
 
 	// Update overflow positioning to account for if the user is using TH1 or higher
-	if (g_osVersion.BuildNumber() >= 10240)
+	if (g_osVersion.BuildNumber() >= 10074)
 		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
 	
 	// 1. shell32.dll - hack created startmenupin instance
@@ -2183,7 +2124,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		else
 		{
 			IID dk = IID_IShutdownChoices8;
-			if (build >= 10240)
+			if (build >= 10074)
 				dk = IID_IShutdownChoices10;
 
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
@@ -2211,7 +2152,7 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	if (rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
-		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - TODO re-enable for non
+		if (g_osVersion.BuildNumber() < 10074) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - restoring this on 10 is now seemingly unnecessary
 		{
 			//register immersive shell fake too
 			RegisterFakeImmersive();
@@ -2232,7 +2173,7 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject(DWORD dwRegister)
 {
 	if (dwRegister == dwRegisterNotify)
 	{
-		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		if (g_osVersion.BuildNumber() < 10240) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
 		{
 			UnregisterFakeImmersive();
 			UnregisterProjection();

@@ -3,11 +3,3 @@
 #define IDB_START         100
 #define IDB_START_125     101
 #define IDB_START_150     102
-#define IDB_DPSTARTSM     6801
-#define IDB_DPSTARTSM_125 6802
-#define IDB_DPSTARTSM_150 6803
-#define IDB_DPSTARTSM_200 6804
-#define IDB_DPSTART       6805
-#define IDB_DPSTART_125   6806
-#define IDB_DPSTART_150   6807
-#define IDB_DPSTART_200   6808
