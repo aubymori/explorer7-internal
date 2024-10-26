@@ -379,12 +379,13 @@ DWORD GetColorizationColor(bool forceOpaque)
 
 ACCENT_STATE GetAccentState(bool isThumbnail)
 {
-	if (isThumbnail)
-		return ACCENT_ENABLE_GRADIENT;
-	else if (g_bColorizationOptions == 3) // acrylic (1803-)
+	if (g_bColorizationOptions == 3) // acrylic (1803-)
 		return ACCENT_ENABLE_ACRYLICBLURBEHIND;
 	else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
 		return ACCENT_ENABLE_BLURBEHIND;
+
+	if (isThumbnail) // run this block after the other ones, to ensure that pseudo-aero mode uses opaque thumbnail. using the option definition causes extreme visual bugs for some reason.
+		return ACCENT_ENABLE_GRADIENT;
 
 	// pseudo-aero & solid-color (all versions) - the replacements for option 0 & fallback for other values entered > 4
 	return ACCENT_ENABLE_TRANSPARENTGRADIENT; // we use transparentgradient for both 1 and 4, as gradient has some weird hrgn side-effects on start menu
@@ -393,10 +394,21 @@ ACCENT_STATE GetAccentState(bool isThumbnail)
 
 WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
 {
+	// to break down what happens here:
+	// - we create an accent policy
+	// - we take in whether thumbnail wnd is calling so we can make tweaks as needed
+	// - accent state gets calculated and returned based on user preference
+	// - this calculation is tweaked if thumbnail wnd flag is passed in, as pseudo-aero looks better with solid thumbnail
+	// - we then define the accent flags - start menu and taskbar work fine with 0x13, thumbnail requires 0x200 to work properly on later windows 10 versions (presumably OK on earlier vers)
+	// - 0x200 is then added to with extra to ensure that blurbehind mode takes in color properly
+	// - we then define gradient color by pulling either DWM accent color or immersive color as applicable
+	// this is then passed into attribute data which we call back into whenever we need to get accent properties without retyping this whole function
+
 	WINDOWCOMPOSITIONATTRIBDATA attrData;
 	ACCENT_POLICY accentPolicy;
+
 	accentPolicy.AccentState = GetAccentState(isThumbnail);
-	accentPolicy.AccentFlags = (isThumbnail) ? 0x200 : 0x13; // values 19 and 16 work for taskbar and start menu
+	accentPolicy.AccentFlags = (isThumbnail) ? (0x1 | 0x2 | 0x200) : (0x13); // very important that this is set up like this!
 	accentPolicy.GradientColor = GetColorizationColor(false);
 
 	attrData.Attrib = WCA_ACCENT_POLICY;
@@ -550,8 +562,10 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 
 	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK) // if user has DWM enabled, and is not using basic/classic
 	{
-		if (g_bColorizationOptions != 0 && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetThumbnailWnd())) // for pseudo-aero, blurbehind, acrylic & solid modes
+		if (g_bColorizationOptions != 0 && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()))) // for pseudo-aero, blurbehind, acrylic & solid modes
+		{
 			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties((hwnd == GetThumbnailWnd()) ? true : false));
+		}
 
 		ForceActiveWindowAppearance(hwnd); // mainly for legacy but doesn't seem to harm anything by applying anyway
 	}
