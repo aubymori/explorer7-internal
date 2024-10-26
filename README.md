@@ -2,7 +2,7 @@
   <img src="https://github.com/user-attachments/assets/10465c11-481a-4403-aeef-19149a776f17">
 </p>
 
-explorer7 is a **wrapper dll** that allows Windows 7's explorer.exe to run properly on modern Windows versions. This brings back the original Windows 7 Start Menu/Taskbar experience.
+explorer7 is a **wrapper library** that allows Windows 7's explorer.exe to run properly on modern Windows versions, aiming to bring back the original Windows 7 shell experience.
 
 <details>
   <summary>Screenshots</summary>
@@ -17,35 +17,34 @@ explorer7 is a **wrapper dll** that allows Windows 7's explorer.exe to run prope
 
 ## Known issues (Milestone 1)
 
-**MAKE SURE YOU READ THESE FIRST TO KNOW WHAT YOU'RE GETTING INTO!**
+**MAKE SURE YOU READ THESE FIRST SO YOU ARE AWARE OF WHAT YOU ARE GETTING INTO!**
 
 **Windows 8.1**
-- No proper strings for "Customize Start Menu" dialog.
+- No proper strings for the "Customize Start Menu" dialog (fixed system-wide in Windows 10).
 
 **Windows 10**
 - Autoplay does not work.
-- Metro "Open With" dialog opens on top left of screen (works with UWP enabled)
-- System msstyles with name "aero.msstyles" messes with the Start Menu colorization.
-- Wallpaper stops working/Desktop becomes buggy when plugging another monitor in/changing multimonitor configuration while explorer is running.
+- System msstyles with the name "aero.msstyles" will screw up the start menu and taskbar colorization (only when ColorizationOptions is set to 0).
+- The wallpaper stops working or, the desktop becomes buggy when plugging another monitor in or changing multi-monitor configuration while explorer is running.
 - Desktop area sticks to a specific resolution and requires going into the Wallpaper control panel page to fix (i.e going from 1920x1080 to 1024x768, the desktop area/wallpaper would be rendered as 1080p still, vice versa).
 - Notification Area Icon settings in Control Panel are missing.
-- Unless icon is blanked, the badge for compression (in case enabled) will appear on taskbar/start menu items.
 
 **Windows 11**
-- Taskbar/Start menu pins broken due to confirmation dialog introduction (fixed in Windows 10 22h2).
-- Yet to be documented!
+- Taskbar and start menu pin creation is broken due to confirmation dialog introduction (currently fixed in Windows 10 22H2, not in 11 23H2+).
+- XAML-based UI dialogs invoked by the keyboard can cause the shell to crash (each must be disabled respectively, likely to be fixed in M3).
+- Further changes and regressions are yet to be listed here, as each version needs to be examined in turn.
 
 **Windows 7 limitations/bugs**
 
 None of the following will be accounted for in explorer7:
 
 - Multi-monitor taskbars are not supported. These would be introduced by Windows 8 build 7779.
-- Startup items defined in modern Task Manager are not accounted for. You must use old msconfig.exe.
-- The taskbar does not remember its size/position until a while after.
+- Startup items defined in the modern task manager are not accounted for. You must use the old msconfig.exe.
+- It takes some time to save changes to the size and position of the taskbar.
 
 ## Installation Guide
 
-For most users, you'll want the **regular installation method**:
+For casual users, the **regular installation method** is listed below:
 
 <details>
   <summary>Standard installation</summary>
@@ -140,8 +139,10 @@ These keys are located under `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Curre
 | OrbDirectory | REG_SZ | Name of the orb images directory to use. This is relative to the installation directory. For example, `"6801"` will use the orb images located at `"explorer7\orbs\6801\"`, `"Orb1\6801"` will use the orbs located at `"explorer7\orbs\Orb1\6801\"`. If this is not specified, the internal explorer image will be used.| **default** |
 | DisableComposition | REG_DWORD | When set to 1, Explorer7 will act as if the Desktop Window Manager is not running. | **0** |
 | ClassicTheme | REG_DWORD | When set to 1, Explorer7 will use the Windows Classic theme. | **0** |
-| EnableImmersive | REG_DWORD | Controls the ability to run UWP apps in the system. When set to 0, UWP apps won't run. | **1** |
+| EnableImmersive | REG_DWORD | Controls the ability to run UWP apps in the system. When set to 0, UWP apps won't run. | **0** |
 | EnableUWPAppsInStart | REG_DWORD | When set to 0, UWP apps will be hidden from the All Programs list. | **1** |
+| ColorizationOptions | REG_DWORD | Controls shell colorization behaviour. Options 1 to 4 may have varying compatibility across Windows versions. | **0** |
+| RPEnabled | REG_DWORD | When set to 1, relevant theme classes suffixed with the number "8" will be used, allowing Windows 8-based themes to render correctly. | **0** |
 
 ## Theme support
 
@@ -232,18 +233,18 @@ We're working based on a milestone stage. Here's the planned stages of developme
 
 |   Stage   | Goal | Status |
 | -------- | --------- | ------ |
-| Milestone 1 | Project start, stability on Windows 8.1 and a solid base for Windows 10 support. | ✅ Completed |
-| Milestone 2 | Ironing out any last Windows 8.1-specific bugs, stability on Windows 10, UWP support, some QOL work (installer, configurator, older .msstyles support, custom orb support) and a solid base for Windows 11 | ⏳ Work in progress |
-| Milestone 3 | Working out any last bugs on Windows 10, finishing up what's left for Windows 11, 1.0 | ⛔ Not in works |
+| Milestone 1 | First release, focusing on stability for Windows 8.1 and a starting point for Windows 10 support. | ✅ Completed |
+| Milestone 2 | Ironing out any last Windows 8.1-specific bugs, stability on Windows 10, likely UWP support, some QOL work (accurate program list, older .msstyles support, custom orb support) and a starting point for Windows 11 support. | ⏳ Work in progress |
+| Milestone 3 | Solving any persistent bugs left for Windows 10, whilst finishing up any remaining bug fixes for Windows 11. | ⛔ Not in active development |
 
-While this project is aimed at restoring Windows 7 explorer.exe functionality, older explorers have been proven to work with the wrapper. In the future, we plan to support them directly.  Here's the chart
+While this project is aimed at restoring Windows 7 explorer.exe functionality, some older explorer versions have been found to work with the wrapper. In the future, we plan to support some of these directly.  Here's the chart
 for support:
 
 | Version | Status |
 | ------- | ------ |
 | Windows 7 | ⏳ Work in progress |
-| Windows Vista | ❌ Not in works |
-| Windows XP x64 | ❌ Not in works |
+| Windows Vista | ❌ Not in active development |
+| Windows XP x64 | ⏳ Early work in progress |
 
 ## Minhook Linker errors
 
