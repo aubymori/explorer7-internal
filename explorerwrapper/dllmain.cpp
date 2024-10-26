@@ -78,6 +78,9 @@ static setIcon_t SetIcon;
 typedef VOID(WINAPI* updateItem_t)(PVOID pThis, int a2);
 static updateItem_t UpdateItem;
 
+typedef VOID(WINAPI* renderThumbnail_t)(PVOID pThis, int, int);
+static renderThumbnail_t renderThumbnail_orig;
+
 typedef LONG(WINAPI* setIconThumb_t)(PVOID pThis, HICON a2, int a3, unsigned int a4);
 static  setIconThumb_t SetIconThumb;
 
@@ -391,7 +394,7 @@ WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
 	WINDOWCOMPOSITIONATTRIBDATA attrData;
 	ACCENT_POLICY accentPolicy;
 	accentPolicy.AccentState = GetAccentState();
-	accentPolicy.AccentFlags = (isThumbnail) ? 0x200 : 0x13; // values 19 and 16 work for taskbar and start menu
+	accentPolicy.AccentFlags = (isThumbnail) ? 0x13 : 0x13; // values 19 and 16 work for taskbar and start menu
 	accentPolicy.GradientColor = GetColorizationColor(false);
 
 	attrData.Attrib = WCA_ACCENT_POLICY;
@@ -569,49 +572,6 @@ int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
 	// TODO in future: more sophisticated RGN fixes so this isn't necessary?
 	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
-
-	// optimize thumbnails. still requires improvement, **ESPECIALLY FOR ROUNDED CORNERS**, but also box clipping reliability
-	if (IsCompositionActiveNEW() && g_bColorizationOptions != 0 && hwnd == GetTaskListThumbWnd() && hRgn != NULL) // Partial fix. Kind of. Not ready to be shipped.
-	{
-		RECT lprc;
-		GetRgnBox(hRgn, &lprc);
-
-		lprc.left += 13;
-		lprc.right -= 18;
-		lprc.top += 12;
-		lprc.bottom -= 18;
-
-		DwmpUpdateAccentBlurRect(hwnd, &lprc);
-
-		ACCENT_POLICY accentPolicy;
-		accentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
-		accentPolicy.AccentFlags = 0x200;
-		accentPolicy.GradientColor = GetColorizationColor(true);
-
-		WINDOWCOMPOSITIONATTRIBDATA attrData;
-		attrData.Attrib = WCA_ACCENT_POLICY;
-		attrData.pvData = &accentPolicy;
-		attrData.cbData = sizeof(accentPolicy);
-
-		SetWindowCompositionAttribute(hwnd, &attrData);
-
-		return SetWindowRgn(hwnd, hRgn, bRedraw);
-	}
-	else if (IsCompositionActiveNEW() && g_bColorizationOptions != 0 && hwnd == GetTaskListThumbWnd() && hRgn == NULL)
-	{
-		ACCENT_POLICY accentPolicy;
-
-		accentPolicy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
-		accentPolicy.AccentFlags = 0x2;
-		accentPolicy.GradientColor = 0;
-
-		WINDOWCOMPOSITIONATTRIBDATA attrData;
-		attrData.Attrib = WCA_ACCENT_POLICY;
-		attrData.pvData = &accentPolicy;
-		attrData.cbData = 0x10;
-
-		SetWindowCompositionAttribute(hwnd, &attrData);
-	}
 	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
@@ -836,6 +796,19 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 	}
 
 	return TRUE;
+}
+
+void RenderThumbnail(PVOID This, int animoffset, int bNoRedraw)
+{
+	renderThumbnail_orig(This, animoffset, bNoRedraw);
+	
+	RECT lprc = *(RECT*)((PBYTE)This + 0x68);
+	HWND hwnd = *(HWND*)((PBYTE)This + 0x60);
+	lprc.left += 13;
+	lprc.right -= 18;
+	lprc.top += 12;
+	lprc.bottom -= 18;
+	DwmpUpdateAccentBlurRect(hwnd, &lprc);
 }
 
 __int64 ShouldAddWindowToTray(HWND hwnd)
@@ -1632,6 +1605,11 @@ void HookAPIs()
 	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
+	
+	// thumbnail fix
+	void* _thumbnailrender = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 20 44 89 40 18 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 48 8B F9");
+	MH_CreateHook(static_cast<LPVOID>(_thumbnailrender), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
+	
 
 	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
