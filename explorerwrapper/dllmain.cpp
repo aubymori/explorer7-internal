@@ -829,16 +829,20 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 }
 
 void RenderThumbnail(PVOID This, int animoffset, int bNoRedraw)
-{
+{	
+	RECT rc = *(RECT*)((PBYTE)This + 0x68);
+	HWND hwnd = *(HWND*)((PBYTE)This + 0x60);
+	HTHEME hthem = *(HTHEME*)((PBYTE)This + 0x98);
+
 	renderThumbnail_orig(This, animoffset, bNoRedraw);
 	
-	RECT lprc = *(RECT*)((PBYTE)This + 0x68);
-	HWND hwnd = *(HWND*)((PBYTE)This + 0x60);
-	lprc.left += 13;
-	lprc.right -= 18;
-	lprc.top += 12;
-	lprc.bottom -= 18;
-	DwmpUpdateAccentBlurRect(hwnd, &lprc);
+	MARGINS mar;
+	GetThemeMargins(hthem, NULL, 2, 0, TMT_CONTENTMARGINS, NULL, &mar);
+	rc.left += mar.cxLeftWidth;
+	rc.right -= mar.cxRightWidth;
+	rc.top += mar.cyTopHeight;
+	rc.bottom -= mar.cyBottomHeight;
+	DwmpUpdateAccentBlurRect(hwnd, &rc);
 }
 
 __int64 ShouldAddWindowToTray(HWND hwnd)
