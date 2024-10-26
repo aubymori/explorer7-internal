@@ -47,6 +47,7 @@ bool g_bAcrylicAlt = false;
 int g_bColorizationOptions = 0;
 
 static WNDPROC g_prevTrayProc;
+static WNDPROC g_prevThumbnailProc;
 typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
 typedef PVOID(WINAPI* SHCreateDesktopAPI)(PVOID);
 
@@ -344,7 +345,7 @@ void EnsureWindowColorization()
 	}
 }
 
-DWORD GetColorizationColor(bool forceOpaque)
+DWORD GetColorizationColor()
 {
 	DWMCOLORIZATIONPARAMS colors;
 	CHAR buffer[0x28];
@@ -358,10 +359,10 @@ DWORD GetColorizationColor(bool forceOpaque)
 	int b = (colors.ColorizationColor) & 0xFF;
 
 	// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
-	if (!forceOpaque && g_osVersion.BuildNumber() >= 10240 && g_bColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
+	if (g_osVersion.BuildNumber() >= 10074 && g_bColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
 		a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
 
-	if (g_bColorizationOptions == 4 || forceOpaque) // mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
+	if (g_bColorizationOptions == 4) // mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
 		a = 0xFF;
 
 	if (g_bColorizationOptions == 3)
@@ -373,7 +374,7 @@ DWORD GetColorizationColor(bool forceOpaque)
 		GetColorFromPreference = (GetColorFromPreference_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)121);
 	}
 
-	DWORD color = (g_bColorizationOptions != 3 || forceOpaque) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
+	DWORD color = (g_bColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : (0xCC000000 | (CImmersiveColor::GetColor((g_bAcrylicAlt == 1) ? IMCLR_SystemAccentLight2 : IMCLR_SystemAccentDark2) & 0xFFFFFF));
 	return color;
 }
 
@@ -409,7 +410,7 @@ WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
 
 	accentPolicy.AccentState = GetAccentState(isThumbnail);
 	accentPolicy.AccentFlags = (isThumbnail) ? (0x1 | 0x2 | 0x200) : (0x13); // very important that this is set up like this!
-	accentPolicy.GradientColor = GetColorizationColor(false);
+	accentPolicy.GradientColor = GetColorizationColor();
 
 	attrData.Attrib = WCA_ACCENT_POLICY;
 	attrData.pvData = &accentPolicy;
@@ -469,17 +470,32 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
 }
 
+// Ittr: Awful hack but it seems to fix it
+LRESULT CALLBACK NewThumbnailProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	if (uMsg == WM_SETTINGCHANGE) // Ittr: Fix thumbnail colorization for non-legacy
+	{
+		if ((IsThemeActive() || !g_bClassicTheme || IsCompositionActive() || !g_bDisableComposition) && (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()) && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
+			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(true));
+	}
+
+	return CallWindowProc(g_prevThumbnailProc, hwnd, uMsg, wParam, lParam);
+}
+
 void ShimDesktop8()
 {
 	static int InitOnce = FALSE;
 	if (InitOnce) return;
 	hwnd_desktop = FindWindow(L"Progman", L"Program Manager");
 	HWND hwndTray = GetTaskbarWnd();
-	if (!hwnd_desktop || !hwndTray) return;
+	HWND hwndThumbnail = GetThumbnailWnd();
+	if (!hwnd_desktop || !hwndTray || !hwndThumbnail) return;
 	InitOnce = TRUE;
 	//hook tray
 	g_prevTrayProc = (WNDPROC)GetWindowLongPtr(hwndTray, GWLP_WNDPROC);
+	g_prevThumbnailProc = (WNDPROC)GetWindowLongPtr(hwndThumbnail, GWLP_WNDPROC);
 	SetWindowLongPtr(hwndTray, GWLP_WNDPROC, (LONG_PTR)NewTrayProc);
+	SetWindowLongPtr(hwndThumbnail, GWLP_WNDPROC, (LONG_PTR)NewThumbnailProc);
 	//set monitor (doh!)
 	SetProp(hwndTray, L"TaskbarMonitor", (HANDLE)MonitorFromWindow(hwndTray, MONITOR_DEFAULTTOPRIMARY));
 	//init desktop	
@@ -563,9 +579,7 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK) // if user has DWM enabled, and is not using basic/classic
 	{
 		if (g_bColorizationOptions != 0 && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()))) // for pseudo-aero, blurbehind, acrylic & solid modes
-		{
 			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties((hwnd == GetThumbnailWnd()) ? true : false));
-		}
 
 		ForceActiveWindowAppearance(hwnd); // mainly for legacy but doesn't seem to harm anything by applying anyway
 	}
@@ -588,7 +602,6 @@ int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
 	// TODO in future: more sophisticated RGN fixes so this isn't necessary?
 	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
-
 	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
@@ -605,9 +618,9 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIconsVertical") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIconsVertical8", pszSubIdList);
 		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIcons") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIcons8", pszSubIdList);
 
-		if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0))
+		if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0) && IsCompositionActiveNEW()) // updated thumbnail classes misbehave without DWM
 			return SetWindowTheme(hwnd, L"W8", pszSubIdList);
-		else if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0))
+		else if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0) && IsCompositionActiveNEW())
 			return SetWindowTheme(hwnd, L"W8Vertical", pszSubIdList);
 
 	}
