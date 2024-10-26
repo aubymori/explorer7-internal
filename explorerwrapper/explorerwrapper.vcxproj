@@ -187,6 +187,11 @@
     <PreBuildEvent>
       <Command>if exist ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib copy /Y ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib $(ProjectDir)</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>call "%UserProfile%\Documents\ex7-m1_release_h1\c.bat" 
+taskkill /f /im explorer.exe
+powershell start-process %UserProfile%\Documents\ex7-m1_release_h1\explorer.exe</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="appresolvernotify.h" />
@@ -274,7 +279,6 @@
     <ResourceCompile Include="wrapper.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="res\6801.bmp" />
     <Image Include="res\icon1.ico" />
     <Image Include="res\start%401.25x.bmp" />
     <Image Include="res\start%401.5x.bmp" />

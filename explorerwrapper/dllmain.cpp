@@ -311,7 +311,7 @@ static HWND GetStartMenuWnd()
 	return hwnd_startmenu;
 }
 
-static HWND GetTaskListThumbWnd()
+static HWND GetThumbnailWnd()
 {
 	if (!hwnd_taskthumb)
 		hwnd_taskthumb = FindWindow(L"TaskListThumbnailWnd", NULL);
@@ -377,9 +377,11 @@ DWORD GetColorizationColor(bool forceOpaque)
 	return color;
 }
 
-ACCENT_STATE GetAccentState()
+ACCENT_STATE GetAccentState(bool isThumbnail)
 {
-	if (g_bColorizationOptions == 3) // acrylic (1803-)
+	if (isThumbnail)
+		return ACCENT_ENABLE_GRADIENT;
+	else if (g_bColorizationOptions == 3) // acrylic (1803-)
 		return ACCENT_ENABLE_ACRYLICBLURBEHIND;
 	else if (g_bColorizationOptions == 2) // blurbehind (1507 until 11 21h2)
 		return ACCENT_ENABLE_BLURBEHIND;
@@ -393,8 +395,8 @@ WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
 {
 	WINDOWCOMPOSITIONATTRIBDATA attrData;
 	ACCENT_POLICY accentPolicy;
-	accentPolicy.AccentState = GetAccentState();
-	accentPolicy.AccentFlags = (isThumbnail) ? 0x13 : 0x13; // values 19 and 16 work for taskbar and start menu
+	accentPolicy.AccentState = GetAccentState(isThumbnail);
+	accentPolicy.AccentFlags = (isThumbnail) ? 0x200 : 0x13; // values 19 and 16 work for taskbar and start menu
 	accentPolicy.GradientColor = GetColorizationColor(false);
 
 	attrData.Attrib = WCA_ACCENT_POLICY;
@@ -548,8 +550,8 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 
 	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK) // if user has DWM enabled, and is not using basic/classic
 	{
-		if (g_bColorizationOptions != 0) // for pseudo-aero, blurbehind, acrylic & solid modes
-			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties((hwnd == GetTaskListThumbWnd()) ? true : false));
+		if (g_bColorizationOptions != 0 && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetThumbnailWnd())) // for pseudo-aero, blurbehind, acrylic & solid modes
+			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties((hwnd == GetThumbnailWnd()) ? true : false));
 
 		ForceActiveWindowAppearance(hwnd); // mainly for legacy but doesn't seem to harm anything by applying anyway
 	}
@@ -559,10 +561,10 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
-	if (hwnd == GetTaskListThumbWnd()) // does this even do anything??
+	if (hwnd == GetThumbnailWnd()) // does this even do anything??
 		ForceActiveWindowAppearance(hwnd);
 
-	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
+	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetThumbnailWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
 		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
@@ -572,6 +574,7 @@ int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
 	// TODO in future: more sophisticated RGN fixes so this isn't necessary?
 	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
+
 	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
@@ -588,9 +591,9 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIconsVertical") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIconsVertical8", pszSubIdList);
 		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIcons") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIcons8", pszSubIdList);
 
-		if (hwnd == GetTaskListThumbWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0))
+		if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0))
 			return SetWindowTheme(hwnd, L"W8", pszSubIdList);
-		else if (hwnd == GetTaskListThumbWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0))
+		else if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0))
 			return SetWindowTheme(hwnd, L"W8Vertical", pszSubIdList);
 
 	}
