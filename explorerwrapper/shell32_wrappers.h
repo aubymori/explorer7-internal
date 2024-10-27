@@ -30,3 +30,41 @@ public:
 
 	IID clsid;
 };
+
+struct MERGEDFOLDERINFO {
+	UINT    csidl;
+	UINT    uANSFlags;          // Flags for AddNameSpace
+	LPCGUID pguidObj;           // optional object tag
+	UINT idk;
+};
+typedef MERGEDFOLDERINFO *LPMERGEDFOLDERINFO;
+
+typedef const MERGEDFOLDERINFO* LPCMERGEDFOLDERINFO;
+
+enum
+{
+	ASFF_DEFAULT = 0x00000000, // There are no applicable Flags
+	ASFF_SORTDOWN = 0x00000001, // Sort the items in this ISF to the bottom.
+	ASFF_MERGESAMEGUID = 0x00000002, // Merge only namespaces with the same pguidObjects
+	ASFF_COMMON = 0x00000004, // this is a "Common" or "All Users" folder
+	ASFF_UNK = 0x0000000A,
+	// the following should all be collapsed to one ASFF_DEFNAMESPACE
+	ASFF_DEFNAMESPACE_BINDSTG = 0x00000100, // The namespace is the default handler for BindToStorage() for merged child items.
+	ASFF_DEFNAMESPACE_COMPARE = 0x00000200, // The namespace is the default handler for CompareIDs() for merged child items.
+	ASFF_DEFNAMESPACE_VIEWOBJ = 0x00000400, // The namespace is the default handler for CreateViewObject() for merged child items.
+	ASFF_DEFNAMESPACE_ATTRIB = 0x00001800, // The namespace is the default handler for GetAttributesOf() for merged child items.
+	ASFF_DEFNAMESPACE_DISPLAYNAME = 0x00001000, // The namespace is the default handler for GetDisplayNameOf(), SetNameOf() and ParseDisplayName() for merged child items.
+	ASFF_DEFNAMESPACE_UIOBJ = 0x00002000, // The namespace is the default handler for GetUIObjectOf() for merged child items.
+	ASFF_DEFNAMESPACE_ITEMDATA = 0x00004000, // The namespace is the default handler for GetItemData() for merged child items.
+	ASFF_DEFNAMESPACE_ALL = 0x0000FF00  // The namespace is the primary handler for all IShellFolder operations on merged child items.
+};
+
+
+HRESULT GetMergedFolder(IShellFolder** ppsf, LPITEMIDLIST* ppidl,
+	LPCMERGEDFOLDERINFO rgmfi, UINT cmfi);
+
+extern const MERGEDFOLDERINFO c_rgmfiStartMenu[];
+
+extern const MERGEDFOLDERINFO c_rgmfiProgramsFolder[];
+
+extern const MERGEDFOLDERINFO c_rgmfiProgramsFolderAndFastItems[];

@@ -78,22 +78,6 @@ ULONG __stdcall CStartMenuItemFilter::Release(void)
     return ref;
 }
 
-bool IsMergedFolderGUID(IShellFolder* ShellFolder, LPCITEMIDLIST pidl, REFGUID Guid)
-{
-    IAugmentedShellFolder* agShellFolder;
-    bool bMatches = false;
-    if (SUCCEEDED(ShellFolder->QueryInterface(IID_PPV_ARGS(&agShellFolder))))
-    {
-        GUID cmp;
-        if (SUCCEEDED(agShellFolder->GetNameSpaceID(pidl, &cmp)))
-        {
-            bMatches = cmp == Guid;
-        }
-        agShellFolder->Release();
-    }
-    return bMatches;
-}
-
 HRESULT __stdcall CStartMenuItemFilter::IncludeItem(IShellItem* psi)
 {
     ULONG v11;
@@ -167,4 +151,20 @@ bool CStartMenuItemFilter::FilterPidl(IShellFolder* shellfolder, LPCITEMIDLIST i
             return 0;
     }
     return v4;
+}
+
+bool IsMergedFolderGUID(IShellFolder* ShellFolder, LPCITEMIDLIST pidl, REFGUID Guid)
+{
+    IAugmentedShellFolder* agShellFolder;
+    bool bMatches = false;
+    if (SUCCEEDED(ShellFolder->QueryInterface(IID_PPV_ARGS(&agShellFolder))))
+    {
+        GUID cmp;
+        if (SUCCEEDED(agShellFolder->GetNameSpaceID(pidl, &cmp)))
+        {
+            bMatches = cmp == Guid;
+        }
+        agShellFolder->Release();
+    }
+    return bMatches;
 }

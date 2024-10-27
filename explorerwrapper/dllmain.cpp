@@ -28,6 +28,7 @@
 #include "shellurl.h"
 #include <wincodec.h>
 #include <winternl.h>
+#include <shlguid.h>
 
 #define _WIN_BLUE 1 //Win8.1-specific changes
 #define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
@@ -1967,6 +1968,37 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	return TRUE;
 }
 
+STDAPI CPersonalStartMenu_CreateInstance(LPUNKNOWN punkOuter, REFIID riid, void** ppvOut)
+{
+	HRESULT hr;
+
+	*ppvOut = NULL;
+
+	IShellMenu* psm;
+	hr = CoCreateInstance(CLSID_MenuBand, NULL, CLSCTX_INPROC_SERVER,
+		IID_PPV_ARGS(&psm));
+	if (SUCCEEDED(hr))
+	{
+		CPersonalProgramsMenuCallback* psmc = new CPersonalProgramsMenuCallback();
+		if (psmc)
+		{
+			hr = psmc->Initialize(psm);
+			if (SUCCEEDED(hr))
+			{
+				// SetShellFolder takes ownership of hkCustom
+				hr = psm->QueryInterface(riid, ppvOut);
+			}
+			psmc->Release();
+		}
+		else
+		{
+			hr = E_OUTOFMEMORY;
+		}
+		psm->Release();
+	}
+	return hr;
+}
+
 extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	__in   REFCLSID rclsid,
 	__in   LPUNKNOWN pUnkOuter,
@@ -1977,6 +2009,13 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 {
 	HRESULT result;
 	result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+
+	if (rclsid == CLSID_PersonalStartMenu)
+	{
+		dbgprintf(L"Wrap CPersonalStartMenu");
+		*ppv = 0;
+		result = CPersonalStartMenu_CreateInstance(pUnkOuter,riid,ppv);
+	}
 
 	if (rclsid == CLSID_TrayNotify && riid == IID_ITrayNotify7 && result != S_OK)
 	{
@@ -2017,13 +2056,18 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"Wrap authuilogonsound7\n");
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IAuthUILogonSound10, ppv);
 	}
-
+	
 	if (rclsid == CLSID_UserAssist && result != S_OK)
 	{
 		if (riid == IID_IUserAssist7)
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IUserAssist10, ppv);
 		else if (riid == IID_IUserAssist72)
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IUserAssist102, ppv);
+		else if (riid == IID_IUserAssistXP)
+		{
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IUserAssist10, ppv);
+			*ppv = new CUserAssistXPWrapper((IUserAssist*)*ppv);
+		}
 		else
 		{
 			dbgprintf(L"Warning, unknown useraassist riid!!!!!");

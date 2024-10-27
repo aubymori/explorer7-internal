@@ -14,6 +14,8 @@ DEFINE_GUID(IID_IStartMenuItemsCache8, 0x934332DD, 0x0B0FE, 0x41F9, 0x0BC, 0x63,
 DEFINE_GUID(IID_IStartMenuItemsCache10, 0x0BA5A92AE, 0x0BFD7, 0x4916, 0x85, 0x4F, 0x6B, 0x3A, 0x40, 0x2B, 0x84, 0x0A8); //_GUID_ba5a92ae_bfd7_4916_854f_6b3a402b84a8
 
 DEFINE_GUID(IID_IStartMenuAppItems8, 0x2C5CCF3, 0x805F, 0x4654, 0x0A7, 0x0B7, 0x34, 0x0A, 0x74, 0x33, 0x53, 0x65); //02c5ccf3_805f_4654_a7b7_340a74335365
+//DEFINE_GUID(SID_SMenuPopup, 0xD1E7AFEB, 0x6A2E, 0x11d0, 0x8C, 0x78, 0x0, 0xC0, 0x4F, 0xD9, 0x18, 0xB4);
+DEFINE_GUID(CLSID_InternetToolbar, 0x5E6AB780L, 0x7743, 0x11CF, 0xA1, 0x2B, 0x00, 0xAA, 0x00, 0x4A, 0xE8, 0x37);
 
 DEFINE_PROPERTYKEY(PKEY_AppUserModel_BestShortcut, 0x9F4C2855, 0x9F79, 0x4B39, 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3, 10);
 DEFINE_PROPERTYKEY(PKEY_AppUserModel_HostEnvironment, 0x9F4C2855, 0x9F79, 0x4B39, 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3, 14);
@@ -170,4 +172,266 @@ private:
 	IStartMenuItemsCache8* m_startmenuitemscache8;
 	IStartMenuItemsCache10* m_startmenuitemscache10;
 	long m_cRef;
+};
+
+class CObjectWithSite : public IObjectWithSite
+{
+public:
+	CObjectWithSite() { _punkSite = NULL; };
+	virtual ~CObjectWithSite() { if (_punkSite) { _punkSite->Release(); } }
+
+	//*** IUnknown ****
+	// (client must provide!)
+
+	//*** IObjectWithSite ***
+	STDMETHOD(SetSite)(IUnknown* punkSite);
+	STDMETHOD(GetSite)(REFIID riid, void** ppvSite);
+
+protected:
+	IUnknown* _punkSite;
+};
+
+#undef  INTERFACE
+#define INTERFACE   ITrayPriv
+
+DECLARE_INTERFACE_(ITrayPriv, IOleWindow)
+{
+	// *** IUnknown methods ***
+	STDMETHOD(QueryInterface) (THIS_ REFIID riid, void** ppv) PURE;
+	STDMETHOD_(ULONG, AddRef) (THIS)  PURE;
+	STDMETHOD_(ULONG, Release) (THIS) PURE;
+
+	// *** IOleWindow methods ***
+	STDMETHOD(GetWindow) (THIS_ HWND * lphwnd) PURE;
+	STDMETHOD(ContextSensitiveHelp) (THIS_ BOOL fEnterMode) PURE;
+
+	// *** ITrayPriv methods ***
+	STDMETHOD(ExecItem)(THIS_ IShellFolder * psf, LPCITEMIDLIST pidl) PURE;
+	STDMETHOD(GetFindCM)(THIS_ HMENU hmenu, UINT idFirst, UINT idLast, IContextMenu * *ppcmFind) PURE;
+	STDMETHOD(GetStaticStartMenu)(THIS_ HMENU * phmenu) PURE;
+};
+
+// ITrayPriv2 - new for Whistler
+//
+// Purpose: Allows Explorer Start Menu object to participate in customdraw.
+//
+#undef  INTERFACE
+#define INTERFACE   ITrayPriv2
+
+DEFINE_GUID(IID_ITrayPriv2, 0x9e83c057, 0x6823, 0x4f1f, 0xbf, 0xa3, 0x74, 0x61, 0xd4, 0x0a, 0x81, 0x73);
+
+MIDL_INTERFACE("9E83C057-6823-4F1F-BFA3-7461D40A8173")
+ITrayPriv2 : public ITrayPriv
+{
+	// *** IUnknown methods ***
+	STDMETHOD(QueryInterface) (THIS_ REFIID riid, void** ppv) PURE;
+	STDMETHOD_(ULONG, AddRef) (THIS)  PURE;
+	STDMETHOD_(ULONG, Release) (THIS) PURE;
+
+	// *** IOleWindow methods ***
+	STDMETHOD(GetWindow) (THIS_ HWND * lphwnd) PURE;
+	STDMETHOD(ContextSensitiveHelp) (THIS_ BOOL fEnterMode) PURE;
+
+	// *** ITrayPriv methods ***
+	STDMETHOD(ExecItem)(THIS_ IShellFolder * psf, LPCITEMIDLIST pidl) PURE;
+	STDMETHOD(GetFindCM)(THIS_ HMENU hmenu, UINT idFirst, UINT idLast, IContextMenu * *ppcmFind) PURE;
+	STDMETHOD(GetStaticStartMenu)(THIS_ HMENU * phmenu) PURE;
+
+	// *** ITrayPriv2 methods ***
+	STDMETHOD(ModifySMInfo)(THIS_ IN LPSMDATA psmd, IN OUT SMINFO * psminfo) PURE;
+};
+#undef  INTERFACE
+
+class CStartMenuCallbackBase : public IShellMenuCallback,
+	public CObjectWithSite
+{
+public:
+	// *** IUnknown methods ***
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObj);
+	STDMETHODIMP_(ULONG) AddRef();
+	STDMETHODIMP_(ULONG)  Release();
+
+	// derived class is expected to implement IShellMenuCallback
+
+	// IObjectWithSite inherited from CObjectWithSite
+
+protected:
+	CStartMenuCallbackBase(BOOL fIsStartPanel = FALSE);
+	~CStartMenuCallbackBase();
+
+	void _InitializePrograms();
+	HRESULT _FilterPidl(UINT uParent, IShellFolder* psf, LPCITEMIDLIST pidl);
+	HRESULT _Promote(LPSMDATA psmd, DWORD dwFlags);
+	BOOL _IsTopLevelStartMenu(UINT uParent, IShellFolder* psf, LPCITEMIDLIST pidl);
+	HRESULT _HandleNew(LPSMDATA psmd);
+	HRESULT _GetSFInfo(SMDATA* psmd, SMINFO* psminfo);
+	HRESULT _ProcessChangeNotify(SMDATA* psmd, LONG lEvent, LPCITEMIDLIST pidl1, LPCITEMIDLIST pidl2);
+
+	HRESULT InitializeProgramsShellMenu(IShellMenu* psm);
+
+	virtual DWORD _GetDemote(SMDATA* psmd) { return 0; }
+	BOOL _IsDarwinAdvertisement(LPCITEMIDLIST pidlFull);
+
+	void _RefreshSettings();
+
+protected:
+	int _cRef;
+
+	DWORD _dwThreadID;
+
+	LPTSTR          _pszPrograms;
+	LPTSTR          _pszWindowsUpdate;
+	LPTSTR          _pszConfigurePrograms;
+	LPTSTR          _pszAdminTools;
+
+	ITrayPriv2* _ptp2;
+
+	BOOL            _fExpandoMenus;
+	BOOL            _fShowAdminTools;
+	BOOL            _fIsStartPanel;
+	BOOL            _fInitPrograms;
+};
+
+class CPersonalProgramsMenuCallback : public CStartMenuCallbackBase
+{
+public:
+	CPersonalProgramsMenuCallback() : CStartMenuCallbackBase(TRUE) { _ptp2 = 0; }
+
+	// *** IShellMenuCallback methods ***
+	STDMETHODIMP CallbackSM(LPSMDATA psmd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+	// *** IObjectWithSite methods *** (overriding CObjectWithSite)
+	STDMETHODIMP SetSite(IUnknown* punk);
+
+public:
+	HRESULT Initialize(IShellMenu* psm)
+	{
+		return InitializeProgramsShellMenu(psm);
+	}
+
+private:
+	void _UpdateTrayPriv();
+
+};
+typedef DWORD   BITBOOL;
+typedef DWORD MRULISTF;
+
+typedef int(__stdcall* MRUDATALISTCOMPARE)(
+	const BYTE* __MIDL_0023,
+	const BYTE* __MIDL_0024,
+	int __MIDL_0025);
+
+MIDL_INTERFACE("fe787bcb-0ee8-44fb-8c89-12f508913c40")
+IMruDataList : public IUnknown
+{
+public:
+	virtual HRESULT STDMETHODCALLTYPE InitData(
+		/* [in] */ UINT uMax,
+		/* [in] */ MRULISTF flags,
+		/* [in] */ HKEY hKey,
+		/* [string][in] */ LPCWSTR pszSubKey,
+		/* [in] */ MRUDATALISTCOMPARE pfnCompare) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE AddData(
+		/* [size_is][in] */ const BYTE* pData,
+		/* [in] */ DWORD cbData,
+		/* [out] */ DWORD* pdwSlot) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE FindData(
+		/* [size_is][in] */ const BYTE* pData,
+		/* [in] */ DWORD cbData,
+		/* [out] */ int* piIndex) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE GetData(
+		/* [in] */ int iIndex,
+		/* [size_is][out] */ BYTE* pData,
+		/* [in] */ DWORD cbData) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE QueryInfo(
+		/* [in] */ int iIndex,
+		/* [out][in] */ DWORD* pdwSlot,
+		/* [out][in] */ DWORD* pcbData) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE Delete(
+		/* [in] */ int iIndex) = 0;
+
+};
+
+class CStartMenuCallback : public CStartMenuCallbackBase
+{
+public:
+	// *** IUnknown methods *** inherited from CStartMenuBase
+
+	// *** IShellMenuCallback methods ***
+	STDMETHODIMP CallbackSM(LPSMDATA psmd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+	// *** IObjectWithSite methods *** (overriding CObjectWithSite)
+	STDMETHODIMP SetSite(IUnknown* punk);
+	STDMETHODIMP GetSite(REFIID riid, void** ppvOut);
+
+	CStartMenuCallback();
+private:
+	virtual ~CStartMenuCallback();
+
+	IContextMenu* _pcmFind;
+	ITrayPriv* _ptp;
+	IUnknown* _punkSite;
+	IOleCommandTarget* _poct;
+	BITBOOL         _fAddOpenFolder : 1;
+	BITBOOL         _fCascadeMyDocuments : 1;
+	BITBOOL         _fCascadePrinters : 1;
+	BITBOOL         _fCascadeControlPanel : 1;
+	BITBOOL         _fFindMenuInvalid : 1;
+	BITBOOL         _fCascadeNetConnections : 1;
+	BITBOOL         _fShowInfoTip : 1;
+	BITBOOL         _fInitedShowTopLevelStartMenu : 1;
+	BITBOOL         _fCascadeMyPictures : 1;
+
+	BITBOOL         _fHasMyDocuments : 1;
+	BITBOOL         _fHasMyPictures : 1;
+
+	TCHAR           _szFindMnemonic[2];
+
+	HWND            _hwnd;
+
+	IMruDataList* _pmruRecent;
+	DWORD           _cRecentDocs;
+
+	DWORD           _dwFlags;
+	DWORD           _dwChevronCount;
+
+	HRESULT _ExecHmenuItem(LPSMDATA psmdata);
+	HRESULT _Init(SMDATA* psmdata);
+	HRESULT _Create(SMDATA* psmdata, void** pvUserData);
+	HRESULT _Destroy(SMDATA* psmdata);
+	HRESULT _GetHmenuInfo(SMDATA* psmd, SMINFO* sminfo);
+	HRESULT _GetObject(LPSMDATA psmd, REFIID riid, void** ppvObj);
+	HRESULT _CheckRestricted(DWORD dwRestrict, BOOL* fRestricted);
+	HRESULT _FilterRecentPidl(IShellFolder* psf, LPCITEMIDLIST pidl);
+	HRESULT _Demote(LPSMDATA psmd);
+	HRESULT _GetTip(LPWSTR pstrTitle, LPWSTR pstrTip);
+	DWORD _GetDemote(SMDATA* psmd);
+	HRESULT _HandleAccelerator(TCHAR ch, SMDATA* psmdata);
+	HRESULT _GetDefaultIcon(LPWSTR psz, int* piIndex);
+	void _GetStaticStartMenu(HMENU* phmenu, HWND* phwnd);
+	HRESULT _GetStaticInfoTip(SMDATA* psmd, LPWSTR pszTip, int cch);
+
+	// helper functions
+	DWORD GetInitFlags();
+	void  SetInitFlags(DWORD dwFlags);
+	HRESULT _InitializeFindMenu(IShellMenu* psm);
+	HRESULT _ExecItem(LPSMDATA, UINT);
+	HRESULT VerifyCSIDL(int idCmd, int csidl, IShellMenu* psm);
+	HRESULT VerifyMergedGuy(BOOL fPrograms, IShellMenu* psm);
+	void _UpdateDocsMenuItemNames(IShellMenu* psm);
+	void _UpdateDocumentsShellMenu(IShellMenu* psm);
+
+public: // Make these public to this file. This is for the CreateInstance
+	// Sub Menu creation
+	HRESULT InitializeFastItemsShellMenu(IShellMenu* psm);
+	HRESULT InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR pszRoot, LPTSTR pszValue,
+		DWORD dwPassInitFlags, DWORD dwSetFlags, BOOL fAddOpen,
+		IShellMenu* psm);
+	HRESULT InitializeDocumentsShellMenu(IShellMenu* psm);
+	HRESULT InitializeSubShellMenu(int idCmd, IShellMenu* psm);
 };

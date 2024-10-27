@@ -1,6 +1,8 @@
 #pragma once
 #include "framework.h"
 
+bool IsMergedFolderGUID(class IShellFolder* ShellFolder, LPCITEMIDLIST pidl, REFGUID Guid);
+
 class CStartMenuItemFilter : public IShellItemFilter
 {
 public:
