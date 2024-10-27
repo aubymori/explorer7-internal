@@ -2353,7 +2353,7 @@ HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 			{
 				LPSEARCHEXTDATA psed = (LPSEARCHEXTDATA)mii.dwItemData;
 
-				if (psed)
+				if (psed && !IsBadReadPtr(psed,8))
 					psminfo->iIcon = psed->iIcon;
 				else
 					psminfo->iIcon = -1;
