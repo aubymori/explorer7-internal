@@ -1999,6 +1999,79 @@ STDAPI CPersonalStartMenu_CreateInstance(LPUNKNOWN punkOuter, REFIID riid, void*
 	return hr;
 }
 
+STDAPI CStartMenu_CreateInstance(LPUNKNOWN punkOuter, REFIID riid, void** ppvOut)
+{
+	HRESULT hr = E_FAIL;
+	IMenuPopup* pmp = NULL;
+
+	*ppvOut = NULL;
+
+	CStartMenuCallback* psmc = new CStartMenuCallback();
+	if (psmc)
+	{
+		IShellMenu* psm;
+
+		hr = CoCreateInstance(CLSID_MenuBand, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&psm));
+		if (SUCCEEDED(hr))
+		{
+			hr = CoCreateInstance(CLSID_MenuDeskBar, punkOuter, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pmp));
+			if (SUCCEEDED(hr))
+			{
+				IBandSite* pbs;
+				hr = CoCreateInstance(CLSID_MenuBandSite, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pbs));
+				if (SUCCEEDED(hr))
+				{
+					hr = pmp->SetClient(pbs);
+					if (SUCCEEDED(hr))
+					{
+						IDeskBand* pdb;
+						hr = psm->QueryInterface(IID_PPV_ARGS(&pdb));
+						if (SUCCEEDED(hr))
+						{
+							hr = pbs->AddBand(pdb);
+							pdb->Release();
+						}
+					}
+					pbs->Release();
+				}
+				// Don't free pmp. We're using it below.
+			}
+
+			if (SUCCEEDED(hr))
+			{
+				// This is so the ref counting happens correctly.
+				hr = psm->Initialize(psmc, 0, 0, SMINIT_VERTICAL | SMINIT_TOPLEVEL);
+				if (SUCCEEDED(hr))
+				{
+					// if this fails, we don't get that part of the menu
+					// this is okay since it can happen if the start menu is redirected
+					// to where we dont have access.
+					psmc->InitializeFastItemsShellMenu(psm);
+				}
+			}
+
+			psm->Release();
+		}
+		psmc->Release();
+	}
+
+	if (SUCCEEDED(hr))
+	{
+		hr = pmp->QueryInterface(riid, ppvOut);
+	}
+	else
+	{
+		// We need to do this so that it does a cascading delete
+		IUnknown_SetSite(pmp, NULL);
+	}
+
+	if (pmp)
+		pmp->Release();
+
+	return hr;
+}
+
+
 extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 	__in   REFCLSID rclsid,
 	__in   LPUNKNOWN pUnkOuter,
@@ -2015,6 +2088,12 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"Wrap CPersonalStartMenu");
 		*ppv = 0;
 		result = CPersonalStartMenu_CreateInstance(pUnkOuter,riid,ppv);
+	}
+	if (rclsid == CLSID_StartMenu)
+	{
+		dbgprintf(L"Wrap CStartMenu");
+		*ppv = 0;
+		result = CStartMenu_CreateInstance(pUnkOuter, riid, ppv);
 	}
 
 	if (rclsid == CLSID_TrayNotify && riid == IID_ITrayNotify7 && result != S_OK)
