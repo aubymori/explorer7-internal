@@ -677,8 +677,8 @@ public:
 	{
 		// I take ownership of this pidl
 		_pidl = pidl;
-		_pszDescriptor = psz;
-		//Str_SetPtr(&_pszDescriptor, psz);
+		//_pszDescriptor = psz;
+		Str_SetPtr(&_pszDescriptor, psz);
 	}
 
 	void CheckInstalled()
@@ -789,8 +789,11 @@ STDAPI_(void) SHReValidateDarwinCacheCustom()
 }
 
 CStartMenuCallbackBase::CStartMenuCallbackBase(BOOL fIsStartPanel)
-	: _cRef(1), _fIsStartPanel(fIsStartPanel)
 {
+	memset(this,0,sizeof(CStartMenuCallbackBase));
+
+	_fIsStartPanel = fIsStartPanel;
+	_cRef = 1;
 	_dwThreadID = GetCurrentThreadId();
 
 	TCHAR szBuf[MAX_PATH];
@@ -801,8 +804,8 @@ CStartMenuCallbackBase::CStartMenuCallbackBase(BOOL fIsStartPanel)
 	{
 		// Add ".lnk" if the file doesn't have an extension
 		PathAddExtension(szBuf, TEXT(".lnk"));
-		//Str_SetPtr(&_pszWindowsUpdate, szBuf);
-		_pszWindowsUpdate = szBuf;
+		Str_SetPtr(&_pszWindowsUpdate, szBuf);
+		//_pszWindowsUpdate = szBuf;
 	}
 
 	cbSize = sizeof(szBuf); // SHGetValue wants sizeof
@@ -810,14 +813,14 @@ CStartMenuCallbackBase::CStartMenuCallbackBase(BOOL fIsStartPanel)
 		NULL, szBuf, &cbSize))
 	{
 		PathAddExtension(szBuf, TEXT(".lnk"));
-		_pszConfigurePrograms = szBuf;
-		//Str_SetPtr(&_pszConfigurePrograms, szBuf);
+		//_pszConfigurePrograms = szBuf;
+		Str_SetPtr(&_pszConfigurePrograms, szBuf);
 	}
 
 	if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_ADMINTOOLS | CSIDL_FLAG_CREATE, NULL, 0, szBuf)))
 	{
-		_pszAdminTools = szBuf;
-		//Str_SetPtr(&_pszAdminTools, PathFindFileName(szBuf));
+		//_pszAdminTools = szBuf;
+		Str_SetPtr(&_pszAdminTools, PathFindFileName(szBuf));
 	}
 
 	_RefreshSettings();
@@ -845,8 +848,8 @@ void CStartMenuCallbackBase::_InitializePrograms()
 		// We're either initing these, or reseting them.
 		TCHAR szTemp[MAX_PATH];
 		SHGetFolderPath(NULL, CSIDL_PROGRAMS, NULL, 0, szTemp);
-		_pszPrograms = PathFindFileName(szTemp);
-		//Str_SetPtr(&_pszPrograms, PathFindFileName(szTemp));
+		//_pszPrograms = PathFindFileName(szTemp);
+		Str_SetPtr(&_pszPrograms, PathFindFileName(szTemp));
 
 		_fInitPrograms = TRUE;
 	}
@@ -886,8 +889,8 @@ HRESULT CStartMenuCallbackBase::_FilterPidl(UINT uParent, IShellFolder* psf, LPC
 {
 	HRESULT hr = S_FALSE;
 
-	assert(IS_VALID_PIDL(pidl));
-	assert(IS_VALID_CODE_PTR(psf, IShellFolder));
+	//assert(IS_VALID_PIDL(pidl));
+	//assert(IS_VALID_CODE_PTR(psf, IShellFolder));
 
 	if (uParent == IDM_PROGRAMS || uParent == IDM_TOPLEVELSTARTMENU)
 	{
@@ -923,15 +926,23 @@ HRESULT CStartMenuCallbackBase::_FilterPidl(UINT uParent, IShellFolder* psf, LPC
 	return hr;
 }
 
+#define SMINV_FORCE          0x00000080
+#define UEMIID_SHELL    CLSID_ActiveDesktop     // FEATURE need better one
+#define UEMIID_BROWSER  CLSID_InternetToolbar   // FEATURE need better one
+#define UEME_RUNPIDL    18
+#define UEMF_EVENTMON   0x00000001 
+#define UEMF_INSTRUMENT 0x00000002
+#define UEMF_XEVENT     (UEMF_EVENTMON | UEMF_INSTRUMENT)
+
 HRESULT CStartMenuCallbackBase::_Promote(LPSMDATA psmd, DWORD dwFlags)
 {
-	//if ((_fExpandoMenus || (_fIsStartPanel && (dwFlags & SMINV_FORCE))) &&
-	//	(psmd->uIdAncestor == IDM_PROGRAMS ||
-	//		psmd->uIdAncestor == IDM_FAVORITES))
-	//{
-	//	UEMFireEvent(psmd->uIdAncestor == IDM_PROGRAMS ? &UEMIID_SHELL : &UEMIID_BROWSER,
-	//		UEME_RUNPIDL, UEMF_XEVENT, (WPARAM)psmd->psf, (LPARAM)psmd->pidlItem);
-	//}
+	if ((_fExpandoMenus || (_fIsStartPanel && (dwFlags & SMINV_FORCE))) &&
+		(psmd->uIdAncestor == IDM_PROGRAMS ||
+			psmd->uIdAncestor == IDM_FAVORITES))
+	{
+		UEMFireEvent(psmd->uIdAncestor == IDM_PROGRAMS ? &UEMIID_SHELL : &UEMIID_BROWSER,
+			UEME_RUNPIDL, UEMF_XEVENT, (WPARAM)psmd->psf, (LPARAM)psmd->pidlItem);
+	}
 	return S_OK;
 }
 
@@ -946,7 +957,7 @@ LPITEMIDLIST FullPidlFromSMData(LPSMDATA psmd)
 	LPITEMIDLIST pidlItem;
 	LPITEMIDLIST pidlFolder = NULL;
 	LPITEMIDLIST pidlFull = NULL;
-	IAugmentedShellFolder2* pasf2;
+	IAugmentedShellFolder* pasf2;
 	if (SUCCEEDED(psmd->psf->QueryInterface(IID_PPV_ARGS(&pasf2))))
 	{
 		if (SUCCEEDED(pasf2->UnWrapIDList(psmd->pidlItem, 1, NULL, &pidlFolder, &pidlItem, NULL)))
@@ -1403,13 +1414,30 @@ BOOL IsCSIDLChild(int csidlParent, int csidlChild)
 
 	return fChild;
 }
+
+HRESULT GetFolderAndPidl(UINT csidl, IShellFolder** ppsf, LPITEMIDLIST* ppidl)
+{
+	*ppsf = NULL;
+	HRESULT hr = SHGetFolderLocation(NULL, csidl, NULL, 0, ppidl);
+	if (SUCCEEDED(hr))
+	{
+		hr = SHBindToObject(NULL, *ppidl, 0, IID_PPV_ARGS(ppsf));
+		if (FAILED(hr))
+		{
+			ILFree(*ppidl);
+			*ppidl = NULL;
+		}
+	}
+	return hr;
+}
+
 #define SMSET_DONTREGISTERCHANGENOTIFY 0x00000020 // ShellFolder is a discontiguous child of a parent shell folder
 HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 {
 	HKEY hkeyPrograms = NULL;
 	LPITEMIDLIST pidl = NULL;
 
-	_fIsStartPanel = true;
+	//_fIsStartPanel = true;
 
 	DWORD dwInitFlags = SMINIT_VERTICAL;
 	if (!FeatureEnabled(_fIsStartPanel ? TEXT("Start_ScrollPrograms") : TEXT("StartMenuScrollPrograms")))
@@ -1421,6 +1449,7 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 	if (_fIsStartPanel)
 		dwInitFlags |= SMINIT_TOPLEVEL;
 
+	//HRESULT hr = psm->Initialize(this, 0, 0, SMINIT_VERTICAL | SMINIT_TOPLEVEL);
 	HRESULT hr = psm->Initialize(this, IDM_PROGRAMS, IDM_PROGRAMS, dwInitFlags);
 	if (SUCCEEDED(hr))
 	{
@@ -1442,17 +1471,23 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 		{
 			// Start Panel: Menu:  The Programs section is a merge of the
 			// Fast Items and Programs folders with a separator between them.
-			dwSmset |= SMSET_SEPARATEMERGEFOLDER;
-			hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolderAndFastItems,
-				4);
+			// WIKTOR: TEMP REMOVE FOR NON MERGED
+			//dwSmset |= SMSET_SEPARATEMERGEFOLDER;
+
+			//hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolderAndFastItems, 4);
+			//hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolderAndFastItems, 4);
+			hr = GetFolderAndPidl(CSIDL_COMMON_PROGRAMS, &psf, &pidl);
+			if (!psf)
+				MessageBox(0, L"psf", L"psf", 0);
 		}
 		else
 		{
 			// Classic Start Menu:  The Programs section is just the per-user
 			// and common Programs folders merged together
-			hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolder,
-				2);
-
+			//hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolder, 2);
+			hr = GetFolderAndPidl(CSIDL_COMMON_PROGRAMS, &psf, &pidl);
+			if (!psf)
+				MessageBox(0, L"psf2", L"psf2", 0);
 			// We used to register for change notify at CSIDL_STARTMENU and assumed
 			// that CSIDL_PROGRAMS was a child of CSIDL_STARTMENU. Since this wasn't always the 
 			// case, I removed the optimization.
@@ -1484,16 +1519,16 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 			// We should have a shell folder from the bind.
 			assert(psf);
 
-			IEnumIDList* pEnumIDList;
-			HRESULT hr = psf->EnumObjects(NULL, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &pEnumIDList);
-			int count = 0;
-			LPITEMIDLIST pidl = NULL;
-			while (pEnumIDList->Next(1, &pidl, NULL) == S_OK) {
-				count++;
-				CoTaskMemFree(pidl);  // Free the PIDL after use
-			}
-			pEnumIDList->Release();
-			dbgprintf(L"count %i",count);
+			//IEnumIDList* pEnumIDList;
+			//HRESULT hr = psf->EnumObjects(NULL, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS, &pEnumIDList);
+			//int count = 0;
+			//LPITEMIDLIST pidl = NULL;
+			//while (pEnumIDList->Next(1, &pidl, NULL) == S_OK) {
+			//	count++;
+			//	CoTaskMemFree(pidl);  // Free the PIDL after use
+			//}
+			//pEnumIDList->Release();
+			//dbgprintf(L"count %i",count);
 
 			hr = psm->SetShellFolder(psf, pidl, hkeyPrograms, dwSmset);
 			psf->Release();
@@ -1652,26 +1687,7 @@ HRESULT CreateRecentMRUList(IMruDataList** ppmru)
 	//*ppmru = CreateSharedRecentMRUList(NULL, NULL, SRMLF_COMPPIDL);
 	return *ppmru ? S_OK : E_OUTOFMEMORY;
 }
-#define NOATOMICRELESEFUNC
-#ifndef ATOMICRELEASE
-#ifdef __cplusplus
-#define ATOMICRELEASET(p, type) { if(p) { type* punkT=p; p=NULL; punkT->Release();} }
-#else
-#define ATOMICRELEASET(p, type) { if(p) { type* punkT=p; p=NULL; punkT->lpVtbl->Release(punkT);} }
-#endif
 
-// doing this as a function instead of inline seems to be a size win.
-//
-#ifdef NOATOMICRELESEFUNC
-#define ATOMICRELEASE(p) ATOMICRELEASET(p, IUnknown)
-#else
-#   ifdef __cplusplus
-#       define ATOMICRELEASE(p) IUnknown_SafeReleaseAndNullPtr(p)
-#   else
-#       define ATOMICRELEASE(p) IUnknown_AtomicRelease((LPVOID*)&p)
-#   endif
-#endif
-#endif //ATOMICRELEASE
 #define RESTOPT_INTELLIMENUS_USER       0
 #define RESTOPT_INTELLIMENUS_DISABLED   1       // Match Restriction assumption: 1 == Off
 #define RESTOPT_INTELLIMENUS_ENABLED    2
@@ -1920,7 +1936,7 @@ CStartMenuCallback::CStartMenuCallback() : _cRecentDocs(-1)
 	memset((void*)(__int64(this) + sizeof(CStartMenuCallbackBase)),0,sizeof(CStartMenuCallback) - sizeof(CStartMenuCallbackBase));
 	_cRecentDocs = -1;
 	_punkSite = 0;
-	LoadString(GetModuleHandle(L"shell32.dll"), IDS_FIND_MNEMONIC, _szFindMnemonic, ARRAYSIZE(_szFindMnemonic));
+	LoadString(GetModuleHandle(L"shellxp.dll"), IDS_FIND_MNEMONIC, _szFindMnemonic, ARRAYSIZE(_szFindMnemonic));
 }
 
 CStartMenuCallback::~CStartMenuCallback()
@@ -2574,7 +2590,7 @@ STDMETHODIMP CStartContextMenu::QueryContextMenu(HMENU hmenu, UINT indexMenu, UI
 	//todo: get this popup
 	//HMENU hmenuStartMenu = 0;
 
-	HMENU hmenuStartMenu = SHLoadMenuPopup(GetModuleHandleW(L"shell32.dll"), MENU_STARTMENUSTATICITEMS);
+	HMENU hmenuStartMenu = SHLoadMenuPopup(LoadLibraryW(L"shellxp.dll"), MENU_STARTMENUSTATICITEMS);
 
 	if (hmenuStartMenu)
 	{
@@ -3083,8 +3099,8 @@ HRESULT CStartMenuCallback::_GetTip(LPWSTR pstrTitle, LPWSTR pstrTip)
 		return S_FALSE;
 	}
 
-	LoadString(GetModuleHandle(L"shell32.dll"), IDS_CHEVRONTIPTITLE, pstrTitle, MAX_PATH);
-	LoadString(GetModuleHandle(L"shell32.dll"), IDS_CHEVRONTIP, pstrTip, MAX_PATH);
+	LoadString(GetModuleHandle(L"shellxp.dll"), IDS_CHEVRONTIPTITLE, pstrTitle, MAX_PATH);
+	LoadString(GetModuleHandle(L"shellxp.dll"), IDS_CHEVRONTIP, pstrTip, MAX_PATH);
 
 	// Why would this fail?
 	//ASSERT(pstrTitle[0] != L'\0' && pstrTip[0] != L'\0');
@@ -3213,7 +3229,7 @@ HRESULT CStartMenuCallback::_GetStaticInfoTip(SMDATA* psmd, LPWSTR pszTip, int c
 		if (s_mpcmdTip[i].idCmd == psmd->uId)
 		{
 			TCHAR szTip[MAX_PATH];
-			if (LoadString(GetModuleHandleW(L"shell32.dll"), s_mpcmdTip[i].idInfoTip, szTip, ARRAYSIZE(szTip)))
+			if (LoadString(LoadLibraryW(L"shellxp.dll"), s_mpcmdTip[i].idInfoTip, szTip, ARRAYSIZE(szTip)))
 			{
 				SHTCharToUnicode(szTip, pszTip, cch);
 				hr = S_OK;
@@ -3347,7 +3363,7 @@ HRESULT CStartMenuCallback::VerifyMergedGuy(BOOL fPrograms, IShellMenu* psm)
 	DWORD dwFlags;
 	LPITEMIDLIST pidl;
 	HRESULT hr = S_OK;
-	IAugmentedShellFolder2* pasf;
+	IAugmentedShellFolder* pasf;
 	if (SUCCEEDED(psm->GetShellFolder(&dwFlags, &pidl, IID_PPV_ARGS(&pasf))))
 	{
 		IShellFolder* psf;
@@ -3495,7 +3511,7 @@ void CStartMenuCallback::_UpdateDocumentsShellMenu(IShellMenu* psm)
 	// Do not update menu if not different than currently have
 	if (fMyDocs != (BOOL)_fHasMyDocuments || fMyPics != (BOOL)_fHasMyPictures)
 	{
-		HMENU hMenu = SHLoadMenuPopup(GetModuleHandleW(L"shell32.dll"), MENU_STARTMENU_MYDOCS);
+		HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shellxp.dll"), MENU_STARTMENU_MYDOCS);
 		if (hMenu)
 		{
 			if (!fMyDocs)
@@ -3527,7 +3543,11 @@ HRESULT CStartMenuCallback::InitializeFastItemsShellMenu(IShellMenu* psm)
 		// Add the fast item folder to the top of the menu
 		IShellFolder* psfFast;
 		LPITEMIDLIST pidlFast;
-		hr = GetMergedFolder(&psfFast, &pidlFast, c_rgmfiStartMenu, 2);
+		//hr = GetMergedFolder(&psfFast, &pidlFast, c_rgmfiStartMenu, 2);
+		hr = GetFolderAndPidl(CSIDL_STARTMENU, &psfFast, &pidlFast);
+
+		if (!psfFast)
+			MessageBox(0,L"psfFast",L"psfFast",0);
 		if (SUCCEEDED(hr))
 		{
 			HKEY hMenuKey = NULL;   // WARNING: pmb2->Initialize() will always owns hMenuKey, so don't close it
@@ -3547,21 +3567,7 @@ HRESULT CStartMenuCallback::InitializeFastItemsShellMenu(IShellMenu* psm)
 	return hr;
 }
 
-HRESULT GetFolderAndPidl(UINT csidl, IShellFolder** ppsf, LPITEMIDLIST* ppidl)
-{
-	*ppsf = NULL;
-	HRESULT hr = SHGetFolderLocation(NULL, csidl, NULL, 0, ppidl);
-	if (SUCCEEDED(hr))
-	{
-		hr = SHBindToObject(NULL, *ppidl, 0,IID_PPV_ARGS(ppsf));
-		if (FAILED(hr))
-		{
-			ILFree(*ppidl);
-			*ppidl = NULL;
-		}
-	}
-	return hr;
-}
+
 #define MENU_STARTMENU_OPENFOLDER       402
 HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR pszRoot, LPTSTR pszValue, DWORD dwPassInitFlags, DWORD dwSetFlags, BOOL fAddOpen, IShellMenu* psm)
 {
@@ -3599,7 +3605,7 @@ HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR 
 		{
 			if (fAddOpen && _fAddOpenFolder)
 			{
-				HMENU hMenu = SHLoadMenuPopup(GetModuleHandleW(L"shell32.dll"), MENU_STARTMENU_OPENFOLDER);
+				HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shellxp.dll"), MENU_STARTMENU_OPENFOLDER);
 				if (hMenu)
 				{
 					psm->SetMenu(hMenu, _hwnd, SMSET_BOTTOM);

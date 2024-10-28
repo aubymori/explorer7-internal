@@ -7,6 +7,7 @@
 #include "MinHook.h"
 #include "knownfolders.h"
 #include "registry.h"
+#include <cassert>
 
 DWORD bEnableUWPAppsInStart = true;
 
@@ -58,15 +59,15 @@ PVOID WINAPI ResolveDelayLoadedAPINEW(PVOID ParentModuleBase, PVOID DelayloadDes
 
 BOOL __stdcall ILIsEqualNEW(LPCITEMIDLIST pidl1, LPCITEMIDLIST pidl2)
 {
-	dbgprintf(L"ILIsEqualNEW\n");
-	IShellFolder* ppshf = 0;
-	HRESULT v4 = SHGetDesktopFolder(&ppshf);
-	if (v4 >= 0)
+	//dbgprintf(L"ILIsEqualNEW\n");
+	BOOL bRet = FALSE;
+	IShellFolder* psfDesktop;
+	if (SUCCEEDED(SHGetDesktopFolder(&psfDesktop)))
 	{
-		v4 = ppshf->CompareIDs(0x10000000i64, pidl1, pidl2);
-		ppshf->Release();
+		bRet = psfDesktop->CompareIDs(0, pidl1, pidl2) == 0;
+		psfDesktop->Release();
 	}
-	return v4 == 0;
+	return bRet;
 }
 
 HRESULT __stdcall SHEvaluateSystemCommandTemplateNEW(PCWSTR pszCmdTemplate, PWSTR* ppszApplication, PWSTR* ppszCommandLine, PWSTR* ppszParameters)
@@ -89,10 +90,47 @@ HRESULT __stdcall Shell32_DllGetClassObject_Hook(REFCLSID rclsid, const IID* con
 	return result;
 }
 
+STDAPI_(BOOL) SHIsSameObject(IUnknown* punk1, IUnknown* punk2)
+{
+	if (!punk1 || !punk2)
+	{
+		return FALSE;
+	}
+	else if (punk1 == punk2)
+	{
+		// Quick shortcut -- if they're the same pointer
+		// already then they must be the same object
+		//
+		return TRUE;
+	}
+	else
+	{
+		IUnknown* punkI1;
+		IUnknown* punkI2;
+
+		// Some apps don't implement QueryInterface! (SecureFile)
+		HRESULT hr = punk1->QueryInterface(IID_PPV_ARGS(&punkI1));
+		if (SUCCEEDED(hr))
+		{
+			punkI1->Release();
+			hr = punk2->QueryInterface(IID_PPV_ARGS(&punkI2));
+			if (SUCCEEDED(hr))
+				punkI2->Release();
+		}
+		return SUCCEEDED(hr) && (punkI1 == punkI2);
+	}
+}
+
+#pragma comment(linker,"/export:#171=SHIsSameObject,@171,NONAME")
+
+HRESULT(__stdcall* CFSFolder_CreateFolder)(IUnknown* punkOuter, LPBC pbc, LPCITEMIDLIST pidl,
+	const PERSIST_FOLDER_TARGET_INFO* pfti, REFIID riid, void** ppv);
+
 void HookShell32()
 {
 	dbgprintf(L"1\n");
 	ResolveDelayLoadedAPI = (ResolveDelayLoadedAPIAPI)GetProcAddress(GetModuleHandle(L"kernel32.dll"),"ResolveDelayLoadedAPI");
+	CFSFolder_CreateFolder = (decltype(CFSFolder_CreateFolder))GetProcAddress(LoadLibraryW(L"windows.storage.dll"),"CFSFolder_CreateFolder");
 	ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "API-MS-WIN-CORE-DELAYLOAD-L1-1-1.DLL", ResolveDelayLoadedAPI, ResolveDelayLoadedAPINEW);
 	//ResolveDelayLoadedAPI = (ResolveDelayLoadedAPIAPI)GetProcAddress(GetModuleHandle(L"api-ms-win-core-delayload-l1-1-1.dll"),"ResolveDelayLoadedAPI");
 	dbgprintf(L"%i\n",(unsigned long long)ResolveDelayLoadedAPI);
@@ -108,6 +146,8 @@ void HookShell32()
 	//auto ordinal902 = GetProcAddress(LoadLibrary(L"shell32.dll"),(LPSTR)902);
 	//ChangeImportedAddress(LoadLibrary(L"shell32.dll"),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.dll"), "SHAboutInfo"), SHAboutInfoWNEW);
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)902), IsSearchEnabledNEW);
+
+	//ChangeImportedAddress(GetModuleHandle(0),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.DLL"), (LPSTR)171), SHIsSameObject);
 
 	//ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)719), SHParseDarwinIDFromCacheWNew);
 
@@ -132,7 +172,21 @@ void HookShell32()
 	g_registry.QueryValue(L"EnableUWPAppsInStart",(LPBYTE)&bEnableUWPAppsInStart,sizeof(DWORD));
 }
 
+HRESULT fBindToDesktop(LPCITEMIDLIST pidl, IShellFolder** ppsfResult)
+{
+	HRESULT hr;
+	IShellFolder* psfDesktop;
 
+	*ppsfResult = NULL;
+
+	hr = SHGetDesktopFolder(&psfDesktop);
+	if (FAILED(hr))
+		return hr;
+
+	hr = psfDesktop->BindToObject(pidl, NULL, IID_PPV_ARGS(ppsfResult));
+
+	return hr;
+}
 
 HRESULT BindToDesktop(LPCITEMIDLIST pidl, IShellFolder2** ppsfResult)
 {
@@ -154,6 +208,30 @@ HRESULT BindToDesktop(LPCITEMIDLIST pidl, IShellFolder2** ppsfResult)
 	hr = psfDesktop2->BindToObject(pidl, NULL, IID_PPV_ARGS(ppsfResult));
 
 	return hr;
+}
+
+#undef SHInterlockedCompareExchange
+STDAPI_(void*) SHInterlockedCompareExchange(void** ppDest, void* pExch, void* pComp)
+{
+#if defined(_X86_)
+	_asm {
+		mov     ecx, ppDest
+		mov     edx, pExch
+		mov     eax, pComp
+		lock    cmpxchg[ecx], edx
+	}
+#else
+	return InterlockedCompareExchangePointer(ppDest, pExch, pComp);
+#endif
+}
+
+STDAPI_(void) SetUnknownOnSuccess(HRESULT hr, IUnknown* punk, IUnknown** ppunkToSet)
+{
+	if (SUCCEEDED(hr))
+	{
+		if (SHInterlockedCompareExchange((void**)ppunkToSet, punk, 0))
+			punk->Release();  // race, someone did this already
+	}
 }
 
 STDAPI SHCacheTrackingFolder(LPCITEMIDLIST pidlRoot, int csidlTarget, IShellFolder2** ppsfCache)
@@ -182,7 +260,8 @@ STDAPI SHCacheTrackingFolder(LPCITEMIDLIST pidlRoot, int csidlTarget, IShellFold
 
 		if (SUCCEEDED(hr))
 		{
-			BindToDesktop(pidl, ppsfCache);
+			hr = CFSFolder_CreateFolder(NULL, NULL, pidl, &pfti, IID_PPV_ARGS(&psf));
+			SetUnknownOnSuccess(hr, psf, (IUnknown**)ppsfCache);
 		}
 
 		if (pidl != pidlRoot)
@@ -222,7 +301,7 @@ ISetFolderEnumRestriction : IUnknown
 	virtual HRESULT SetEnumRestriction(DWORD dwRequired, DWORD dwForbidden) = 0;
 };
 
-HRESULT GetMergedFolder(IShellFolder** ppsf, LPITEMIDLIST* ppidl,
+HRESULT GetMergedFolder(IShellFolder2** ppsf, LPITEMIDLIST* ppidl,
 	LPCMERGEDFOLDERINFO rgmfi, UINT cmfi)
 {
 	*ppidl = NULL;
@@ -253,15 +332,15 @@ HRESULT GetMergedFolder(IShellFolder** ppsf, LPITEMIDLIST* ppidl,
 			// (Perf note: We compare pointers directly.)
 			if (rgmfi[imfi].pguidObj == &CLSID_StartMenu)
 			{
-				if (SHRestricted(REST_NOSTARTMENUSUBFOLDERS))
-				{
-					ISetFolderEnumRestriction* prest;
-					if (SUCCEEDED(psf->QueryInterface(IID_PPV_ARGS(&prest))))
-					{
-						prest->SetEnumRestriction(0, SHCONTF_FOLDERS); // disallow subfolders
-						prest->Release();
-					}
-				}
+				//if (SHRestricted(REST_NOSTARTMENUSUBFOLDERS))
+				//{
+				//	ISetFolderEnumRestriction* prest;
+				//	if (SUCCEEDED(psf->QueryInterface(IID_PPV_ARGS(&prest))))
+				//	{
+				//		prest->SetEnumRestriction(0, SHCONTF_FOLDERS); // disallow subfolders
+				//		prest->Release();
+				//	}
+				//}
 			}
 			//else
 			//{
@@ -271,7 +350,7 @@ HRESULT GetMergedFolder(IShellFolder** ppsf, LPITEMIDLIST* ppidl,
 			//}
 
 
-			hr = pasf->AddNameSpace((LPGUID)rgmfi[imfi].pguidObj, psf, NULL, rgmfi[imfi].uANSFlags, rgmfi[imfi].idk);
+			hr = pasf->AddNameSpace((LPGUID)rgmfi[imfi].pguidObj, psf, NULL, rgmfi[imfi].uANSFlags, 0);
 			if (SUCCEEDED(hr))
 			{
 				if (rgmfi[imfi].uANSFlags & ASFF_DEFNAMESPACE_DISPLAYNAME)
@@ -289,13 +368,59 @@ HRESULT GetMergedFolder(IShellFolder** ppsf, LPITEMIDLIST* ppidl,
 	}
 
 	if (SUCCEEDED(hr))
-		*ppsf = pasf;   // copy out the ref
+	{
+		pasf->QueryInterface(IID_PPV_ARGS(ppsf));
+		//pasf->Release();
+		//*ppsf = pasf;   // copy out the ref
+	}
 	else
 	{
 		if (pasf)
 			pasf->Release();
 	}
 
+	return hr;
+}
+
+HRESULT GetMergedFolders(IShellFolder** ppsfStartMenu, LPITEMIDLIST* ppidl,
+	LPCMERGEDFOLDERINFO Folders, UINT length)
+{
+	HRESULT hr;
+	IAugmentedShellFolder* pasf = nullptr;
+
+	*ppsfStartMenu = NULL;
+	hr = CoCreateInstance(CLSID_MergedFolder, 0LL, 1u, IID_IAugmentedFolder, (LPVOID*)&pasf);
+
+	for (int i = 0; i < length; ++i)
+	{
+		auto Info = Folders[i];
+		LPITEMIDLIST pidlUserStartMenu;
+		IShellFolder* psfUserStartMenu = nullptr;
+
+		hr = SHGetSpecialFolderLocation(NULL, Info.csidl, &pidlUserStartMenu);
+		if (FAILED(hr)) continue;
+
+		hr = fBindToDesktop(pidlUserStartMenu, &psfUserStartMenu);
+		if (FAILED(hr))
+		{
+			ILFree(pidlUserStartMenu);
+			continue;
+		}
+
+		hr = pasf->AddNameSpace((LPGUID)Info.pguidObj, psfUserStartMenu, pidlUserStartMenu, Info.uANSFlags, 2);
+		if (FAILED(hr))
+		{
+			psfUserStartMenu->Release();
+			ILFree(pidlUserStartMenu);
+			continue;
+		}
+		hr = SHGetIDListFromUnk(psfUserStartMenu, ppidl);    // copy out the pidl for this guy
+		psfUserStartMenu->Release();
+		ILFree(pidlUserStartMenu);
+	}
+	
+
+	*ppsfStartMenu = pasf;
 	return hr;
 }
 
@@ -654,29 +779,29 @@ STDAPI SHPropertyBag_WriteBOOL(IPropertyBag* ppb, LPCWSTR pszPropName, BOOL fVal
 
 HRESULT CreateMergedFolderHelper(LPCMERGEDFOLDERINFO rgmfi, UINT cmfi, REFIID riid, void** ppv)
 {
-	IShellFolder* psf;
+	IShellFolder2* psf;
 	LPITEMIDLIST pidl;
 	HRESULT hr = GetMergedFolder(&psf, &pidl, rgmfi, cmfi);
 	if (SUCCEEDED(hr))
 	{
 		hr = psf->QueryInterface(riid, ppv);
 
-		if (SUCCEEDED(hr))
-		{
-			IPersistPropertyBag* pppb;
-			if (SUCCEEDED(psf->QueryInterface(IID_PPV_ARGS(&pppb))))
-			{
-				IPropertyBag* ppb;
-				if (SUCCEEDED(SHCreatePropertyBagOnMemory(STGM_READWRITE, IID_PPV_ARGS(&ppb))))
-				{
-					// these merged folders have to be told to use new changenotification
-					SHPropertyBag_WriteBOOL(ppb, L"MergedFolder\\ShellView", TRUE);
-					pppb->Load(ppb, NULL);
-					ppb->Release();
-				}
-				pppb->Release();
-			}
-		}
+		//if (SUCCEEDED(hr))
+		//{
+		//	IPersistPropertyBag* pppb;
+		//	if (SUCCEEDED(psf->QueryInterface(IID_PPV_ARGS(&pppb))))
+		//	{
+		//		IPropertyBag* ppb;
+		//		if (SUCCEEDED(SHCreatePropertyBagOnMemory(STGM_READWRITE, IID_PPV_ARGS(&ppb))))
+		//		{
+		//			// these merged folders have to be told to use new changenotification
+		//			SHPropertyBag_WriteBOOL(ppb, L"MergedFolder\\ShellView", TRUE);
+		//			pppb->Load(ppb, NULL);
+		//			ppb->Release();
+		//		}
+		//		pppb->Release();
+		//	}
+		//}
 
 		psf->Release();
 		ILFree(pidl);
@@ -754,24 +879,24 @@ HRESULT __stdcall CProgramsFolderClassFactory::CreateInstance(IUnknown* pUnkOute
 	if (pUnkOuter) return CLASS_E_NOAGGREGATION;
 	if (this->clsid == CLSID_ProgramsFolderAndFastItems)
 	{
-		IShellFolder* ShellFolder;
-		HRESULT result = CreateMergedFolderHelper(c_rgmfiProgramsFolderAndFastItems,_ARRAYSIZE(c_rgmfiProgramsFolderAndFastItems), IID_IShellFolder, (void**)&ShellFolder);
+		IShellFolder2* ShellFolder;
+		HRESULT result = CreateMergedFolderHelper(c_rgmfiProgramsFolderAndFastItems,4, IID_IShellFolder2, (void**)&ShellFolder);
 		result = ShellFolder->QueryInterface(riid, ppvObject);
 		ShellFolder->Release();
 		return result;
 	}
 	else if (this->clsid == CLSID_ProgramsFolder)
 	{
-		IShellFolder* ShellFolder;
-		HRESULT result = CreateMergedFolderHelper(c_rgmfiProgramsFolder, _ARRAYSIZE(c_rgmfiProgramsFolder), IID_IShellFolder, (void**)&ShellFolder);
+		IShellFolder2* ShellFolder;
+		HRESULT result = CreateMergedFolderHelper(c_rgmfiProgramsFolder, 2, IID_IShellFolder2, (void**)&ShellFolder);
 		result = ShellFolder->QueryInterface(riid, ppvObject);
 		ShellFolder->Release();
 		return result;
 	}
 	else if (this->clsid == CLSID_StartMenuFolder)
 	{
-		IShellFolder* ShellFolder;
-		HRESULT result = CreateMergedFolderHelper(c_rgmfiStartMenu, _ARRAYSIZE(c_rgmfiStartMenu), IID_IShellFolder, (void**)&ShellFolder);
+		IShellFolder2* ShellFolder;
+		HRESULT result = CreateMergedFolderHelper(c_rgmfiStartMenu, 2, IID_IShellFolder2, (void**)&ShellFolder);
 		result = ShellFolder->QueryInterface(riid, ppvObject);
 		ShellFolder->Release();
 		return result;

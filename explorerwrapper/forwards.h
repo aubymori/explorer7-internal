@@ -135,7 +135,7 @@
 #pragma comment(linker,FORWARDO(SHLWAPI,348))
 #pragma comment(linker,FORWARDO(SHLWAPI,192))
 #pragma comment(linker,FORWARDO(SHLWAPI,628))
-#pragma comment(linker,FORWARDO(SHLWAPI,171))
+
 #pragma comment(linker,FORWARDO(SHLWAPI,513))
 #pragma comment(linker,FORWARDO(SHLWAPI,512))
 #pragma comment(linker,FORWARDO(SHLWAPI,194))

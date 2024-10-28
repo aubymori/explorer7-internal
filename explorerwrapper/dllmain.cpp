@@ -1973,7 +1973,7 @@ STDAPI CPersonalStartMenu_CreateInstance(LPUNKNOWN punkOuter, REFIID riid, void*
 	HRESULT hr;
 
 	*ppvOut = NULL;
-
+	
 	IShellMenu* psm;
 	hr = CoCreateInstance(CLSID_MenuBand, NULL, CLSCTX_INPROC_SERVER,
 		IID_PPV_ARGS(&psm));
@@ -1982,9 +1982,11 @@ STDAPI CPersonalStartMenu_CreateInstance(LPUNKNOWN punkOuter, REFIID riid, void*
 		CPersonalProgramsMenuCallback* psmc = new CPersonalProgramsMenuCallback();
 		if (psmc)
 		{
+			//hr = psm->Initialize(psmc, 0, 0, SMINIT_VERTICAL | SMINIT_TOPLEVEL);
 			hr = psmc->Initialize(psm);
 			if (SUCCEEDED(hr))
 			{
+				dbgprintf(L"INITIALIZE FAILED");
 				// SetShellFolder takes ownership of hkCustom
 				hr = psm->QueryInterface(riid, ppvOut);
 			}
@@ -2108,11 +2110,11 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		return result;
 	}
 
-	if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK && g_osVersion.BuildNumber() >= 10074) //Ittr: as far as im aware doesnt cause crashing on 1507/11. needs further checking when im awake
-	{
-		auto shellItemFilter = new CStartMenuItemFilter();
-		result = shellItemFilter->QueryInterface(riid, ppv);
-	}
+	//if (rclsid == CLSID_PersonalStartMenu && riid == IID_IShellItemFilter && result != S_OK && g_osVersion.BuildNumber() >= 10074) //Ittr: as far as im aware doesnt cause crashing on 1507/11. needs further checking when im awake
+	//{
+	//	auto shellItemFilter = new CStartMenuItemFilter();
+	//	result = shellItemFilter->QueryInterface(riid, ppv);
+	//}
 
 	if (rclsid == CLSID_SysTray) //create Metro before tray
 	{
