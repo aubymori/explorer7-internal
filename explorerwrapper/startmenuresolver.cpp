@@ -1936,7 +1936,7 @@ CStartMenuCallback::CStartMenuCallback() : _cRecentDocs(-1)
 	memset((void*)(__int64(this) + sizeof(CStartMenuCallbackBase)),0,sizeof(CStartMenuCallback) - sizeof(CStartMenuCallbackBase));
 	_cRecentDocs = -1;
 	_punkSite = 0;
-	LoadString(GetModuleHandle(L"shellxp.dll"), IDS_FIND_MNEMONIC, _szFindMnemonic, ARRAYSIZE(_szFindMnemonic));
+	LoadString(LoadLibraryW(L"shell32.dll"), IDS_FIND_MNEMONIC, _szFindMnemonic, ARRAYSIZE(_szFindMnemonic));
 }
 
 CStartMenuCallback::~CStartMenuCallback()
@@ -2369,8 +2369,8 @@ HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 			{
 				LPSEARCHEXTDATA psed = (LPSEARCHEXTDATA)mii.dwItemData;
 
-				if (psed && !IsBadReadPtr(psed,8))
-					psminfo->iIcon = psed->iIcon;
+				if (psed /* && !IsBadReadPtr(psed, 8)*/)
+					psminfo->iIcon = mii.dwItemData;
 				else
 					psminfo->iIcon = -1;
 
@@ -2590,7 +2590,7 @@ STDMETHODIMP CStartContextMenu::QueryContextMenu(HMENU hmenu, UINT indexMenu, UI
 	//todo: get this popup
 	//HMENU hmenuStartMenu = 0;
 
-	HMENU hmenuStartMenu = SHLoadMenuPopup(LoadLibraryW(L"shellxp.dll"), MENU_STARTMENUSTATICITEMS);
+	HMENU hmenuStartMenu = SHLoadMenuPopup(LoadLibraryW(L"shell32.dll"), MENU_STARTMENUSTATICITEMS);
 
 	if (hmenuStartMenu)
 	{
@@ -3099,8 +3099,8 @@ HRESULT CStartMenuCallback::_GetTip(LPWSTR pstrTitle, LPWSTR pstrTip)
 		return S_FALSE;
 	}
 
-	LoadString(GetModuleHandle(L"shellxp.dll"), IDS_CHEVRONTIPTITLE, pstrTitle, MAX_PATH);
-	LoadString(GetModuleHandle(L"shellxp.dll"), IDS_CHEVRONTIP, pstrTip, MAX_PATH);
+	LoadString(LoadLibraryW(L"shell32.dll"), IDS_CHEVRONTIPTITLE, pstrTitle, MAX_PATH);
+	LoadString(LoadLibraryW(L"shell32.dll"), IDS_CHEVRONTIP, pstrTip, MAX_PATH);
 
 	// Why would this fail?
 	//ASSERT(pstrTitle[0] != L'\0' && pstrTip[0] != L'\0');
@@ -3229,7 +3229,7 @@ HRESULT CStartMenuCallback::_GetStaticInfoTip(SMDATA* psmd, LPWSTR pszTip, int c
 		if (s_mpcmdTip[i].idCmd == psmd->uId)
 		{
 			TCHAR szTip[MAX_PATH];
-			if (LoadString(LoadLibraryW(L"shellxp.dll"), s_mpcmdTip[i].idInfoTip, szTip, ARRAYSIZE(szTip)))
+			if (LoadString(LoadLibraryW(L"shell32.dll"), s_mpcmdTip[i].idInfoTip, szTip, ARRAYSIZE(szTip)))
 			{
 				SHTCharToUnicode(szTip, pszTip, cch);
 				hr = S_OK;
@@ -3511,7 +3511,7 @@ void CStartMenuCallback::_UpdateDocumentsShellMenu(IShellMenu* psm)
 	// Do not update menu if not different than currently have
 	if (fMyDocs != (BOOL)_fHasMyDocuments || fMyPics != (BOOL)_fHasMyPictures)
 	{
-		HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shellxp.dll"), MENU_STARTMENU_MYDOCS);
+		HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shell32.dll"), MENU_STARTMENU_MYDOCS);
 		if (hMenu)
 		{
 			if (!fMyDocs)
@@ -3605,7 +3605,7 @@ HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR 
 		{
 			if (fAddOpen && _fAddOpenFolder)
 			{
-				HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shellxp.dll"), MENU_STARTMENU_OPENFOLDER);
+				HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shell32.dll"), MENU_STARTMENU_OPENFOLDER);
 				if (hMenu)
 				{
 					psm->SetMenu(hMenu, _hwnd, SMSET_BOTTOM);
