@@ -8,6 +8,7 @@
 #include "knownfolders.h"
 #include "registry.h"
 #include <cassert>
+#include <shellapi.h>
 
 DWORD bEnableUWPAppsInStart = true;
 
@@ -121,6 +122,14 @@ STDAPI_(BOOL) SHIsSameObject(IUnknown* punk1, IUnknown* punk2)
 	}
 }
 
+STDAPI_(BOOL) fSHRunControlPanel(LPCTSTR commandLine, HWND parent)
+{
+	WCHAR parameters[MAX_PATH] = L"shell32.dll,Control_RunDLL ";
+	wcscat(parameters, commandLine);
+
+	return ((INT_PTR)ShellExecuteW(parent, L"open", L"rundll32.exe", parameters, NULL, SW_SHOWNORMAL) > 32);
+}
+
 #pragma comment(linker,"/export:#171=SHIsSameObject,@171,NONAME")
 
 HRESULT(__stdcall* CFSFolder_CreateFolder)(IUnknown* punkOuter, LPBC pbc, LPCITEMIDLIST pidl,
@@ -151,8 +160,8 @@ void HookShell32()
 
 	//ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)719), SHParseDarwinIDFromCacheWNew);
 
-	//todo: evaluate if this is needed
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);
+	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), MAKEINTRESOURCEA(161)), fSHRunControlPanel);
 
 	uintptr_t Cunt = FindPattern((uintptr_t)LoadLibrary(L"shell32.dll"), "41 8B E9 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
 	if (Cunt && g_osVersion.BuildNumber() >= 19045)
