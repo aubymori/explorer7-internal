@@ -9,6 +9,7 @@
 #include <Uxtheme.h>
 #include <guiddef.h>
 #include <dwmapi.h>
+#include <Vssym32.h>
 #include <winscard.h>
 #include <propkey.h>
 #include <DocObj.h>

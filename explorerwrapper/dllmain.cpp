@@ -27,12 +27,6 @@
 #include "shell32_wrappers.h"
 #include "shellurl.h"
 
-#define _WIN_BLUE 1 //Win8.1-specific changes
-#define _WIN_TH1 0 //Win10TH1-specific changes - currently unused
-#define _WIN_RS1 0 //Win10RS1-specific changes - currently unused
-#define _WIN_RS5 0 //Win10RS5-specific changes - currently unused
-#define _WIN_VB 0 //Win10VB-specific changes - currently unused
-
 BOOL g_alttabhooked;
 HWND hwnd_desktop;
 HWND hwnd_taskbar;
@@ -47,9 +41,10 @@ DWORD g_dwTrayThreadId = 0;
 
 bool g_bClassicTheme = false;
 bool g_bDisableComposition = false;
-bool g_enableImmersiveShellStack = false;
+bool g_bEnableImmersiveShellStack = false;
 
 static WNDPROC g_prevTrayProc;
+static WNDPROC g_prevThumbnailProc;
 typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
 typedef PVOID(WINAPI* SHCreateDesktopAPI)(PVOID);
 
@@ -91,13 +86,6 @@ wiktorArray<HTHEME>* themeHandles;
 DEFINE_GUID(IID_TrayClock7, 0x4376df10, 0xa662, 0x420b, 0xb3, 0x0d, 0x95, 0x88, 0x81, 0x46, 0x1e, 0xf9);
 DEFINE_GUID(IID_TrayClock8, 0x7A5FCA8A, 0x76B1, 0x44C8, 0xA9, 0x7C, 0xE7, 0x17, 0x3C, 0xCA, 0x5F, 0x4F);
 
-struct WINCOMPATTRDATA
-{
-	DWORD attribute; // the attribute to query, see below
-	PVOID pData; // buffer to store the result
-	ULONG dataSize; // size of the pData buffer
-};
-
 enum ACCENT_STATE : INT {				// Affects the rendering of the background of a window. These names are only for ACCENT_POLICY purposes 
 	ACCENT_DISABLED = 0,					// Default value. Background is black.
 	ACCENT_ENABLE_GRADIENT = 1,				// Background is GradientColor, alpha channel ignored.
@@ -116,11 +104,50 @@ struct ACCENT_POLICY {			// Determines how a window's background is rendered.
 };
 
 enum WINDOWCOMPOSITIONATTRIB : INT {	// Determines what attribute is being manipulated.
-	WCA_ACCENT_POLICY = 0x13,
-	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 0xF				// The attribute being get or set is an accent policy.
+	WCA_UNDEFINED = 0,
+	WCA_NCRENDERING_ENABLED = 1,
+	WCA_NCRENDERING_POLICY = 2,
+	WCA_TRANSITIONS_FORCEDISABLED = 3,
+	WCA_ALLOW_NCPAINT = 4,
+	WCA_CAPTION_BUTTON_BOUNDS = 5,
+	WCA_NONCLIENT_RTL_LAYOUT = 6,
+	WCA_FORCE_ICONIC_REPRESENTATION = 7,
+	WCA_EXTENDED_FRAME_BOUNDS = 8,
+	WCA_HAS_ICONIC_BITMAP = 9,
+	WCA_THEME_ATTRIBUTES = 10,
+	WCA_NCRENDERING_EXILED = 11,
+	WCA_NCADORNMENTINFO = 12,
+	WCA_EXCLUDED_FROM_LIVEPREVIEW = 13,
+	WCA_VIDEO_OVERLAY_ACTIVE = 14,
+	WCA_FORCE_ACTIVEWINDOW_APPEARANCE = 15,
+	WCA_DISALLOW_PEEK = 16,
+	WCA_CLOAK = 17,
+	WCA_CLOAKED = 18,
+	WCA_ACCENT_POLICY = 19,
+	WCA_FREEZE_REPRESENTATION = 20,
+	WCA_EVER_UNCLOAKED = 21,
+	WCA_VISUAL_OWNER = 22,
+	WCA_HOLOGRAPHIC = 23,
+	WCA_EXCLUDED_FROM_DDA = 24,
+	WCA_PASSIVEUPDATEMODE = 25,
+	WCA_USEDARKMODECOLORS = 26,
+	WCA_CORNER_STYLE = 27,
+	WCA_PART_COLOR = 28,
+	WCA_DISABLE_MOVESIZE_FEEDBACK = 29,
+	WCA_SYSTEMBACKDROP_TYPE = 30,
+	WCA_SET_TAGGED_WINDOW_RECT = 31,
+	WCA_CLEAR_TAGGED_WINDOW_RECT = 32,
+	WCA_LAST = 33
 };
 
-typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINCOMPATTRDATA* pAttrData);
+struct WINDOWCOMPOSITIONATTRIBDATA
+{
+	WINDOWCOMPOSITIONATTRIB Attrib; // the attribute to query, see below
+	void* pvData; // buffer to store the result
+	UINT cbData; // size of the pData buffer
+};
+
+typedef BOOL(WINAPI* SetWindowCompositionAttributeAPI) (HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData);
 static SetWindowCompositionAttributeAPI SetWindowCompositionAttribute;
 
 //extern declared in nsctree.h
@@ -128,6 +155,44 @@ HRESULT(__fastcall* CNSCHost_FillNSCOg)(uintptr_t nscHost);
 
 //extern declared in version.h
 COSVersion g_osVersion;
+
+const LPWSTR sz_DesktopWindowManagerKey = L"SOFTWARE\\Microsoft\\Windows\\DWM"; // Ittr: used for colorization fix by force
+const LPWSTR sz_SettingsKey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced"; // already defined in registry.cpp, should really be accessed better sorry! intention to remove this one after m2 and we officially support win11.
+const LPWSTR sz_ShellFolder = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a109-50dc2113ce9a}"; // used for shellfolder creation
+const LPWSTR sz_ShellFolder2 = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a109-50dc2113ce9a}\\InProcServer32"; // used for shellfolder creation
+const LPWSTR sz_ShellFolder3 = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a109-50dc2113ce9a}\\ShellFolder"; // used for shellfolder creation
+
+const LPWSTR sz_InternetEmail = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}"; // used for start menu
+const LPWSTR sz_InternetEmail2 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\DefaultIcon"; // used for start menu
+const LPWSTR sz_InternetEmail3 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\InProcServer32"; // used for start menu
+const LPWSTR sz_InternetEmail4 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\Instance"; // used for start menu
+const LPWSTR sz_InternetEmail5 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\Instance\\InitPropertyBag"; // used for start menu
+const LPWSTR sz_InternetEmail6 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\shellex\\ContextMenuHandlers\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}";
+const LPWSTR sz_InternetEmail7 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\shellex\\IconHandler"; // used for start menu
+const LPWSTR sz_InternetEmail8 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\shellex\\MayChangeDefaultMenu"; // used for start menu
+const LPWSTR sz_InternetEmail9 = L"SOFTWARE\\Classes\\CLSID\\{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}\\ShellFolder"; // used for start menu
+
+
+static LRESULT RegGetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	DWORD sz = 4;
+	return SHRegGetValueW(key, subkey, value, SRRF_RT_REG_DWORD, NULL, dwVal, &sz);
+}
+
+static LRESULT RegSetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	return SHSetValueW(key, subkey, value, REG_DWORD, dwVal, 4);
+}
+
+static LRESULT RegSetSZ(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	return SHSetValueW(key, subkey, value, REG_SZ, dwVal, (DWORD)wcslen((wchar_t*)dwVal) * sizeof(dwVal[0]));
+}
+
+static LRESULT RegSetExpandSZ(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+{
+	return SHSetValueW(key, subkey, value, REG_EXPAND_SZ, dwVal, 2 * ((DWORD)wcslen((wchar_t*)dwVal) * sizeof(dwVal[0])));
+}
 
 typedef struct {
 	DWORD ColorizationColor;
@@ -139,52 +204,32 @@ typedef struct {
 	DWORD ColorizationOpaqueBlend;
 } DWMCOLORIZATIONPARAMS, * PDWMCOLORIZATIONPARAMS;
 
-static BOOL IsRTMDWM()
-{
-	if (!IsCompositionActive()) return FALSE;
-
-	DWMCOLORIZATIONPARAMS colors;
-	CHAR buffer[0x28];
-	memset(buffer, 0, 0x28);
-	DwmGetColorizationParametersOrig(&buffer);
-	memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
-	return (colors.ColorizationGlassReflectionIntensity == 1);
-}
-
 static HWND GetTaskbarWnd()
 {
+	// This seems to work for all taskbar versions
 	if (!hwnd_taskbar)
 		hwnd_taskbar = FindWindow(L"Shell_TrayWnd", NULL);
 	return hwnd_taskbar;
 }
 
-static BOOL CALLBACK FindSMCallback(HWND hwnd, LPARAM lParam)
-{
-	if (GetClassWord(hwnd, GCW_ATOM) == (ATOM)lParam && (GetProp(hwnd, L"StartMenuTag")))
-	{
-		hwnd_startmenu = hwnd;
-		return FALSE;
-	}
-	return TRUE;
-}
-
-
 static HWND GetStartMenuWnd()
 {
-	if (!hwnd_startmenu || !IsWindow(hwnd_startmenu))
-	{
-		WNDCLASS dummy = { 0 };
-		ATOM dv2atom = GetClassInfo(GetModuleHandle(NULL), L"DV2ControlHost", &dummy);
-		EnumThreadWindows(GetCurrentThreadId(), FindSMCallback, (LPARAM)dv2atom);
-	}
+	// so StartMenuTag isn't a thing in vista...
+	// you might be wondering how we should fetch the start menu instead...
+	// the answer is to call the singular DV2ControlHost window that exists
+	// 
+	// why does this work?
+	// well, jumplists don't exist either in vista so you can safely assume DV2ControlHost is only used for start menu
+
+	if (!hwnd_startmenu)
+		hwnd_startmenu = FindWindow(L"DV2ControlHost", NULL); 
 	return hwnd_startmenu;
 }
 
-static HWND GetTaskListThumbWnd()
+static HWND GetThumbnailWnd()
 {
-	if (!hwnd_taskthumb)
-		hwnd_taskthumb = FindWindow(L"TaskListThumbnailWnd", NULL);
-	return hwnd_taskthumb;
+	// non-functional currently, vista is inefficient and uses several windows for thumbnails.
+	return NULL;
 }
 
 const UINT ThemeChangeMessage = WM_USER + 69420;
@@ -197,10 +242,92 @@ BOOL CALLBACK RefreshWindows(HWND wnd, LPARAM prm)
 	return TRUE;
 }
 
+// Ittr: Forcing this change fixes colorization on aero.msstyles for 1809+ on taskbar and start menu ONLY.
+void EnsureWindowColorization()
+{
+	if (g_osVersion.BuildNumber() >= 17763)
+	{
+		DWORD value = 0; // initialise in memory
+		DWORD colorVal = 1; // doesn't work when reduced to a single string, annoying but atleast we can use it here
+		RegGetDWORD(HKEY_CURRENT_USER, sz_DesktopWindowManagerKey, L"EnableWindowColorization", &value); // output the data from attributes key...
+
+		if (value != colorVal) // basically if the attribute value doesn't exist or is the wrong value...
+		{
+			RegSetDWORD(HKEY_CURRENT_USER, sz_DesktopWindowManagerKey, L"EnableWindowColorization", &colorVal); // apply folder attributes, arguably the most important part
+		}
+	}
+}
+
+DWORD GetColorizationColor()
+{
+	DWMCOLORIZATIONPARAMS colors;
+	CHAR buffer[0x28];
+	memset(buffer, 0, 0x28);
+	DwmGetColorizationParametersOrig(&buffer);
+	memcpy(&colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+
+	int a = (colors.ColorizationColor >> 24) & 0xFF;
+	int r = (colors.ColorizationColor >> 16) & 0xFF;
+	int g = (colors.ColorizationColor >> 8) & 0xFF;
+	int b = (colors.ColorizationColor) & 0xFF;
+
+	// we override the alpha for Vista since the taskbar is already darkened artistically.
+	a = 0x45; // TODO: get default exact value from Vista, add a range so users can vary things but default to a value outside that range
+
+	return ((a << 24) | (b << 16) | (g << 8) | r);
+}
+
+ACCENT_STATE GetAccentState()
+{
+	// while developing vista it makes sense to build everything around the mode that will universally work regardless of OS version
+	// we can consider restoring blurbehind and acrylic later on once more stuff works
+	// this is a temporary measure so codebase is cleaner and so changes to colorization from 7 aren't lagged behind here
+	return ACCENT_ENABLE_TRANSPARENTGRADIENT;
+}
+
+WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties()
+{
+	// to break down what happens here:
+	// - we create an accent policy
+	// - we take in whether thumbnail wnd is calling so we can make tweaks as needed
+	// - accent state gets calculated and returned based on user preference
+	// - this calculation is tweaked if thumbnail wnd flag is passed in, as pseudo-aero looks better with solid thumbnail
+	// - we then define the accent flags - start menu and taskbar work fine with 0x13, thumbnail requires 0x200 to work properly on later windows 10 versions (presumably OK on earlier vers)
+	// - 0x200 is then added to with extra to ensure that blurbehind mode takes in color properly
+	// - we then define gradient color by pulling either DWM accent color or immersive color as applicable
+	// this is then passed into attribute data which we call back into whenever we need to get accent properties without retyping this whole function
+
+	WINDOWCOMPOSITIONATTRIBDATA attrData;
+	ACCENT_POLICY accentPolicy;
+
+	accentPolicy.AccentState = GetAccentState();
+	accentPolicy.AccentFlags = 0x13; // very important that this is set up like this! maybe less so for Vista
+	accentPolicy.GradientColor = GetColorizationColor();
+
+	attrData.Attrib = WCA_ACCENT_POLICY;
+	attrData.pvData = &accentPolicy;
+	attrData.cbData = sizeof(accentPolicy);
+	return attrData;
+}
+
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
+
+	if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()))) // for pseudo-aero, blurbehind, acrylic & solid modes
+		SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties());
+	else if (!IsThemeActive() || g_bClassicTheme)
+	{
+		DWMNCRENDERINGPOLICY pol = DWMNCRP_DISABLED;
+		DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &pol, sizeof(DWMNCRENDERINGPOLICY));
+	}
+
+	if (uMsg == WM_SETTINGCHANGE || uMsg == WM_WININICHANGE) // vc++ says this is redundant - it isn't, it accounts for vista setting changes and modern setting changes
+	{
+		if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()))) // for pseudo-aero, blurbehind, acrylic & solid modes
+			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties());
+	}
 
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
@@ -233,6 +360,11 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		if (lParam == 1)
 			SetEvent(hEvent_DesktopVisible);
 		return 0;
+	}
+
+	if (uMsg == WM_THEMECHANGED)
+	{
+		EnsureWindowColorization(); // Ittr: Correct colorization enablement setting for Win10/11
 	}
 
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
@@ -286,83 +418,59 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 	return ret;
 }
 
-//Ittr: Less lines of code and more utility/reusability for setting composition attributes in future
-void ForceActiveWindowAppearance(HWND hwnd)
+//Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
+BOOL WINAPI IsCompositionActiveNEW()
 {
-	ACCENT_POLICY policy = { ACCENT_ENABLE_ACRYLICBLURBEHIND, 1, 0x1, 1 }; //BlurBehind is just the naming as the category names were ripped from accent states. Please ignore!
-	WINCOMPATTRDATA data = { WCA_FORCE_ACTIVEWINDOW_APPEARANCE, &policy, 4 };
-	SetWindowCompositionAttribute(hwnd, &data);
+	if (g_bDisableComposition) { return FALSE; }
+
+	return IsCompositionActive();
 }
 
-BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINCOMPATTRDATA* pAttrData)
+HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 {
-	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->attribute, *(DWORD*)pAttrData->pData);
-	if (_WIN_BLUE && IsCompositionActive()) //If we are 8.1 or higher for some reason Tihiy's original hack doesn't work so we forcefully run this instead
+	if (g_bDisableComposition) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
+
+	return DwmIsCompositionEnabled(pfEnabled);
+}
+
+BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised again 25/10/24
+{
+	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
+
+	if (!IsThemeActive() || g_bClassicTheme || !IsCompositionActive() || g_bDisableComposition) // we do funny things so explorer works properly for classic/basic.
 	{
-		/*
-			NOTE TO SELF (AND OTHERS):
-			PSEUDO-AERO STILL WORKS ON 8.1 AND 10.
-			TRANSPARENCY MAKES IT WORK JUST FINE.
-		*/
-		if (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetTaskListThumbWnd()) //enable rtm pseudo-aero
-		{
-			ForceActiveWindowAppearance(hwnd);
-			return SetWindowCompositionAttribute(hwnd, pAttrData);
-		}
+		return NULL; // we handle this in trayproc in Vista because the API we use for 7 doesn't work :P
 	}
-	else if (!_WIN_BLUE && pAttrData->attribute == 0x10) //changed in 7->8
+
+	if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition)) // if user has DWM enabled, and is not using basic/classic
 	{
-		pAttrData->attribute = 0xF;
-		if (IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd())) //enable rtm pseudo-aero
-		{
-			SetWindowCompositionAttribute(hwnd, pAttrData);
-			WINCOMPATTRDATA rtm;
-			struct ATTR13DATA
-			{
-				DWORD p1;
-				DWORD p2;
-				DWORD p3;
-				DWORD p4;
-			};
-			ATTR13DATA attr13 = { 0 };
-			attr13.p1 = 4;
-			rtm.attribute = 0x13;
-			rtm.pData = &attr13;
-			rtm.dataSize = 0x10;
-			return SetWindowCompositionAttribute(hwnd, &rtm);
-		}
+		if ((hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()))) // for pseudo-aero, blurbehind, acrylic & solid modes
+			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties());
 	}
+
 	return SetWindowCompositionAttribute(hwnd, pAttrData);
 }
 
 HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
-	if(hwnd == GetTaskListThumbWnd()) ForceActiveWindowAppearance(hwnd);
-	//if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd()) ) //enable rtm pseudo-aero
-		//pBlurBehind->fEnable = 0;
+	if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetThumbnailWnd())) //enable rtm pseudo-aero
+		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
 
-int WINAPI SetWindowRgnNEW(HWND hWnd, HRGN hRgn, BOOL bRedraw)
+int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 {
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
-	if (hRgn == NULL && hWnd == GetStartMenuWnd()) return 0;
-	return SetWindowRgn(hWnd, hRgn, bRedraw);
-}
-
-HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
-{
-	//Ittr: Temporarily comment these out as unneeded - we want original 7 theme classes to be used where appropriate!
-	//if ( lstrcmp(pszSubAppName,L"VerticalShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"VerticalShowDesktop8",pszSubIdList);
-	//if ( lstrcmp(pszSubAppName,L"ShowDesktop") == 0 ) return SetWindowTheme(hwnd,L"ShowDesktop8",pszSubIdList);
-	return SetWindowTheme(hwnd, pszSubAppName, pszSubIdList);
+	// TODO in future: more sophisticated RGN fixes so this isn't necessary?
+	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
+	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
 UINT WINAPI SetErrorModeNEW(UINT uMode)
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
 		CreateTwinUI_UWP();
 
 	return SetErrorMode(uMode);
@@ -378,41 +486,6 @@ GhostWindowFromHungWindow_t GhostWindowFromHungWindow = nullptr;
 ATOM g_SecondaryTaskbarAtom;
 
 HWND* v_hwndDesktop;
-
-
-
-//bool IsValidTabWindowForTray(HWND hwnd)
-//{
-//	bool bValidTabWindow = false;
-//
-//	if (hwnd)
-//	{
-//		HWND hwndA920 = (HWND)GetPropW(hwnd, (LPCWSTR)0xA920);
-//		IPropertyStore* propertyStore;
-//		//wil::unique_cotaskmem_string appId;
-//		if (hwndA920)
-//		{
-//			if (SUCCEEDED(SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&propertyStore))))
-//			{
-//				wil::PropertyStoreHelper propertyStoreHelper(propertyStore.get());
-//				if (SUCCEEDED(propertyStoreHelper.GetString(PKEY_AppUserModel_ID, appId.put())) && appId)
-//				{
-//					wil::com_ptr<IShellItem2> shellItem2;
-//					if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_AppsFolder, KF_FLAG_DONT_VERIFY, appId.get(), IID_PPV_ARGS(&shellItem2))))
-//					{
-//						bValidTabWindow = true;
-//					}
-//				}
-//			}
-//		}
-//		else
-//		{
-//			bValidTabWindow = true;
-//		}
-//	}
-//
-//	return bValidTabWindow;
-//}
 
 BOOL ShouldAddWindowToTrayHelper(HWND hwnd)
 {
@@ -611,21 +684,6 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 	return DwmpActivateLivePreview(a1, a2, a3, a4, a5);
 }
 
-//Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
-BOOL WINAPI IsCompositionActiveNEW()
-{
-	if (g_bDisableComposition) { return FALSE; }
-
-	return IsCompositionActive();
-}
-
-HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
-{
-	if (g_bDisableComposition) { return 0x80263001; } //0x80263001 is the value to signify composition being disabled for some reason
-
-	return DwmIsCompositionEnabled(pfEnabled);
-}
-
 HICON GetUWPIcon(HWND a2)
 {
 	HICON icon = NULL;
@@ -702,78 +760,8 @@ VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
 	}
 	else
 		SetIcon(This, a2, a3, a4);
+
 }
-
-/*
-INT64 GetClassIconCB(PVOID This, struct ICONBCPARAM* a2, int a3)
-{
-	INT64 ret = 0;
-	if (IsShellFrameWindow)
-	{
-		if (IsShellFrameWindow(*(HWND*)a2+1))
-		{
-			return 4294967294;
-			//return GetClassIconCB_orig(This, a2, a3);
-		}
-		else
-		{
-			return GetClassIconCB_orig(This, a2, a3);
-		}
-	}
-	return 0;
-}
-*/
-
-//fix for classic start menu icon
-typedef HANDLE(WINAPI* BrandingLoadImage_t)(
-	LPCWSTR lpszModule,
-	UINT    uImageId,
-	UINT    type,
-	int     cx,
-	int     cy,
-	UINT    fuLoad
-	);
-BrandingLoadImage_t BrandingLoadImage = nullptr;
-HANDLE WINAPI BrandingLoadImageNEW(
-	LPCWSTR lpszModule,
-	UINT    uImageId,
-	UINT    type,
-	int     cx,
-	int     cy,
-	UINT    fuLoad
-)
-{
-	WCHAR msg[256];
-	wsprintfW(msg, L"BrandingLoadImage, id: %u", uImageId);
-	MessageBoxW(NULL, msg, L"debug", NULL);
-
-	UINT uNewId = 0;
-	switch (uImageId)
-	{
-	case 1041:
-		uNewId = IDB_START;
-		break;
-	case 2041:
-		uNewId = IDB_START_125;
-		break;
-	case 3041:
-		uNewId = IDB_START_150;
-		break;
-	}
-
-	if (uNewId)
-		return LoadImageW(
-			g_hInstance,
-			MAKEINTRESOURCE(uNewId),
-			type, cx, cy, fuLoad
-		);
-	else
-		return BrandingLoadImage(
-			lpszModule, uImageId, type,
-			cx, cy, fuLoad
-		);
-}
-
 //Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
 //Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
 void ShowWin32Menus()
@@ -845,7 +833,6 @@ void FixAuthUI()
 		ChangeImportedPattern(inst3, patch1, size);
 	}
 }
-
 
 int g_fDPIAware = 0;
 int g_nScreenDpi = 0;
@@ -978,6 +965,7 @@ void HookTrayThread(void)
 		(uintptr_t)GetModuleHandle(NULL),
 		"48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 00 03 00 00 48 8B"
 	);
+
 	if (!CTray__SyncThreadProc_orig)
 	{
 		CTray__SyncThreadProc_orig = (LPTHREAD_START_ROUTINE)FindPattern(
@@ -996,62 +984,6 @@ void HookTrayThread(void)
 	}
 }
 
-/* Adjust a window's position to be pushed away from the taskbar */
-SIZE AdjustWindowRectForTaskbar(RECT* lprc)
-{
-	HMONITOR hm = MonitorFromRect(lprc, MONITOR_DEFAULTTONEAREST);
-	HDC hDC = GetDC(NULL);
-	int offset = MulDiv(8, GetDeviceCaps(hDC, LOGPIXELSY), 96);
-	ReleaseDC(NULL, hDC);
-
-	MONITORINFO mi = { sizeof(MONITORINFO) };
-	GetMonitorInfoW(hm, &mi);
-
-	int dx = 0, dy = 0;
-	PLONG plrc = (PLONG)lprc;
-	PLONG plwrc = (PLONG)&mi.rcWork;
-	for (int i = 0; i < 4; i++)
-	{
-		int curOffset = plwrc[i] - plrc[i];
-		curOffset = (curOffset < 0) ? -curOffset : curOffset;
-
-		if (curOffset < offset)
-		{
-			int* set = (i % 2 == 0) ? &dx : &dy;
-			if (i > 1)
-			{
-				*set -= offset - curOffset;
-			}
-			else
-			{
-				*set += offset - curOffset;
-			}
-		}
-	}
-	return { dx, dy };
-}
-
-BOOL WINAPI CalculatePopupWindowPositionNEW(
-	const POINT* anchorPoint,
-	const SIZE* windowSize,
-	UINT         flags,
-	RECT* excludeRect,
-	RECT* popupWindowPosition
-)
-{
-	BOOL res = CalculatePopupWindowPosition(
-		anchorPoint, windowSize, flags,
-		excludeRect, popupWindowPosition
-	);
-	if (IsCompositionActiveNEW() && res && (flags & TPM_WORKAREA) != 0)
-	{
-		SIZE adjust = AdjustWindowRectForTaskbar(popupWindowPosition);
-		OffsetRect(popupWindowPosition, adjust.cx, adjust.cy);
-	}
-	return res;
-}
-
-
 HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPCWSTR lpClassName,
 	LPCWSTR lpWindowName,
@@ -1066,11 +998,19 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	if (g_enableImmersiveShellStack) // UWP enabled
+	if (g_bEnableImmersiveShellStack) // UWP enabled
 	{
 		DWORD p0 = (DWORD)_ReturnAddress();
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
 		HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam);
+
+		// Ittr: We do this to eliminate the ghost window. The power of trans rights compelled me to fix this :3
+		BOOL shouldCloak = true;
+		WCHAR titleBuffer[MAX_PATH];
+		GetClassName(ret, titleBuffer, sizeof(titleBuffer));
+		WCHAR afwTitle[23] = L"ApplicationFrameWindow";
+		if (strcmp((char*)titleBuffer, (char*)afwTitle) == 0)
+			DwmSetWindowAttribute(ret, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
 
 		dbgprintf(L"CREATEWINDOWINBANDNEW %i", dwBand);
 
@@ -1098,6 +1038,15 @@ HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3,
 	DWORD p0 = (DWORD)_ReturnAddress();
 	exStyle = exStyle | WS_EX_TOOLWINDOW;
 	HWND ret = CreateWindowInBandExOrig(exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 & 1, dwTypeFlags);
+
+	// Ittr: We do this to eliminate the ghost window. The power of trans rights compelled me to fix this :3
+	BOOL shouldCloak = true;
+	WCHAR titleBuffer[MAX_PATH];
+	GetClassName(ret, titleBuffer, sizeof(titleBuffer));
+	WCHAR afwTitle[23] = L"ApplicationFrameWindow";
+	if (strcmp((char*)titleBuffer, (char*)afwTitle) == 0)
+		DwmSetWindowAttribute(ret, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
+
 	dbgprintf(L"%p: CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, ret, GetLastError());
 	dbgprintf(L"CreateWindowInBandExOrig %i", p13);
 
@@ -1130,122 +1079,11 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 	return TRUE;
 }
 
-BOOL FileExists(LPCTSTR szPath)
+HMODULE GetCurrentModuleHandle() //use for internal resource calls... honestly i just wanted to show it could be done 
 {
-	DWORD dwAttrib = GetFileAttributes(szPath);
-
-	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
-		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-}
-
-void GetOrbDPIAndPos(LPWSTR fName)
-{
-	APPBARDATA abd;
-	abd.cbSize = sizeof(APPBARDATA);
-	SHAppBarMessage(ABM_GETTASKBARPOS, &abd);
-
-	HDC screen = GetDC(NULL);
-	double hPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSX);
-	double vPixelsPerInch = GetDeviceCaps(screen, LOGPIXELSY);
-	ReleaseDC(NULL, screen);
-	double dpi = (hPixelsPerInch + vPixelsPerInch) * 0.5;
-
-	if (dpi >= 120)
-	{
-		if (dpi >= 144)
-		{
-			if (dpi >= 192)
-			{
-				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6808");
-				else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6812");
-				else StringCchCopyW(fName, MAX_PATH, L"6804");
-			}
-			else
-			{
-				if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6807");
-				else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6811");
-				else StringCchCopyW(fName, MAX_PATH, L"6803");
-			}
-		}
-		else
-		{
-			if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6806");
-			else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6810");
-			else StringCchCopyW(fName, MAX_PATH, L"6802");
-		}
-	}
-	else
-	{
-		if (abd.uEdge == ABE_LEFT || abd.uEdge == ABE_RIGHT) StringCchCopyW(fName, MAX_PATH, L"6805");
-		else if (abd.uEdge == ABE_TOP) StringCchCopyW(fName, MAX_PATH, L"6809");
-		else StringCchCopyW(fName, MAX_PATH, L"6801");
-	}
-}
-
-HANDLE __stdcall LoadImageW_CallHook(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, int cy, UINT fuLoad)
-{
-	dbgprintf(L"LoadImageW_CallHook has been called!");
-
-	WCHAR szExeDir[MAX_PATH];
-	GetModuleFileNameW(NULL, szExeDir, MAX_PATH);
-	WCHAR* backslash = StrRChrW(szExeDir, NULL, L'\\');
-	if (*backslash == L'\\')
-		*backslash = L'\0';
-
-	WCHAR szOrbDir[MAX_PATH];
-	LSTATUS res = g_registry.QueryValue(L"OrbDirectory", (LPBYTE)szOrbDir, sizeof(szOrbDir));
-	if (!*szOrbDir || ERROR_SUCCESS != res)
-		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
-
-	WCHAR szOrbFile[MAX_PATH];
-	GetOrbDPIAndPos(szOrbFile);
-
-	WCHAR szOrbPath[MAX_PATH * 3];
-	wsprintfW(
-		szOrbPath,
-		L"%s\\orbs\\%s\\%s.bmp",
-		szExeDir,
-		szOrbDir,
-		szOrbFile
-	);
-
-	if (FileExists(szOrbPath) == FALSE)
-	{
-		return LoadImageW(hInst, name, type, cx, cy, fuLoad);
-	}
-	else
-	{
-		return LoadImageW(NULL, szOrbPath, IMAGE_BITMAP, 0, 0, fuLoad | LR_LOADFROMFILE);
-	}
-}
-
-void HookLoadImageForSizeAndFont()
-{
-	auto callLoadImage = (uintptr_t)FindPattern((uintptr_t)GetModuleHandle(0), "FF 15 ?? ?? ?? ?? 48 89 43 ?? 48 85 C0 74 ?? 4C 8D ?? ?? ?? BA ?? ?? ?? ?? 48 8B C8 FF 15");
-	if (callLoadImage)
-	{
-		//write a nop
-		DWORD old;
-		VirtualProtect((void*)callLoadImage, 1, PAGE_EXECUTE_READWRITE, &old);
-		*reinterpret_cast<char*>(callLoadImage) = 0x90;
-		VirtualProtect((void*)callLoadImage, 1, old, 0);
-
-		callLoadImage += 1;
-
-		// write a call to our function
-		DetourCall((void*)callLoadImage, LoadImageW_CallHook);
-
-
-	}
-
-	char* callDrawExtended = (char*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 57 48 83 EC 30 33 DB 48 8B F9 48 39 59 40");
-	if (!callDrawExtended) return;
-
-	if (callDrawExtended)
-	{
-		unsigned char bytes[] = { 0xB0,0x01,0xC3 };
-		ChangeImportedPattern(callDrawExtended, bytes, sizeof(bytes));
-	}
+	HMODULE hMod = NULL;
+	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&GetCurrentModuleHandle), &hMod);
+	return hMod;
 }
 
 HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnknown* pUnkOuter, IID& riid, void** ppv)
@@ -1260,28 +1098,41 @@ HRESULT WINAPI SHCoCreateInstanceNew(PCWSTR pszCLSID, const CLSID* pclsid, IUnkn
 	return res;
 }
 
-void HookShell32();
-void HookAPIs()
+void DisableWin11AltTab()
 {
-	DWORD dwEnableUWP = 1;
-	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD)); // Ittr: shortened the name for convenience but still not sure on it at the moment. TODO determine name before release
-	g_enableImmersiveShellStack = (dwEnableUWP != 0);
+	if (g_osVersion.BuildNumber() >= 21996) // build check because this is unnecessary for windows 10
+	{
+		//Ittr: Why? Because it causes it to crash and its stupid
+		char* immersiveBytes = "40 53 48 83 EC 20 83 79 ?? 02 74 17";
 
-	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
-	//change desktop
-	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
-	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHCreateDesktopOrig, SHCreateDesktopNEW);
-	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)201);
-	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHDesktopMessageLoop, SHDesktopMessageLoopNEW);
+		//Load and patch DLL
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"twinui.pcshell.dll"), immersiveBytes), bytes, sizeof(bytes)); //byebye
+	}
+}
 
-	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "SHCoCreateInstance"), SHCoCreateInstanceNew);
+void FixWin11SearchIcon()
+{
+	// Ittr: An accidental change that actually works. Not complaining at all
+	// Tested on 22000 and 26100
+	// Not yet tested on Nickel (226xx)
+	if (g_osVersion.BuildNumber() >= 21996) // build check because this is unnecessary for windows 10
+	{
+		char* searchBytes;
 
-	//ChangeImportedAddress(GetModuleHandle(NULL),"shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)902), GetProcAddress(GetModuleHandle(L"shunimpl.dll"),(LPSTR)473));
-	//change appid
-	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
-	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
-	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
+		if (g_osVersion.BuildNumber() >= 26100)
+			searchBytes = "40 55 48 8B EC 48 83 EC 40"; // SHIsFileExplorerInTabletMode()
+		else
+			searchBytes = "48 89 5C 24 20 55 48 8B EC"; // SHIsFileExplorerInTabletMode()
 
+
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), searchBytes), bytes, sizeof(bytes));
+	}
+}
+
+void RemoveLoadAnimationDataMap()
+{
 	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
 	if (LoadAnimationDataMap)
 	{
@@ -1293,9 +1144,10 @@ void HookAPIs()
 		*reinterpret_cast<char*>(LoadAnimationDataMap) = 0xC3;
 		VirtualProtect(LoadAnimationDataMap, 1, old, 0);
 	}
-	else
-		MessageBox(0, L"SHite", L"FUck", 0);
+}
 
+void RemoveGetClassIdForShellTarget()
+{
 	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
 	if (GetClassIdForShellTarget)
 	{
@@ -1307,51 +1159,85 @@ void HookAPIs()
 		*reinterpret_cast<char*>(GetClassIdForShellTarget) = 0xC3;
 		VirtualProtect(GetClassIdForShellTarget, 1, old, 0);
 	}
+}
 
-	ThemeManagerInitialize();
-	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
-	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
-	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
-
-	void* _ctaskbandadd = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "FF F3 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F8 06 00 00");
-	//void* _ctaskbandclasscb = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B F1 48 8B 0A 49 8B F8 48 8B DA");
-	//addIcon_orig = (addIcon_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 18 56 57 41 54 48 83 EC 20 45 33 E4");
-	void* _cthumbnailUpdate = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 30 48 8B 81 B0 00 00 00");
-	SetIconThumb = (setIconThumb_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 63 D8 4C 8B 81 B0 00 00 00");
-
-	//void* fillnsc = (void*)FindPattern((uintptr_t)GetModuleHandle(0),"48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
-	CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
-	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
-	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
-
+void ModifyDesktopHwnd()
+{
 	uintptr_t desktopHwnd = FindPattern((uintptr_t)GetModuleHandle(0), "74 ?? 48 3B 3D ?? ?? ?? ?? 8D 43 01 0F 45 D8");
 	if (desktopHwnd)
 	{
 		desktopHwnd += 2;
 		v_hwndDesktop = (HWND*)(desktopHwnd + 7 + *reinterpret_cast<signed int*>(desktopHwnd + 3));
 	}
+}
 
+void HookShell32();
+void HookAPIs()
+{
+	// Before doing anything else, initialize the registry switch for immersive shell as this determines what hooks and changes are needed
+	DWORD dwEnableUWP = 0;
+	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
+	g_bEnableImmersiveShellStack = dwEnableUWP;
+
+	// Change and fix core desktop components
+	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
+	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHCreateDesktopOrig, SHCreateDesktopNEW);
+	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)201);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHDesktopMessageLoop, SHDesktopMessageLoopNEW);
+
+	// Fixes the "search by extension" feature in the start menu
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "SHCoCreateInstance"), SHCoCreateInstanceNew);
+
+	// Change appid
+	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
+
+	// Disable DWM composition as quickly as we can (if registry key set)
+	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmIsCompositionEnabled, DwmIsCompositionEnabledNEW);
+
+	// 1. Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
+	// 2. Remove Windows 8+ immersive shell msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
+	RemoveLoadAnimationDataMap();
+	RemoveGetClassIdForShellTarget();
+
+	// Initialize the theme manager and declare the types for the UXTheme apis we're hooking
+	ThemeManagerInitialize();
+	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
+	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
+	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
+
+	// ???
+	ModifyDesktopHwnd();
+
+	// We initialize the MinHook system here
 	MH_Initialize();
+
+	// Hook UXTheme-related calls for the purpose of our inactive theme system.
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+
+	// Hook and update definitions of what windows should be added to the tray - largely for UWP purposes, but essentially zero-cost so included on both immersive on and off modes.
+	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
+	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
 	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
 
-
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only execute this code if we are running in immersive mode.
+	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
+	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
 	{
-		// This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
+		// 1. This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
+		// 2. Prepare the taskbar and thumbnails to handle UWP icons. Further work needed for jumplists and to prevent wrongful classification as "Application Frame Host" in the first place.
+		void* _ctaskbandadd = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "FF F3 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F8 06 00 00");
+		void* _cthumbnailUpdate = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 30 48 8B 81 B0 00 00 00");
+		SetIconThumb = (setIconThumb_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 63 D8 4C 8B 81 B0 00 00 00");
+
 		MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&SetIcon));
 		MH_CreateHook(static_cast<LPVOID>(_cthumbnailUpdate), UpdateItemIcon, reinterpret_cast<LPVOID*>(&UpdateItem));
-		//MH_CreateHook(static_cast<LPVOID>(_ctaskbandclasscb), GetClassIconCB, reinterpret_cast<LPVOID*>(&GetClassIconCB_orig));
-	}
 
-
-	// Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
-	// UWP stuff
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
-	{
+		// The rest of this code block is dedicated to ensuring UWP actually runs in the first place
 		CreateWindowInBandOrig = decltype(CreateWindowInBandOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand"));
 		CreateWindowInBandExOrig = decltype(CreateWindowInBandExOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBandEx"));
 		SetWindowBandApiOrg = decltype(SetWindowBandApiOrg)(GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowBand"));
@@ -1382,56 +1268,54 @@ void HookAPIs()
 		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), "AllowSetForegroundWindow"), ReturnZero, NULL);
 	}
 
-	if (CNSCHost_FillNSCOg && g_osVersion.BuildNumber() >= 10240)
-		MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
+	// If we are on Windows 10 or higher, query the original program list pattern and create our hook to fix the visual issues
+	// Non-functional for Vista, needs reworking
+	if (g_osVersion.BuildNumber() >= 10240)
+	{
+		CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+		if (CNSCHost_FillNSCOg)
+			MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
+	}
+
+	// Prevent theme overrides applying to file explorer *VERY IMPORTANT*
 	HookTrayThread();
 
-
-	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"), OpenThemeData_Hook);
-	//ChangeImportedAddress(GetModuleHandle(NULL),"uxtheme.dll", GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "CloseThemeData"), CloseThemeDataNEW);
-	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmIsCompositionEnabled, DwmIsCompositionEnabledNEW);
-	//adapt colorization api
+	// Adapt colorization api
 	DwmGetColorizationParametersOrig = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)127);
 	DwmpActivateLivePreview = (decltype(DwmpActivateLivePreview))GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)113);
 	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmpActivateLivePreview, DwmpActivateLivePreviewNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmGetColorizationParametersOrig, DwmGetColorizationParametersNEW);
 
-	//8RTM - composition
-	//Ittr: Restore active DWM "colorization" to previews, taskbar and start menu (how this renders is theme-dependent)
+	// Add DWM colorization attributes to taskbar and start menu (depending on whether mode is 0 aka legacy or 1-3 aka new options) (how this renders is theme-dependent).
+	// Currently not working for taskbar thumbnails from 1809 onwards...
 	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowCompositionAttribute");
 	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowCompositionAttribute, SetWindowCompositionAttributeNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmEnableBlurBehindWindow, DwmEnableBlurBehindWindowNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowRgn, SetWindowRgnNEW);
-	//load functions needed for task enum hook
+
+	// Load functions needed for task enumeration hook
 	HMODULE user32 = LoadLibrary(L"user32.dll");
 	IsShellFrameWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2573);
-	//IsShellManagedWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2574);
 	GhostWindowFromHungWindow = (GhostWindowFromHungWindow_t)GetProcAddress(user32, "GhostWindowFromHungWindow");
-	//perform the actual hook
-	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", IsWindowVisible, IsWindowVisibleNEW);
-	//change show desktop btn
-	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", SetWindowTheme, SetWindowThemeNEW);
-	//overflow positioning if user is using TH1 or higher
-	if (g_osVersion.BuildNumber() >= 10240)
-		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
-	//fix classic start menu icon (pls fix)
-	/*HMODULE winbrand = LoadLibrary(L"winbrand.dll");
-	BrandingLoadImage = (BrandingLoadImage_t)GetProcAddress(winbrand, "BrandingLoadImage");
-	if (BrandingLoadImage)
-		ChangeImportedAddress(GetModuleHandle(NULL),"winbrand.dll",BrandingLoadImage,BrandingLoadImageNEW);*/
-		//shell32 - hack created startmenupin instance		
-	StartMenuPin_PatchShell32();
-	//shell32 - patch delayload shit
-	HookShell32();
-	ShowWin32Menus(); //Remove immersive menus so taskbar behaves properly
-	FixAuthUI();
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", IsWindowVisible, IsWindowVisibleNEW); // perform the actual hook
 
-	// query disable comp value
+	// 1. shell32.dll - hack created startmenupin instance
+	// 2. shell32.dll - patch delayload shit
+	StartMenuPin_PatchShell32();
+	HookShell32();
+
+	// Assorted fixes and changes
+	ShowWin32Menus(); // Remove immersive menus so taskbar behaves properly (TODO: Fix for windows 11)
+	FixAuthUI(); // Responsible for fixing CLogoffOptions
+	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
+	FixWin11SearchIcon(); // Prevents search icon from being mangled by a buggy tablet mode implementation (cheers Microsoft)
+
+	// Query registry for disable composition value
 	DWORD dwDisableComposition = 0;
 	g_registry.QueryValue(L"DisableComposition", (LPBYTE)&dwDisableComposition, sizeof(DWORD));
 	g_bDisableComposition = (dwDisableComposition != 0);
 
-	// query classic theme
+	// Query registry for forced classic theme value
 	DWORD dwClassicTheme = 0;
 	g_registry.QueryValue(L"ClassicTheme", (LPBYTE)&dwClassicTheme, sizeof(DWORD));
 	if (dwClassicTheme != 0)
@@ -1439,15 +1323,12 @@ void HookAPIs()
 		dbgprintf(L"setting classic theme");
 		g_bDisableComposition = true; // classic theme never had comp, duh
 		g_bClassicTheme = true;
-		SetThemeAppProperties(NULL);
+		SetThemeAppProperties(NULL); // method needs future improvement here...
 	}
 
-	HookLoadImageForSizeAndFont();
-
-	//enable hooks at end
+	// Enable MinHook hooks at the end
 	MH_EnableHook(MH_ALL_HOOKS);
 }
-
 
 BOOL WINAPI GetUserObjectInformationNew(HANDLE hObj, int nIndex, PVOID pvInfo, DWORD nLength, LPDWORD lpnLengthNeeded)
 {
@@ -1471,14 +1352,14 @@ UINT_PTR WINAPI SetTimer_WUI(HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERPR
 	return SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc);
 }
 
-
+// Used even when immersive UI is not active in some cases..?
 void HookImmersive()
 {
 	HMODULE immersiveui = LoadLibrary(L"Windows.UI.Immersive.dll");
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
@@ -1487,7 +1368,7 @@ void HookImmersive()
 	ChangeImportedAddress(immersiveui, "user32.dll", GetUserObjectInformation, GetUserObjectInformationNew);
 	ChangeImportedAddress(immersiveui, "user32.dll", SetTimer, SetTimer_WUI);
 
-	if (!g_enableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
+	if (!g_bEnableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
 	{
 		//bugbug!!!
 		ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
@@ -1499,19 +1380,7 @@ void HookImmersive()
 	}
 }
 
-FARPROC
-WINAPI
-GetProcAddress_Hook(
-	HMODULE hModule,
-	LPCSTR lpProcName
-)
-{
-	//dbgprintf(L"GetProcAddress Hook\n");
-	return GetProcAddress(hModule, lpProcName);
-}
-
-//TODO: Migrate to use ChangeImportedPattern or equivalent when said function is finalised. Not migrated yet due to importance of shunimpl
-//Basically this allows explorer to actually work on builds >9200
+// Basically this allows explorer to actually work on builds >9200
 void AssFuckShunimpl()
 {
 	uintptr_t shunImpl = (uintptr_t)GetModuleHandle(L"shunimpl.dll");
@@ -1526,11 +1395,120 @@ void AssFuckShunimpl()
 
 }
 
+// Generic crash error
+void CrashError()
+{
+	WCHAR errorText[71] = L"An unexpected error occurred and explorer7 needs to quit. We're sorry!"; // Funny brick game message go haha
+	WCHAR errorTitle[16] = L"explorer7 Crash";
+
+	MessageBoxW(NULL, errorText, errorTitle, MB_ICONERROR); // the actual error box lol
+}
+
+// Create all programs shellfolder on 1607+ where it doesn't already exist
+void CreateShellFolder()
+{
+	//addendum: using the regular HKLM location is not viable for non-administrator users so we store in HKCU, which causes it to turn up in HKEY_USERS somewhere. 
+	//this shouldn't work, but it does :P
+	if (g_osVersion.BuildNumber() >= 14393) // Ittr: byebye internet2.reg
+	{
+		DWORD value = 0; // initialise in memory
+		DWORD attrVal = 0x28100000; // doesn't work when reduced to a single string, annoying but atleast we can use it here
+		RegGetDWORD(HKEY_CURRENT_USER, sz_ShellFolder3, L"Attributes", &value); // output the data from attributes key...
+
+		if (value != attrVal) // basically if the attribute value doesn't exist or is the wrong value...
+		{
+			// we create all the relevant values. issue solved for new users - program list works out of the box now
+			RegSetSZ(HKEY_CURRENT_USER, sz_ShellFolder, NULL, (DWORD*)L"Programs Folder and Fast Items"); // create clsid name
+			RegSetExpandSZ(HKEY_CURRENT_USER, sz_ShellFolder2, NULL, (DWORD*)L"%SystemRoot%\\system32\\shell32.dll"); // point it to shell32
+			RegSetSZ(HKEY_CURRENT_USER, sz_ShellFolder2, L"ThreadingModel", (DWORD*)L"Apartment"); // regular threading model criteria...
+			RegSetDWORD(HKEY_CURRENT_USER, sz_ShellFolder3, L"Attributes", &attrVal); // apply folder attributes, arguably the most important part
+		}
+
+		///////////// THE BELOW CURRENTLY DOES NOT WORK PROPERLY. THE ISSUE MAINLY SEEMS TO BE WITH CLSID/GUID INPUTS INTO THE REGISTRY.
+		/*DWORD value2 = 0;
+		DWORD attrVal2 = 0x00000001;
+		DWORD intendedAttr = 0x00000000;
+		RegGetDWORD(HKEY_CURRENT_USER, sz_InternetEmail, L"Attributes", &value2);*/
+
+		/*if (value2 != attrVal2)
+		{
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail, NULL, (DWORD*)L"Internet");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail, L"LocalizedString", (DWORD*)L"@explorer.exe,-7024");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail, L"InfoTip", (DWORD*)L"@explorer.exe,-7004");
+
+			RegSetExpandSZ(HKEY_CURRENT_USER, sz_InternetEmail2, NULL, (DWORD*)L"%SystemRoot%\\explorer.exe,-253");
+
+			RegSetExpandSZ(HKEY_CURRENT_USER, sz_InternetEmail3, NULL, (DWORD*)L"%SystemRoot%\\system32\\shdocvw.dll");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail3, L"ThreadingModel", (DWORD*)L"Apartment");
+
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail4, L"CLSID", (DWORD*)L"{25585dc7-4da0-438d-ad04-e42c8d2d64b9}");
+
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail5, L"Element", (DWORD*)L"{3c81e7fa-1f3b-464a-a350-114a25beb2a2}");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail5, L"InitString", (DWORD*)L"StartMenuInternet");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail5, L"opentext", (DWORD*)L"@shell32.dll,-12705");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail5, L"properties", (DWORD*)L"inetcpl.cpl");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail5, L"propertiestext", (DWORD*)L"@shell32.dll,-12704");
+
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail6, NULL, (DWORD*)L"");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail7, NULL, (DWORD*)L"{2559a1f4-21d7-11d4-bdaf-00c04f60b9f0}");
+			RegSetSZ(HKEY_CURRENT_USER, sz_InternetEmail8, NULL, (DWORD*)L"");
+			RegSetDWORD(HKEY_CURRENT_USER, sz_InternetEmail9, L"Attributes", &intendedAttr);
+		}*/
+	}
+}
+
+// Compatibility warning for Windows 11 (Milestone 2)
+void FirstRunCompatibilityWarning()
+{
+	if (g_osVersion.BuildNumber() >= 21996 || g_osVersion.BuildNumber() == 20348) // temporary one-off M2 warning for win11 users, permanent for iron users
+	{
+		DWORD value = 0;
+		RegGetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunVersionCheck", &value);
+		if (value != 1)
+		{
+			MessageBoxW(NULL, L"This build of Windows is not currently supported.\n\nYou may encounter usability issues.", L"explorer7", MB_ICONEXCLAMATION);
+			DWORD newValue = 1;
+			RegSetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunVersionCheck", &newValue);
+		}
+	}
+}
+
+// Where we need to close explorer silently (such as to block people from using awful, horrendous software...)
+void ExitExplorerSilently()
+{
+	// we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
+	LPDWORD exitCode;
+	GetExitCodeProcess(L"explorer.exe", exitCode);
+	ExitProcess((UINT)exitCode); // exit explorer
+}
+
+// Initialize the inactive theme engine
+void ThemeHandlesInit()
+{
+	themeHandles = new wiktorArray<HTHEME>();
+	themeHandles->data = 0;
+	themeHandles->size = 0;
+}
+
+// Terminate inactive theme engine when needed
+void EndThemeHandles()
+{
+	realloc(themeHandles->data, 0);
+	themeHandles->size = 0;
+	delete themeHandles;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
 {
 	CheckTimeBomb();
+
+	// Ittr: We initialise values for closing program if shitblinds is present
+	WCHAR programPath[MAX_PATH] = L"\\Stardock\\WindowBlinds 11\\unins000.exe";
+	WCHAR blacklistPath[MAX_PATH];
+	ExpandEnvironmentStringsW(L"%ProgramFiles%", (LPWSTR)blacklistPath, sizeof(blacklistPath));
+	lstrcat(blacklistPath, programPath);
 
 	switch (ul_reason_for_call)
 	{
@@ -1538,9 +1516,13 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	{
 		AssFuckShunimpl();
 
-		themeHandles = new wiktorArray<HTHEME>();
-		themeHandles->data = 0;
-		themeHandles->size = 0;
+		if (GetFileAttributesW((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
+			CrashError(); // The user-facing crash message - we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
+
+		CreateShellFolder(); // Fix shell folder for 1607+...
+		EnsureWindowColorization(); // Correct colorization enablement setting for Win10/11
+		FirstRunCompatibilityWarning(); // Warn users on Windows 11 (for milestone 2) and Server 2022 of potential problems
+		ThemeHandlesInit(); // Basically start the inactive theme management process
 
 		dbgprintf(L"Dll Attach\n");
 		g_hInstance = hModule;
@@ -1563,15 +1545,16 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 			ChangeImportedAddress(GetModuleHandle(L"alttab.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
 			g_alttabhooked = TRUE;
 		}
+
+		if (GetFileAttributes((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 2 - actually stops the program from running
+			ExitExplorerSilently(); //byebye WB users
+
 	}
 	break;
 	case DLL_THREAD_DETACH:
 		break;
 	case DLL_PROCESS_DETACH:
-		realloc(themeHandles->data, 0);
-		themeHandles->size = 0;
-		delete themeHandles;
-
+		EndThemeHandles();
 		break;
 	}
 	return TRUE;
@@ -1599,13 +1582,12 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 
-		if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+		if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
 			CreateTwinUI_UWP();
 
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface
 	{
-
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IRegTreeOptions8, ppv);
 		*ppv = new CRegTreeOptionsWrapper((IRegTreeOptions8*)*ppv);
 	}
@@ -1719,7 +1701,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		else
 		{
 			IID dk = IID_IShutdownChoices8;
-			if (build >= 10240)
+			if (build >= 10074)
 				dk = IID_IShutdownChoices10;
 
 			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, dk, ppv);
@@ -1747,7 +1729,7 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	if (rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
-		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - TODO re-enable for non
+		if (g_osVersion.BuildNumber() < 10074) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - restoring this on 10 is now seemingly unnecessary
 		{
 			//register immersive shell fake too
 			RegisterFakeImmersive();
@@ -1768,7 +1750,7 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject(DWORD dwRegister)
 {
 	if (dwRegister == dwRegisterNotify)
 	{
-		if (g_osVersion.BuildNumber() < 10240) // Ittr: temporarily gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		if (g_osVersion.BuildNumber() < 10240) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
 		{
 			UnregisterFakeImmersive();
 			UnregisterProjection();

@@ -187,7 +187,7 @@ BOOL WINAPI ChangeExportedAddress_ORDINAL(HMODULE hModule, ULONGLONG origOrdinal
 
     for (DWORD i = 0; i < pImportDir->NumberOfFunctions; i++) 
     {
-        WORD ordinal = pImportDir->Base + i;
+        DWORD ordinal = pImportDir->Base + i;
 
         char name[256] = "NO NAME";
 
@@ -209,7 +209,7 @@ BOOL WINAPI ChangeExportedAddress_ORDINAL(HMODULE hModule, ULONGLONG origOrdinal
             //dbgprintfA("Forwarded Export: ordinal %i %s %s\n", ordinal, name, forwardedTo);
             if (origOrdinal == ordinal)
             {
-                int len = strlen(newForward) + 1;
+                size_t len = strlen(newForward) + 1;
                 VirtualProtect(forwardedTo, len * sizeof(CHAR), PAGE_EXECUTE_READWRITE, &oldpr);
                 memcpy((void*)(lpFileBase + functionRva), newForward, sizeof(CHAR) * len);
                 VirtualProtect(forwardedTo, len * sizeof(CHAR), oldpr, 0);

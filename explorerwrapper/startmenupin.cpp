@@ -122,7 +122,7 @@ LRESULT CStartMenuPin::GetMenuStringID(UINT* w)
 
 int CStartMenuPin::GetHelpText(unsigned __int64 id, LPWSTR buf, UINT nCharMax)
 {
-	return Shell32_LoadString(h_shell32, id + 0x1508, buf, nCharMax);
+	return Shell32_LoadString(h_shell32, id + 0x1508ul, buf, nCharMax);
 }
 
 WCHAR* CStartMenuPin::GetVerb(UINT op)
