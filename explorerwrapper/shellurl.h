@@ -13,56 +13,56 @@ MIDL_INTERFACE("4f33718d-bae1-4f9b-96f2-d2a16e683346")
 IShellURL7 : public IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE ParseFromOutsideSource(ushort const*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetUrl(ushort*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetUrl(ushort const*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetDisplayName(ushort*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetPidl(LPITEMIDLIST*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetPidl(LPITEMIDLIST) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetPidlAndArgs(LPITEMIDLIST, ushort const*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetArgs(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE AddPath(LPITEMIDLIST) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetCancelObject(void*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE StartAsyncPathParse(HWND__*, ushort const*, ulong, void*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetParseResult(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetUsnSource(ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetUsnSource(ulong*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetNavFlags(int, int) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetCookie(ulong*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Execute(void*, int*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetCurrentWorkingDir(LPITEMIDLIST) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetMessageBoxParent(HWND__*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetPidlNoGenerate(LPITEMIDLIST*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetStandardParsingFlags(int) = 0;
+	STDMETHOD(ParseFromOutsideSource)(ushort const*, ulong) = 0;
+	STDMETHOD(GetUrl)(ushort*, ulong) = 0;
+	STDMETHOD(SetUrl)(ushort const*, ulong) = 0;
+	STDMETHOD(GetDisplayName)(ushort*, ulong) = 0;
+	STDMETHOD(GetPidl)(LPITEMIDLIST*) = 0;
+	STDMETHOD(SetPidl)(LPITEMIDLIST) = 0;
+	STDMETHOD(SetPidlAndArgs)(LPITEMIDLIST, ushort const*) = 0;
+	STDMETHOD(GetArgs)(void) = 0;
+	STDMETHOD(AddPath)(LPITEMIDLIST) = 0;
+	STDMETHOD(SetCancelObject)(void*) = 0;
+	STDMETHOD(StartAsyncPathParse)(HWND__*, ushort const*, ulong, void*) = 0;
+	STDMETHOD(GetParseResult)(void) = 0;
+	STDMETHOD(SetUsnSource)(ulong) = 0;
+	STDMETHOD(GetUsnSource)(ulong*) = 0;
+	STDMETHOD(SetNavFlags)(int, int) = 0;
+	STDMETHOD(GetCookie)(ulong*) = 0;
+	STDMETHOD(Execute)(void*, int*, ulong) = 0;
+	STDMETHOD(SetCurrentWorkingDir)(LPITEMIDLIST) = 0;
+	STDMETHOD(SetMessageBoxParent)(HWND__*) = 0;
+	STDMETHOD(GetPidlNoGenerate)(LPITEMIDLIST*) = 0;
+	STDMETHOD(GetStandardParsingFlags)(int) = 0;
 };
 
 MIDL_INTERFACE("88df9332-6adb-4604-8218-508673ef7f8a")
 IShellURL10 : public IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE ParseFromOutsideSource(ushort const*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetUrl(ushort*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetUrl(ushort const*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetDisplayName(ushort*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetPidl(LPITEMIDLIST*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetPidl(LPITEMIDLIST) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetPidlAndArgs(LPITEMIDLIST, ushort const*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetArgs(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE AddPath(LPITEMIDLIST) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetCancelObject(void*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE StartAsyncPathParse(HWND__*, ushort const*, ulong, void*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetParseResult(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetRequestID(int) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetRequestID(int*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetNavFlags(int, int) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetCookie(ulong*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Execute(void*, int*, ulong) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetCurrentWorkingDir(LPITEMIDLIST) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetMessageBoxParent(HWND__*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetPidlNoGenerate(LPITEMIDLIST*) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetStandardParsingFlags(int) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetUrlAlloc(ushort**) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetDisplayNameAlloc(ushort**) = 0;
+	STDMETHOD(ParseFromOutsideSource)(ushort const*, ulong) = 0;
+	STDMETHOD(GetUrl)(ushort*, ulong) = 0;
+	STDMETHOD(SetUrl)(ushort const*, ulong) = 0;
+	STDMETHOD(GetDisplayName)(ushort*, ulong) = 0;
+	STDMETHOD(GetPidl)(LPITEMIDLIST*) = 0;
+	STDMETHOD(SetPidl)(LPITEMIDLIST) = 0;
+	STDMETHOD(SetPidlAndArgs)(LPITEMIDLIST, ushort const*) = 0;
+	STDMETHOD(GetArgs)(void) = 0;
+	STDMETHOD(AddPath)(LPITEMIDLIST) = 0;
+	STDMETHOD(SetCancelObject)(void*) = 0;
+	STDMETHOD(StartAsyncPathParse)(HWND__*, ushort const*, ulong, void*) = 0;
+	STDMETHOD(GetParseResult)(void) = 0;
+	STDMETHOD(SetRequestID)(int) = 0;
+	STDMETHOD(GetRequestID)(int*) = 0;
+	STDMETHOD(SetNavFlags)(int, int) = 0;
+	STDMETHOD(GetCookie)(ulong*) = 0;
+	STDMETHOD(Execute)(void*, int*, ulong) = 0;
+	STDMETHOD(SetCurrentWorkingDir)(LPITEMIDLIST) = 0;
+	STDMETHOD(SetMessageBoxParent)(HWND__*) = 0;
+	STDMETHOD(GetPidlNoGenerate)(LPITEMIDLIST*) = 0;
+	STDMETHOD(GetStandardParsingFlags)(int) = 0;
+	STDMETHOD(GetUrlAlloc)(ushort**) = 0;
+	STDMETHOD(GetDisplayNameAlloc)(ushort**) = 0;
 };
 
 class CShellURLWrapper : public IShellURL7
@@ -70,30 +70,30 @@ class CShellURLWrapper : public IShellURL7
 public:
 	CShellURLWrapper(IShellURL10* actual);
 
-	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
-	ULONG STDMETHODCALLTYPE AddRef(void);
-	ULONG STDMETHODCALLTYPE Release(void);
-	HRESULT STDMETHODCALLTYPE ParseFromOutsideSource(ushort const*, ulong);
-	HRESULT STDMETHODCALLTYPE GetUrl(ushort*, ulong);
-	HRESULT STDMETHODCALLTYPE SetUrl(ushort const*, ulong);
-	HRESULT STDMETHODCALLTYPE GetDisplayName(ushort*, ulong);
-	HRESULT STDMETHODCALLTYPE GetPidl(LPITEMIDLIST*);
-	HRESULT STDMETHODCALLTYPE SetPidl(LPITEMIDLIST);
-	HRESULT STDMETHODCALLTYPE SetPidlAndArgs(LPITEMIDLIST, ushort const*);
-	HRESULT STDMETHODCALLTYPE GetArgs(void);
-	HRESULT STDMETHODCALLTYPE AddPath(LPITEMIDLIST);
-	HRESULT STDMETHODCALLTYPE SetCancelObject(void*);
-	HRESULT STDMETHODCALLTYPE StartAsyncPathParse(HWND__*, ushort const*, ulong, void*);
-	HRESULT STDMETHODCALLTYPE GetParseResult(void);
-	HRESULT STDMETHODCALLTYPE SetUsnSource(ulong);
-	HRESULT STDMETHODCALLTYPE GetUsnSource(ulong*);
-	HRESULT STDMETHODCALLTYPE SetNavFlags(int, int);
-	HRESULT STDMETHODCALLTYPE GetCookie(ulong*);
-	HRESULT STDMETHODCALLTYPE Execute(void*, int*, ulong);
-	HRESULT STDMETHODCALLTYPE SetCurrentWorkingDir(LPITEMIDLIST);
-	HRESULT STDMETHODCALLTYPE SetMessageBoxParent(HWND__*);
-	HRESULT STDMETHODCALLTYPE GetPidlNoGenerate(LPITEMIDLIST*);
-	HRESULT STDMETHODCALLTYPE GetStandardParsingFlags(int);
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
+	STDMETHODIMP ParseFromOutsideSource(ushort const*, ulong);
+	STDMETHODIMP GetUrl(ushort*, ulong);
+	STDMETHODIMP SetUrl(ushort const*, ulong);
+	STDMETHODIMP GetDisplayName(ushort*, ulong);
+	STDMETHODIMP GetPidl(LPITEMIDLIST*);
+	STDMETHODIMP SetPidl(LPITEMIDLIST);
+	STDMETHODIMP SetPidlAndArgs(LPITEMIDLIST, ushort const*);
+	STDMETHODIMP GetArgs(void);
+	STDMETHODIMP AddPath(LPITEMIDLIST);
+	STDMETHODIMP SetCancelObject(void*);
+	STDMETHODIMP StartAsyncPathParse(HWND__*, ushort const*, ulong, void*);
+	STDMETHODIMP GetParseResult(void);
+	STDMETHODIMP SetUsnSource(ulong);
+	STDMETHODIMP GetUsnSource(ulong*);
+	STDMETHODIMP SetNavFlags(int, int);
+	STDMETHODIMP GetCookie(ulong*);
+	STDMETHODIMP Execute(void*, int*, ulong);
+	STDMETHODIMP SetCurrentWorkingDir(LPITEMIDLIST);
+	STDMETHODIMP SetMessageBoxParent(HWND__*);
+	STDMETHODIMP GetPidlNoGenerate(LPITEMIDLIST*);
+	STDMETHODIMP GetStandardParsingFlags(int);
 
 	ULONG m_cRef;
 	IShellURL10* m_actual;

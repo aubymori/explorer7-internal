@@ -936,8 +936,11 @@ VOID UpdateItemIcon(PVOID This, int a2)
 
 }
 
+PVOID CtaskBandPtr = 0;
+
 VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
 {
+	CtaskBandPtr = This;
 	if (IsShellFrameWindow && IsShellFrameWindow(a2))
 	{
 		HICON hc = GetUWPIcon(a2);
@@ -1588,6 +1591,66 @@ void ModifyDesktopHwnd()
 	}
 }
 
+enum BlockHotKeyRegistrationFlags : __int32
+{
+	BHKRF_None = 0x0,
+	BHKRF_Always = 0x1,
+	BHKRF_PpiEdition = 0x2,
+	BHKRF_AssignedAccessMultiAppMode = 0x4,
+	BHKRF_ShellLauncher = 0x8,
+};
+
+const struct IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION
+{
+	BlockHotKeyRegistrationFlags blockFlags;
+	int id;
+	unsigned int fsModifiers;
+	unsigned int vk;
+};
+
+HRESULT(__fastcall* CImmersiveWindowMessageService__RequestHotkeys)(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5);
+HRESULT CImmersiveWindowMessageService__RequestHotkeys_Hook(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5)
+{
+	dbgprintf(L"CImmersiveWindowMessageService__RequestHotkeys");
+	if (a3->vk == VK_LWIN || a3->vk == VK_RWIN || (a3->vk == VK_ESCAPE && a3->fsModifiers & VK_CONTROL)) // fix win key
+	{
+		dbgprintf(L"FIXING WINDOWS KEY");
+		return S_OK;
+	}
+
+	return CImmersiveWindowMessageService__RequestHotkeys(a1,a2,a3,a4,a5);
+}
+
+UINT shellHook = 0;
+
+UINT(WINAPI* fRegisterWindowMessageW)(LPCWSTR lpString);
+UINT WINAPI RegisterWindowMessageWNEW(LPCWSTR lpString)
+{
+	dbgprintf(L"RegisterWindowMessageWNEW %s",lpString);
+	if (wcscmp(L"SHELLHOOK", lpString) == 0)
+	{
+		dbgprintf(L"RegisterWindowMessageWNEW REDIRD");
+
+		if (shellHook != 0)
+			return shellHook;
+
+		shellHook = fRegisterWindowMessageW(L"SHELLHOOK");
+		return shellHook;
+	}
+	return fRegisterWindowMessageW(lpString);
+}
+
+HRESULT(__fastcall* CTaskBand_HandleShellHook)(PVOID ctaskband, int id, HWND a3);
+
+HRESULT(__fastcall* OnShellHookMessage)(void* a1);
+HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be opened
+{
+	if (CtaskBandPtr)
+		return CTaskBand_HandleShellHook(CtaskBandPtr,7,0);
+
+	return OnShellHookMessage(a1);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1617,6 +1680,7 @@ void HookAPIs()
 	// Disable DWM composition as quickly as we can (if registry key set)
 	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
 	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmIsCompositionEnabled, DwmIsCompositionEnabledNEW);
+	//ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", RegisterWindowMessageW, RegisterWindowMessageWNEW);
 
 	// 1. Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
 	// 2. Remove Windows 8+ immersive shell msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
@@ -1635,10 +1699,19 @@ void HookAPIs()
 	// We initialize the MinHook system here
 	MH_Initialize();
 
+	//CImmersiveWindowMessageService__RequestHotkeys = (decltype(CImmersiveWindowMessageService__RequestHotkeys))FindPattern((uintptr_t)LoadLibrary(L"twinui.dll"), "4C 8B DC 4D 89 43 ?? 57 41 54 41 55 41 56 41 57 48 83 EC");
+	//MH_CreateHook(static_cast<LPVOID>(CImmersiveWindowMessageService__RequestHotkeys), CImmersiveWindowMessageService__RequestHotkeys_Hook, reinterpret_cast<LPVOID*>(&CImmersiveWindowMessageService__RequestHotkeys));
+
+	fRegisterWindowMessageW = (decltype(fRegisterWindowMessageW))GetProcAddress(LoadLibraryW(L"user32.dll"),"RegisterWindowMessageW");
+
+	CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
+	OnShellHookMessage = (decltype(OnShellHookMessage))FindPattern((uintptr_t)LoadLibraryW(L"twinui.pcshell.dll"), "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83");
+
 	// Hook UXTheme-related calls for the purpose of our inactive theme system.
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
+	MH_CreateHook(static_cast<LPVOID>(OnShellHookMessage), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&OnShellHookMessage));
 
 	// Hook and update definitions of what windows should be added to the tray - largely for UWP purposes, but essentially zero-cost so included on both immersive on and off modes.
 	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
@@ -1673,7 +1746,7 @@ void HookAPIs()
 		MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandOrig), CreateWindowInBandNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandOrig));
 		MH_CreateHook(static_cast<LPVOID>(CreateWindowInBandExOrig), CreateWindowInBandExNew, reinterpret_cast<LPVOID*>(&CreateWindowInBandExOrig));
 		MH_CreateHook(static_cast<LPVOID>(SetWindowBandApiOrg), SetWindowBandNew, reinterpret_cast<LPVOID*>(&SetWindowBandApiOrg));
-		MH_CreateHook(static_cast<LPVOID>(RegisterHotKeyApiOrg), RegisterWindowHotkeyNew, reinterpret_cast<LPVOID*>(&RegisterHotKeyApiOrg));
+		//MH_CreateHook(static_cast<LPVOID>(RegisterHotKeyApiOrg), RegisterWindowHotkeyNew, reinterpret_cast<LPVOID*>(&RegisterHotKeyApiOrg));
 
 		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2581), ReturnZero, NULL); // GetWindowTrackInfoAsync
 		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2563), ReturnZero, NULL); // ClearForeground

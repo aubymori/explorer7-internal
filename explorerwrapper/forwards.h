@@ -148,6 +148,7 @@
 #pragma comment(linker,FORWARDO(SHLWAPI,554))
 #pragma comment(linker,FORWARDO(SHLWAPI,250))
 #pragma comment(linker,FORWARDO(SHLWAPI,346))
+#pragma comment(linker,FORWARDO(SHLWAPI,19))
 
 
 //shlwapi - names
@@ -216,3 +217,4 @@
 #pragma comment(linker,FORWARDN(SHLWAPI,wnsprintfW))
 #pragma comment(linker,FORWARDN(SHLWAPI,StrCatW))
 #pragma comment(linker,FORWARDN(SHLWAPI,StrCpyW))
+#pragma comment(linker,FORWARDN(SHLWAPI,SHEnumValueW))

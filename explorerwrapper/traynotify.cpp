@@ -128,6 +128,12 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::QueryInterface(REFIID riid,void **
 		AddRef();
 		return S_OK;
 	}
+	if (riid == IID_ITrayNotify7)
+	{
+		*ppvObject = static_cast<ITrayNotify8*>(this);
+		AddRef();
+		return S_OK;
+	}
 	if (riid == IID_ITrayNotify8)
 	{
 		*ppvObject = static_cast<ITrayNotify8*>(this);
@@ -157,6 +163,8 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1,ULON
 	*p2 = 0;
 	if (g_osVersion.BuildNumber() >= 10240)
 		return S_OK;
+	//INotificationCB* cb;
+	//p1->QueryInterface(IID_PPV_ARGS(&cb));
 	return m_notify7->RegisterCallback(p1);
 }
 

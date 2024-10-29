@@ -29,6 +29,13 @@ public:
 	STDMETHOD(SetWindowingEnvironmentConfig)(IUnknown*) PURE;
 };
 
+MIDL_INTERFACE("d782ccba-afb0-43f1-94db-fda3779eaccb")
+INotificationCB : IUnknown
+{
+	STDMETHOD(Notify)(DWORD dwMessage, void* pNotifyItem) PURE;
+};
+
+
 class CTrayNotifyFactory : public IClassFactory
 {
 public:
