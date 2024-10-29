@@ -45,6 +45,8 @@ bool g_bEnableImmersiveShellStack = false;
 bool g_bRPEnabled = false; // Lol
 bool g_bAcrylicAlt = false;
 int g_bColorizationOptions = 0;
+bool g_bOverrideAlpha = false;
+DWORD g_bAlphaValue = 0x6B;
 
 static WNDPROC g_prevTrayProc;
 static WNDPROC g_prevThumbnailProc;
@@ -364,6 +366,10 @@ DWORD GetColorizationColor()
 
 	if (g_bColorizationOptions == 4) // mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
 		a = 0xFF;
+
+	// Windows 10 and 11 users specifically without glass tools may struggle to adjust color opacity, this optional override fixes this
+	if (g_bOverrideAlpha && (g_bColorizationOptions == 1 || g_bColorizationOptions == 2))
+		a = (g_bAlphaValue) & 0xFF;
 
 	if (g_bColorizationOptions == 3)
 	{
@@ -1768,6 +1774,17 @@ void HookAPIs()
 
 	}
 
+	// Query registry for alpha override
+	DWORD dwOverrideAlpha = 0;
+	g_registry.QueryValue(L"OverrideAlpha", (LPBYTE)&dwOverrideAlpha, sizeof(DWORD));
+	g_bOverrideAlpha = dwOverrideAlpha;
+
+	// Query registry for custom alpha value, falls back to default Win7 0x6B if no value is set
+	DWORD dwAlphaValue = 0x6B;
+	g_registry.QueryValue(L"AlphaValue", (LPBYTE)&dwAlphaValue, sizeof(DWORD));
+	g_bAlphaValue = dwAlphaValue;
+
+	// Query registry for which acrylic style to use (if user is using colorization option 3)
 	DWORD dwAcrylicAlt = 0;
 	g_registry.QueryValue(L"AcrylicColorization", (LPBYTE)&dwAcrylicAlt, sizeof(DWORD));
 	g_bAcrylicAlt = dwAcrylicAlt;
