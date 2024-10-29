@@ -438,3 +438,5 @@ public: // Make these public to this file. This is for the CreateInstance
 	HRESULT InitializeDocumentsShellMenu(IShellMenu* psm);
 	HRESULT InitializeSubShellMenu(int idCmd, IShellMenu* psm);
 };
+
+HRESULT SHCoInitialize(void);

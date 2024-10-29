@@ -121,11 +121,47 @@ STDAPI_(BOOL) SHIsSameObject(IUnknown* punk1, IUnknown* punk2)
 		return SUCCEEDED(hr) && (punkI1 == punkI2);
 	}
 }
-
+#define IS_INTRESOURCE(_r) (((ULONG_PTR)(_r) >> 16) == 0)
 STDAPI_(BOOL) fSHRunControlPanel(LPCTSTR commandLine, HWND parent)
 {
+	LPTSTR pszCmdLine = NULL;
+
+	if (!IS_INTRESOURCE(commandLine))
+	{
+		pszCmdLine = StrDup(commandLine);
+	}
+	else
+	{
+		ULONG id = PtrToUlong((void*)commandLine);
+		if (id == 9012) //hack cuz shit changed
+		{
+			pszCmdLine = L"SYSDM.CPL,System";
+		}
+		else
+		{
+			TCHAR szCmdLine[MAX_PATH];
+
+			if (LoadString(LoadLibraryW(L"shell32.dll"), id, szCmdLine, ARRAYSIZE(szCmdLine)))
+				pszCmdLine = StrDup(szCmdLine);
+		}
+	}
+
+	if (!pszCmdLine)
+		return FALSE;
+
+	if (wcscmp(pszCmdLine, L"nusrmgr.cpl ,initialTask=ChangePicture") == 0) //another hack to hack 7 cpl in
+	{
+		IOpenControlPanel* openCPL = 0;
+		if (SUCCEEDED(CoCreateInstance(CLSID_OpenControlPanel, 0, 0x17u, IID_PPV_ARGS(&openCPL))))
+			openCPL->Open(L"Microsoft.UserAccounts",0,0);
+
+		if (openCPL)
+			openCPL->Release();
+		return TRUE;
+	}
+
 	WCHAR parameters[MAX_PATH] = L"shell32.dll,Control_RunDLL ";
-	wcscat(parameters, commandLine);
+	wcscat(parameters, pszCmdLine);
 
 	return ((INT_PTR)ShellExecuteW(parent, L"open", L"rundll32.exe", parameters, NULL, SW_SHOWNORMAL) > 32);
 }

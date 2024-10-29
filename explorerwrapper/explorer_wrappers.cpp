@@ -1,4 +1,6 @@
 #include "framework.h"
+#include "dbgprint.h"
+#include "associationelement.h"
 
 extern "C" DWORD WINAPI SHGetSignature(DWORD p1, DWORD p2, DWORD p3)
 {
@@ -29,7 +31,20 @@ extern "C" DWORD WINAPI SHInvokeCommandWithFlagsAndSite(DWORD_PTR unk1, DWORD_PT
 extern "C" HRESULT WINAPI IUnknown_QueryServiceNEW( IUnknown *punk, REFGUID guidService, REFIID riid, void **ppvOut)
 {
 	if (guidService == IID_ICommDlgBrowser) return E_NOINTERFACE;
-	return IUnknown_QueryService(punk,guidService,riid,ppvOut);
+
+	dbgprintf(L"IUnknown_QueryService called");
+	if (riid == IID_IAssociationElementXP)
+	{
+		dbgprintf(L"Querying IAssociationElement, wrapping");
+		IAssociationElement* pAssoc = nullptr;
+		if (SUCCEEDED(IUnknown_QueryService(punk, IID_IAssociationElement, IID_PPV_ARGS(&pAssoc))))
+		{
+			dbgprintf(L"Wrap successful");
+			*ppvOut = new CAssociationElementWrapper(pAssoc);
+			return S_OK;
+		}
+	}
+	return IUnknown_QueryService(punk, guidService, riid, ppvOut);
 }
 
 extern "C" void WINAPI WinListInit()

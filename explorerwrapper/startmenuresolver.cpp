@@ -2729,7 +2729,7 @@ HRESULT CStartMenuCallback::_CheckRestricted(DWORD dwRestrict, BOOL* fRestricted
 }
 #define SHGetAttributesOf(pidl, prgfInOut) SHGetNameAndFlags(pidl, 0, NULL, 0, prgfInOut)
 
-STDAPI SHCoInitialize(void)
+HRESULT SHCoInitialize(void)
 {
 	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 	if (FAILED(hr))
