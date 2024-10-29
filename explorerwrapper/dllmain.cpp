@@ -26,6 +26,7 @@
 #include "shellitemfilter.h"
 #include "shell32_wrappers.h"
 #include "shellurl.h"
+#include "associationelement.h"
 #include <wincodec.h>
 #include <winternl.h>
 #include <shlguid.h>
@@ -1642,6 +1643,28 @@ HRESULT WINAPI SHMapIDListToSystemImageListIndexAsyncNEW(
 	return fn(psts, psf, pidlChild, pfnCallback, pvCallbackData, pvCallbackHint, outIndex1, outIndex2);
 }
 
+HRESULT WINAPI IUnknown_QueryServiceNEW(
+	IUnknown *punk,
+	REFGUID   guidService,
+	REFIID    riid,
+	void    **ppvOut
+)
+{
+	dbgprintf(L"IUnknown_QueryService called");
+	if (riid == IID_IAssociationElementXP)
+	{
+		dbgprintf(L"Querying IAssociationElement, wrapping");
+		IAssociationElement *pAssoc = nullptr;
+		if (SUCCEEDED(IUnknown_QueryService(punk, IID_IAssociationElement, IID_PPV_ARGS(&pAssoc))))
+		{
+			dbgprintf(L"Wrap successful");
+			*ppvOut = new CAssociationElementWrapper(pAssoc);
+			return S_OK;
+		}
+	}
+	return IUnknown_QueryService(punk, guidService, riid, ppvOut);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1663,6 +1686,8 @@ void HookAPIs()
 	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
 	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
+
+	ChangeImportedAddress(GetModuleHandle(NULL), "shlwapi.dll", GetProcAddress(GetModuleHandle(L"shlwapi.dll"), "IUnknown_QueryService"), IUnknown_QueryServiceNEW);
 
 	FixWinXPUserPic();
 

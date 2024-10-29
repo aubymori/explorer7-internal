@@ -190,6 +190,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="appresolvernotify.h" />
+    <ClInclude Include="associationelement.h" />
     <ClInclude Include="augmentedshellfolder.h" />
     <ClInclude Include="authui.h" />
     <ClInclude Include="autoplay.h" />
@@ -224,6 +225,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="appresolvernotify.cpp" />
+    <ClCompile Include="associationelement.cpp" />
     <ClCompile Include="authui.cpp" />
     <ClCompile Include="autoplay.cpp" />
     <ClCompile Include="cregtree.cpp" />

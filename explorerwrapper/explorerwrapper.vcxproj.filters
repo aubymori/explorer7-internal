@@ -111,6 +111,9 @@
     <ClInclude Include="shellurl.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="associationelement.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -189,6 +192,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="shellurl.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="associationelement.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>
