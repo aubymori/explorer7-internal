@@ -424,10 +424,26 @@ WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
 	return attrData;
 }
 
+void UpdateCompositedFrameSettings(HWND hwnd)
+{
+	// if the user is using explorer7 either:
+	// - with no theme
+	// - with composition disabled
+	// we disable DWM frames to prevent unwanted behaviour.
+
+	if (!IsThemeActive() || g_bClassicTheme || !IsCompositionActive() || g_bDisableComposition)
+	{
+		DWMNCRENDERINGPOLICY pol = DWMNCRP_DISABLED;
+		DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &pol, sizeof(DWMNCRENDERINGPOLICY));
+	}
+}
+
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
+
+	UpdateCompositedFrameSettings(hwnd);
 
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
@@ -467,10 +483,12 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		EnsureWindowColorization(); // Ittr: Correct colorization enablement setting for Win10/11
 	}
 
-	if (uMsg == WM_SETTINGCHANGE) // Ittr: Fix taskbar colorization for non-legacy
+	if (uMsg == WM_SETTINGCHANGE || uMsg == WM_ERASEBKGND || uMsg == WM_WININICHANGE) // Ittr: Fix taskbar colorization for non-legacy
 	{
-		if ((IsThemeActive() || !g_bClassicTheme || IsCompositionActive() || !g_bDisableComposition) && hwnd == GetTaskbarWnd() && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
+		if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && hwnd == GetTaskbarWnd() && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
 			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(false));
+
+		UpdateCompositedFrameSettings(hwnd);
 	}
 
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
@@ -479,10 +497,12 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 // Ittr: Awful hack but it seems to fix it
 LRESULT CALLBACK NewThumbnailProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (uMsg == WM_SETTINGCHANGE) // Ittr: Fix thumbnail colorization for non-legacy
+	if (uMsg == WM_SETTINGCHANGE || uMsg == WM_ERASEBKGND || uMsg == WM_WININICHANGE) // Ittr: Fix thumbnail colorization for non-legacy
 	{
-		if ((IsThemeActive() || !g_bClassicTheme || IsCompositionActive() || !g_bDisableComposition) && (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()) && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
+		if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()) && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
 			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(true));
+
+		UpdateCompositedFrameSettings(hwnd);
 	}
 
 	return CallWindowProc(g_prevThumbnailProc, hwnd, uMsg, wParam, lParam);
@@ -571,15 +591,7 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 
 	if (!IsThemeActive() || g_bClassicTheme || !IsCompositionActive() || g_bDisableComposition) // we do funny things so explorer works properly for classic/basic.
 	{
-		int bNCRenderingEnabled = DWMNCRP_DISABLED;
-
-		// Disable DWM frames - thank FUCK this works
-		WINDOWCOMPOSITIONATTRIBDATA attrData;
-		attrData.Attrib = WCA_NCRENDERING_POLICY;
-		attrData.pvData = &bNCRenderingEnabled;
-		attrData.cbData = sizeof(bNCRenderingEnabled);
-
-		return SetWindowCompositionAttribute(hwnd, &attrData); //byebye
+		return NULL; // we handle this in trayproc now
 	}
 
 	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK) // if user has DWM enabled, and is not using basic/classic
@@ -1608,6 +1620,7 @@ const struct IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION
 	unsigned int vk;
 };
 
+// experimental hotkey fix 1 - broke uwp
 HRESULT(__fastcall* CImmersiveWindowMessageService__RequestHotkeys)(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5);
 HRESULT CImmersiveWindowMessageService__RequestHotkeys_Hook(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5)
 {
@@ -1621,6 +1634,7 @@ HRESULT CImmersiveWindowMessageService__RequestHotkeys_Hook(void* a1, unsigned i
 	return CImmersiveWindowMessageService__RequestHotkeys(a1,a2,a3,a4,a5);
 }
 
+// experimental hotkey fix 2 - doesn't work at present
 UINT shellHook = 0;
 
 UINT(WINAPI* fRegisterWindowMessageW)(LPCWSTR lpString);
@@ -1640,11 +1654,15 @@ UINT WINAPI RegisterWindowMessageWNEW(LPCWSTR lpString)
 	return fRegisterWindowMessageW(lpString);
 }
 
+// experimental hotkey fix 3 - buggy results but *does* appear to work
 HRESULT(__fastcall* CTaskBand_HandleShellHook)(PVOID ctaskband, int id, HWND a3);
 
 HRESULT(__fastcall* OnShellHookMessage)(void* a1);
-HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be opened
+HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be opened - a bit temperamental
 {
+	// key to note: at the moment, we can either do this for bugged start menu behaviour, or we can return S_OK and have no menu on the hotkey at all.
+	// neither is ideal, but we can probably ship m2 like this and fix properly later
+
 	if (CtaskBandPtr)
 		return CTaskBand_HandleShellHook(CtaskBandPtr,7,0);
 
