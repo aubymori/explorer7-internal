@@ -29,7 +29,7 @@
 #include "associationelement.h"
 #include <wincodec.h>
 #include <winternl.h>
-#include <shlguid.h>\
+#include <shlguid.h>
 
 // Uncomment to enable UWP
 //#define WITH_UWP
