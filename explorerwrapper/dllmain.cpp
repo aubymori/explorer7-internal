@@ -382,12 +382,12 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 
 UINT WINAPI SetErrorModeNEW(UINT uMode)
 {
-	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
-
-#ifdef WITH_UWP
-	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
-		CreateTwinUI_UWP();
-#endif
+//	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
+//
+//#ifdef WITH_UWP
+//	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+//		CreateTwinUI_UWP();
+//#endif
 
 	return SetErrorMode(uMode);
 }
@@ -1090,6 +1090,14 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
 		HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam);
 
+		// Ittr: We do this to eliminate the ghost window. The power of trans rights compelled me to fix this :3
+		BOOL shouldCloak = true;
+		WCHAR titleBuffer[MAX_PATH];
+		GetClassName(ret, titleBuffer, sizeof(titleBuffer));
+		WCHAR afwTitle[23] = L"ApplicationFrameWindow";
+		if (strcmp((char*)titleBuffer, (char*)afwTitle) == 0)
+			DwmSetWindowAttribute(ret, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
+
 		dbgprintf(L"CREATEWINDOWINBANDNEW %i", dwBand);
 
 		if (ret)
@@ -1117,6 +1125,15 @@ HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3,
 	DWORD p0 = (DWORD)_ReturnAddress();
 	exStyle = exStyle | WS_EX_TOOLWINDOW;
 	HWND ret = CreateWindowInBandExOrig(exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 & 1, dwTypeFlags);
+
+	// Ittr: We do this to eliminate the ghost window. The power of trans rights compelled me to fix this :3
+	BOOL shouldCloak = true;
+	WCHAR titleBuffer[MAX_PATH];
+	GetClassName(ret, titleBuffer, sizeof(titleBuffer));
+	WCHAR afwTitle[23] = L"ApplicationFrameWindow";
+	if (strcmp((char*)titleBuffer, (char*)afwTitle) == 0)
+		DwmSetWindowAttribute(ret, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
+
 	dbgprintf(L"%p: CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", p0, exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, ret, GetLastError());
 	dbgprintf(L"CreateWindowInBandExOrig %i", p13);
 
@@ -1654,6 +1671,54 @@ HRESULT WINAPI SHMapIDListToSystemImageListIndexAsyncNEW(
 	return fn(psts, psf, pidlChild, pfnCallback, pvCallbackData, pvCallbackHint, outIndex1, outIndex2);
 }
 
+DWORD g_dwThreadIdShell = 0;
+HWND g_hWndXpShell = nullptr;
+bool g_fGswDisabledOnce = false;
+HWND GetShellWindow_hook()
+{
+	//if (GetCurrentThreadId() == g_dwThreadIdShell && !g_fGswDisabledOnce)
+	//{
+	//	HWND orig = GetShellWindow();
+	//	WCHAR szCurrentShellWindowClassName[300];
+
+	//	if (GetClassNameW(orig, szCurrentShellWindowClassName, ARRAYSIZE(szCurrentShellWindowClassName)))
+	//	{
+	//		if (wcscmp(szCurrentShellWindowClassName, L"TaskmanWndClass") == 0)
+	//		{
+	//			g_fGswDisabledOnce = true;
+	//			return g_hWndXpShell;
+	//		}
+	//	}
+
+	//	g_hWndXpShell = orig;
+	//	return orig;
+	//}
+
+	return GetShellWindow();
+}
+
+void HookImmersive();
+
+ULONG(*CTray__MainThreadProc_orig)(PVOID ppvParam);
+ULONG CTray__MainThreadProc_hook(PVOID ppvParam)
+{
+	dbgprintf(L"CTray::MainThreadProc: Initialising immersive stack...");
+
+#ifdef WITH_UWP
+	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
+
+	if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+	{
+		HookImmersive();
+		CreateTwinUI_UWP();
+	}
+#endif
+
+	dbgprintf(L"Say hello to the newly running immersive stack!");
+
+	return CTray__MainThreadProc_orig(ppvParam);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1661,6 +1726,13 @@ void HookAPIs()
 	DWORD dwEnableUWP = 0;
 	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD)); // Ittr: shortened the name for convenience but still not sure on it at the moment. TODO determine name before release
 	g_enableImmersiveShellStack = (dwEnableUWP != 0);
+	g_dwThreadIdShell = GetCurrentThreadId();
+	ChangeImportedAddress(
+		GetModuleHandle(NULL),
+		"user32.dll",
+		GetShellWindow,
+		GetShellWindow_hook
+	);
 #endif
 
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
@@ -1712,6 +1784,9 @@ void HookAPIs()
 	fOpenThemeData = decltype(fOpenThemeData)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeData"));
 	fOpenThemeDataForDpi = decltype(fOpenThemeDataForDpi)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataForDpi"));
 	fOpenThemeDataEx = decltype(fOpenThemeDataEx)(GetProcAddress(GetModuleHandle(L"uxtheme.dll"), "OpenThemeDataEx"));
+
+	void* _CTray__MainThreadProc = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 83 EC 58 48 83 79 08 00 48 89 5C 24 60 48 8B D9 0F");
+	MH_CreateHook(static_cast<LPVOID>(_CTray__MainThreadProc), CTray__MainThreadProc_hook, reinterpret_cast<LPVOID*>(&CTray__MainThreadProc_orig));
 
 	void* _ctaskbandadd = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "FF F3 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F8 06 00 00");
 	//void* _ctaskbandclasscb = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B F1 48 8B 0A 49 8B F8 48 8B DA");
@@ -2143,10 +2218,10 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 
-#ifdef WITH_UWP
-		if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
-			CreateTwinUI_UWP();
-#endif
+//#ifdef WITH_UWP
+//		if (g_enableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+//			CreateTwinUI_UWP();
+//#endif
 
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface

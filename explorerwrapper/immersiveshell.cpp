@@ -14,21 +14,21 @@ IImmersiveShellHookService* ShellHookService;
 
 static bool successfullySetShellWindow = false;
 
-DWORD WINAPI TwinThread( LPVOID lpParameter )
+DWORD WINAPI TwinThread(LPVOID lpParameter)
 {
-	CoInitializeEx(NULL,COINIT_APARTMENTTHREADED);
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	IImmersiveBehavior* behavior;
 	HRESULT ret = CoUnmarshalInterface((IStream*)lpParameter, IID_ImmersiveBehavior, (PVOID*)&behavior);
-	dbgprintf(L"IImmersiveBehavior %p %p",ret,behavior);
-	UINT count;	
+	dbgprintf(L"IImmersiveBehavior %p %p", ret, behavior);
+	UINT count;
 	behavior->GetMaximumComponentCount(&count);
 	UINT i;
-	for (i=0;i<count;i++)
+	for (i = 0; i < count; i++)
 	{
-		dbgprintf(L"creating TwinUI component %d",i);
+		dbgprintf(L"creating TwinUI component %d", i);
 		IUnknown* component;
-		HRESULT ret = behavior->CreateComponent(i,&component);
-		dbgprintf(L"created TwinUI component %p %p",ret,component);
+		HRESULT ret = behavior->CreateComponent(i, &component);
+		dbgprintf(L"created TwinUI component %p %p", ret, component);
 	}
 	return 0;
 }
@@ -102,7 +102,7 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 	return DefWindowProc(hwnd, msg, w, l);
 }
 
-void CreateTaskManWindow()
+HRESULT CreateTaskManWindow()
 {
 	// create taskman class (handles taskbar buttons)
 	WNDCLASSEX taskmanclass = {};
@@ -122,9 +122,21 @@ void CreateTaskManWindow()
 
 	if (!RegisterClassExW(&taskmanclass))
 	{
-		return;
+		dbgprintf(L"Failed to register taskman window class.");
+		return E_FAIL;
 	}
 	auto Taskman = CreateWindowExW(0, L"TaskmanWndClass", NULL, 0x82000000, 0, 0, 0, 0, 0, 0, 0, 0);
+
+	if (Taskman)
+	{
+		return S_OK;
+	}
+	else
+	{
+		dbgprintf(L"Failed to create taskman window itself");
+	}
+
+	return E_FAIL;
 }
 
 void SetProgmanAsShell()
@@ -168,13 +180,19 @@ void CreateTwinUI()
 
 void CreateTwinUI_UWP()
 {
+	dbgprintf(L"CreateTwinUI_UWP");
 	auto user32 = LoadLibrary(TEXT("user32.dll"));
 	GetTaskmanWindowFunc = (GetTaskmanWindow)GetProcAddress(user32, "GetTaskmanWindow");
 	SetTaskmanWindowFunc = (SetTaskmanWindow)GetProcAddress(user32, "SetTaskmanWindow");
 	SetShellWindowFunc = (SetShellWindow)GetProcAddress(user32, "SetShellWindow");
 
 
-	CreateTaskManWindow();
+	if (FAILED(CreateTaskManWindow()))
+	{
+		return;
+	}
+
+	dbgprintf(L"Created taskman window");
 
 	IImmersiveShellCreator* ImmersiveShellCreator;
 	if (SUCCEEDED(CoCreateInstance(CLSID_ImmersiveShellBuilder, NULL, CLSCTX_INPROC_SERVER, IID_ImmersiveShellBuilder, (LPVOID*)&ImmersiveShellCreator)))
@@ -186,7 +204,9 @@ void CreateTwinUI_UWP()
 		dbgprintf(L"TwinUI instance created %p %p", ret, controller);
 		if (SUCCEEDED(ret))
 		{
+			dbgprintf(L"Starting TWinUI controller...");
 			HRESULT hr = controller->Start();
+			dbgprintf(L"Started TWinUI controller successfully.");
 
 			dbgprintf(L"Immersive Shell Controller Result: %x", hr);
 		}

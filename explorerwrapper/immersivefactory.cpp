@@ -3,7 +3,7 @@
 
 static DWORD dwRegisterImmersive;
 
-HRESULT STDMETHODCALLTYPE CImmersiveFactory::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CImmersiveFactory::QueryInterface(REFIID riid, void **ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -30,9 +30,9 @@ ULONG STDMETHODCALLTYPE CImmersiveFactory::Release(void)
 	return 1;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveFactory::CreateInstance( IUnknown * pUnkOuter, REFIID riid, void ** ppvObject )
+HRESULT STDMETHODCALLTYPE CImmersiveFactory::CreateInstance(IUnknown * pUnkOuter, REFIID riid, void ** ppvObject)
 {
-	if ( pUnkOuter ) return CLASS_E_NOAGGREGATION;
+	if (pUnkOuter) return CLASS_E_NOAGGREGATION;
 	if (riid == IID_IUnknown)
 	{
 		*ppvObject = new CImmersiveProvider;
@@ -41,7 +41,7 @@ HRESULT STDMETHODCALLTYPE CImmersiveFactory::CreateInstance( IUnknown * pUnkOute
 	return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveFactory::LockServer( BOOL fLock )
+HRESULT STDMETHODCALLTYPE CImmersiveFactory::LockServer(BOOL fLock)
 {
 	return S_OK;
 }
@@ -51,7 +51,7 @@ CImmersiveProvider::CImmersiveProvider()
 	m_cRef = 1;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveProvider::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CImmersiveProvider::QueryInterface(REFIID riid, void **ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -101,7 +101,7 @@ PDWORD WINAPI GetSidSubAuthorityNEW( PSID pSid, DWORD nSubAuthority )
 	return ret;
 }*/
 
-HRESULT STDMETHODCALLTYPE CImmersiveProvider::QueryService( REFGUID guidService, REFIID riid, void **ppv )
+HRESULT STDMETHODCALLTYPE CImmersiveProvider::QueryService(REFGUID guidService, REFIID riid, void **ppv)
 {
 	if (guidService == SID_IImmersiveMonitorService && riid == IID_IImmersiveMonitorService)
 	{
@@ -114,7 +114,7 @@ HRESULT STDMETHODCALLTYPE CImmersiveProvider::QueryService( REFGUID guidService,
 		return S_OK;
 	}
 	/*if (guidService == IID_IIWpnPlatform && riid == IID_IIWpnPlatform)
-	{		
+	{
 		HMODULE hWpnApps = GetModuleHandle(L"wpnapps.dll");
 		dbgprintf(L"wpnapps = %p",hWpnApps);
 		GetProcessUIContextInformation = (GetProcessUIContextInformationAPI)GetProcAddress(GetModuleHandle(L"user32.dll"),(LPSTR)2521);
@@ -127,7 +127,7 @@ HRESULT STDMETHODCALLTYPE CImmersiveProvider::QueryService( REFGUID guidService,
 		dbgprintf(L"Creating push notifications platform = %p",res);
 		return res;
 	}
-	
+
 	WCHAR clsid[40];
 	WCHAR iid[40];
 	StringFromGUID2(guidService,clsid,40);
@@ -141,7 +141,7 @@ CImmersiveMonitorManager::CImmersiveMonitorManager()
 	m_cRef = 1;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryInterface(REFIID riid, void **ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -182,24 +182,24 @@ HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetCount(UINT* p1)
 	return S_OK;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetConnectedCount(UINT*){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetAt(UINT,IUnknown**){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetFromHandle(HMONITOR,IUnknown**){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetFromIdentity(ULONG,IUnknown**){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetImmersiveProxyMonitor(IUnknown**){UNIMPLFUNC}
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetConnectedCount(UINT*) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetAt(UINT, IUnknown**) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetFromHandle(HMONITOR, IUnknown**) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetFromIdentity(ULONG, IUnknown**) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::GetImmersiveProxyMonitor(IUnknown**) { UNIMPLFUNC }
 
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryServiceByIdentity(ULONG, REFGUID guidService, REFIID riid, void **ppv ){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryServiceFromWindow(HWND, REFGUID guidService, REFIID riid, void **ppv ){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::MoveImmersiveMonitor(int){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::SetImmersiveMonitor(IUnknown*){UNIMPLFUNC}
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryServiceByIdentity(ULONG, REFGUID guidService, REFIID riid, void **ppv) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryServiceFromWindow(HWND, REFGUID guidService, REFIID riid, void **ppv) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::MoveImmersiveMonitor(int) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::SetImmersiveMonitor(IUnknown*) { UNIMPLFUNC }
 
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryServiceFromPoint(tagPOINT* pt, REFGUID guidService, REFIID riid, void **ppv )
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryServiceFromPoint(tagPOINT* pt, REFGUID guidService, REFIID riid, void **ppv)
 {
-	HMONITOR hMonitor = MonitorFromPoint(*pt,MONITOR_DEFAULTTOPRIMARY);
-	return QueryService(hMonitor,guidService,riid,ppv);
+	HMONITOR hMonitor = MonitorFromPoint(*pt, MONITOR_DEFAULTTOPRIMARY);
+	return QueryService(hMonitor, guidService, riid, ppv);
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryService(HMONITOR hMonitor, REFGUID guidService, REFIID riid, void **ppv )
+HRESULT STDMETHODCALLTYPE CImmersiveMonitorManager::QueryService(HMONITOR hMonitor, REFGUID guidService, REFIID riid, void **ppv)
 {
 	if (guidService == SID_IImmersiveLayout && riid == IID_IImmersiveLayout)
 	{
@@ -220,7 +220,7 @@ CImmersiveLayout::CImmersiveLayout(HMONITOR hMonitor)
 	m_cRef = 1;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::QueryInterface(REFIID riid, void **ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -234,7 +234,7 @@ HRESULT STDMETHODCALLTYPE CImmersiveLayout::QueryInterface(REFIID riid,void **pp
 		AddRef();
 		return S_OK;
 	}
-	
+
 	return E_NOINTERFACE;
 }
 
@@ -253,32 +253,32 @@ ULONG STDMETHODCALLTYPE CImmersiveLayout::Release(void)
 	return m_cRef;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::RegisterLayoutClient(UINT,IUnknown*,ULONG*){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::UnregisterLayoutClient(ULONG){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::RegisterForLayoutChanges(UINT,IUnknown*,ULONG*){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::UnregisterForLayoutChanges(ULONG){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetImmersiveShellWorkArea(tagRECT*){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::InvalidateWorkArea(ULONG){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetBandWorkAreaCount(void){UNIMPLFUNC}
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetBandWorkAreaAt(UINT,IUnknown**){UNIMPLFUNC}
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::RegisterLayoutClient(UINT, IUnknown*, ULONG*) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::UnregisterLayoutClient(ULONG) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::RegisterForLayoutChanges(UINT, IUnknown*, ULONG*) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::UnregisterForLayoutChanges(ULONG) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetImmersiveShellWorkArea(tagRECT*) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::InvalidateWorkArea(ULONG) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetBandWorkAreaCount(void) { UNIMPLFUNC }
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetBandWorkAreaAt(UINT, IUnknown**) { UNIMPLFUNC }
 
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetInnerWorkAreaForBand(ULONG,tagRECT* out)
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetInnerWorkAreaForBand(ULONG, tagRECT* out)
 {
 	dbgprintf(L"CImmersiveLayout::GetInnerWorkAreaForBand");
 	SetRectEmpty(out);
 	MONITORINFO mi;
 	mi.cbSize = sizeof(mi);
-	if ( GetMonitorInfo(m_hMonitor,&mi) )
-		CopyRect(out,&mi.rcWork);
+	if (GetMonitorInfo(m_hMonitor, &mi))
+		CopyRect(out, &mi.rcWork);
 	else
-		SystemParametersInfo(SPI_GETWORKAREA,0,out,0);
-		
+		SystemParametersInfo(SPI_GETWORKAREA, 0, out, 0);
+
 	return S_OK;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetOuterWorkAreaForBand(ULONG,tagRECT* out)
+HRESULT STDMETHODCALLTYPE CImmersiveLayout::GetOuterWorkAreaForBand(ULONG, tagRECT* out)
 {
-	return GetInnerWorkAreaForBand(0,out);
+	return GetInnerWorkAreaForBand(0, out);
 }
 
 CImmersiveMode::CImmersiveMode()
@@ -286,7 +286,7 @@ CImmersiveMode::CImmersiveMode()
 	m_cRef = 1;
 }
 
-HRESULT STDMETHODCALLTYPE CImmersiveMode::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CImmersiveMode::QueryInterface(REFIID riid, void **ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -333,7 +333,7 @@ HRESULT STDMETHODCALLTYPE CImmersiveMode::SetMode(DWORD mode)
 
 void RegisterFakeImmersive()
 {
-	CoRegisterClassObject(CLSID_ImmersiveShell,new CImmersiveFactory,CLSCTX_INPROC_SERVER|CLSCTX_LOCAL_SERVER,REGCLS_MULTIPLEUSE,&dwRegisterImmersive);
+	CoRegisterClassObject(CLSID_ImmersiveShell, new CImmersiveFactory, CLSCTX_INPROC_SERVER | CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &dwRegisterImmersive);
 }
 
 void UnregisterFakeImmersive()
