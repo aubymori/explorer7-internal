@@ -1669,6 +1669,31 @@ HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be
 	return OnShellHookMessage(a1);
 }
 
+// Ittr: Get rid of the immersive start menu and stop it appearing on TH1+ when UWP is on.
+// This is very important and also extremely fragile.
+// I'll also be honest - I haven't tested 1703 because who the fuck uses 1703 LOL
+void RemoveImmersiveStart()
+{
+	if (g_bEnableImmersiveShellStack) // because we don't want to run this thing if user isn't using UWP
+	{
+		char* ShowStartView; // XamlLauncher::ShowStartView
+		unsigned char bytes[] = { 0xC3 }; // retn
+
+		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell
+		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+
+		if (g_osVersion.BuildNumber() >= 16299) // RS3 onwards
+			ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00";
+		else if (g_osVersion.BuildNumber() >= 15063) // RS2
+			ShowStartView = "48 89 5C 24 20 55 56 57 48 83 EC 30 48 83 B9 F8 00 00 00 00 41 8B E8";
+		else if (g_osVersion.BuildNumber() >= 10074) // TH1 to RS1
+			ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00";
+
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, ShowStartView), bytes, sizeof(bytes)); //byebye
+	}
+
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1722,14 +1747,16 @@ void HookAPIs()
 
 	fRegisterWindowMessageW = (decltype(fRegisterWindowMessageW))GetProcAddress(LoadLibraryW(L"user32.dll"),"RegisterWindowMessageW");
 
-	CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
-	OnShellHookMessage = (decltype(OnShellHookMessage))FindPattern((uintptr_t)LoadLibraryW(L"twinui.pcshell.dll"), "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83");
+	// disabled - <1607 doesnt like atm + unfinished. sorry! uncomment if you're testing
+	//CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
+	//OnShellHookMessage = (decltype(OnShellHookMessage))FindPattern((uintptr_t)LoadLibraryW(L"twinui.pcshell.dll"), "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83");
 
 	// Hook UXTheme-related calls for the purpose of our inactive theme system.
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
-	MH_CreateHook(static_cast<LPVOID>(OnShellHookMessage), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&OnShellHookMessage));
+	// disabled - <1607 doesnt like atm + unfinished. sorry! uncomment if you're testing
+	//MH_CreateHook(static_cast<LPVOID>(OnShellHookMessage), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&OnShellHookMessage));
 
 	// Hook and update definitions of what windows should be added to the tray - largely for UWP purposes, but essentially zero-cost so included on both immersive on and off modes.
 	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
@@ -1740,7 +1767,6 @@ void HookAPIs()
 	// thumbnail fix
 	void* _thumbnailrender = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 20 44 89 40 18 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 48 8B F9");
 	MH_CreateHook(static_cast<LPVOID>(_thumbnailrender), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
-	
 
 	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
@@ -1830,6 +1856,7 @@ void HookAPIs()
 	HookShell32();
 
 	// Assorted fixes and changes
+	RemoveImmersiveStart(); // Remove Windows 10+ immersive start menu for UWP mode (doesn't fix hotkeys yet)
 	ShowWin32Menus(); // Remove immersive menus so taskbar behaves properly (TODO: Fix for windows 11)
 	FixAuthUI(); // Responsible for fixing CLogoffOptions
 	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
