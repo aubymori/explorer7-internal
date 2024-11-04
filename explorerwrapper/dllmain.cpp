@@ -1694,6 +1694,57 @@ void RemoveImmersiveStart()
 
 }
 
+// Ittr: Get rid of the half-broken virtual desktops interface and prevent it appearing on TH1+ when UWP is on.
+// This isn't detrimental to user experience to enable, but it completely breaks with the intended user experience.
+// Also causes crashing on earlier (pre-GE) Windows 11 which we can now avoid by disabling the remains of the feature.
+// For some reason, Germanium and later already disable this. We're not complaining
+void RemoveVirtualDesktops()
+{
+	if (g_bEnableImmersiveShellStack) // because we don't want to run this thing if user isn't using UWP
+	{
+		char* TaskViewHostShow; // XamlAllUpViewHost::Show 
+		// (preceded by CAllUpViewHost::Show in TH1-RS1, replaced by TaskViewHost::Show in W11 Nickel)
+		unsigned char bytes[] = { 0xC3 }; // retn
+
+		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
+		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+
+		// this function is particularly annoying - the signature is different in some way for almost every version of Windows 10/11
+		// in some cases, it changes and reverts again in later versions
+		// :/
+		if (g_osVersion.BuildNumber() >= 22621)
+			TaskViewHostShow = "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00";
+		else if (g_osVersion.BuildNumber() >= 22000)
+			TaskViewHostShow = "48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00";
+		else if (g_osVersion.BuildNumber() >= 19041)
+			TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC";
+		else if (g_osVersion.BuildNumber() >= 17763)
+			TaskViewHostShow = "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00";
+		else if (g_osVersion.BuildNumber() >= 15063)
+			TaskViewHostShow = "4C 8B DC ?? 41 54 41 55 41 56 41 57 48 83 EC";
+		else if (g_osVersion.BuildNumber() >= 10586)
+			TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00";
+		else if (g_osVersion.BuildNumber() >= 10074)
+			TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00";
+
+
+			//                      "48 89 5C 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 60 03 00 00" - W11 Germanium
+			//						"40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00" - W11 Nickel
+			//						"48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00" - W11 Cobalt
+			//TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC"; // VB
+			//						"4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00"; // 19H1 (???)
+			//                      "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC" - RS5, same as VB
+			//                      "4C 8B DC 56 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00" - RS4, same as RS3 with 2 bytes changed
+			//                      "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00" - RS3, same as RS4 with 2 bytes changed
+			//                      "4C 8B DC 57 41 54 41 55 41 56 41 57 48 83 EC 60" - RS2, similar to RS3 but shorter
+			//                      "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00" - RS1
+			//                      "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00" - TH2, SAME as RS1
+			//						"48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00" - TH1
+
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, TaskViewHostShow), bytes, sizeof(bytes)); //byebye
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1857,6 +1908,7 @@ void HookAPIs()
 
 	// Assorted fixes and changes
 	RemoveImmersiveStart(); // Remove Windows 10+ immersive start menu for UWP mode (doesn't fix hotkeys yet)
+	RemoveVirtualDesktops(); // Remove Windows 10+ virtual desktops functionality for UWP mode
 	ShowWin32Menus(); // Remove immersive menus so taskbar behaves properly (TODO: Fix for windows 11)
 	FixAuthUI(); // Responsible for fixing CLogoffOptions
 	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
@@ -1879,7 +1931,7 @@ void HookAPIs()
 	}
 
 	// Query registry for colorization option selected by the user
-	DWORD dwColorizationOptions = 0; // default to "legacy" mode - same as milestone 1
+	DWORD dwColorizationOptions = 1; // default to pseudo-aero from now on - mode 0 remains present for milestone 2
 	g_registry.QueryValue(L"ColorizationOptions", (LPBYTE)&dwColorizationOptions, sizeof(DWORD));
 	if (dwColorizationOptions != 0 && dwColorizationOptions < 5) // if outside the boundaries, defaults back to 0
 	{
@@ -1913,7 +1965,7 @@ void HookAPIs()
 	if (BrandingLoadImage)
 		ChangeImportedAddress(GetModuleHandle(NULL),"winbrand.dll",BrandingLoadImage,BrandingLoadImageNEW);*/
 
-	// Handle custom start orb feature & RP orb
+	// Handle custom start orb feature
 	HookLoadImageForSizeAndFont();
 
 	// Enable MinHook hooks at the end
