@@ -424,26 +424,10 @@ WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbnail)
 	return attrData;
 }
 
-void UpdateCompositedFrameSettings(HWND hwnd)
-{
-	// if the user is using explorer7 either:
-	// - with no theme
-	// - with composition disabled
-	// we disable DWM frames to prevent unwanted behaviour.
-
-	if (!IsThemeActive() || g_bClassicTheme || !IsCompositionActive() || g_bDisableComposition)
-	{
-		DWMNCRENDERINGPOLICY pol = DWMNCRP_DISABLED;
-		DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &pol, sizeof(DWMNCRENDERINGPOLICY));
-	}
-}
-
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
 		SetProgmanAsShell(); // misha: TODO hack
-
-	UpdateCompositedFrameSettings(hwnd);
 
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
@@ -488,7 +472,6 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && hwnd == GetTaskbarWnd() && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
 			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(false));
 
-		UpdateCompositedFrameSettings(hwnd);
 	}
 
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
@@ -502,7 +485,6 @@ LRESULT CALLBACK NewThumbnailProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 		if ((IsThemeActive() && !g_bClassicTheme && IsCompositionActive() && !g_bDisableComposition) && (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd()) && g_bColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
 			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(true));
 
-		UpdateCompositedFrameSettings(hwnd);
 	}
 
 	return CallWindowProc(g_prevThumbnailProc, hwnd, uMsg, wParam, lParam);
@@ -591,7 +573,16 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 
 	if (!IsThemeActive() || g_bClassicTheme || !IsCompositionActive() || g_bDisableComposition) // we do funny things so explorer works properly for classic/basic.
 	{
-		return NULL; // we handle this in trayproc now
+		int bNCRenderingEnabled = DWMNCRP_DISABLED;
+
+		// Disable DWM frames - thank FUCK this works
+		WINDOWCOMPOSITIONATTRIBDATA attrData;
+		attrData.Attrib = WCA_NCRENDERING_POLICY;
+		attrData.pvData = &bNCRenderingEnabled;
+		attrData.cbData = sizeof(bNCRenderingEnabled);
+
+		SetWindowCompositionAttribute(hwnd, &attrData); //byebye
+		return SetWindowCompositionAttribute(hwnd, pAttrData);
 	}
 
 	if (IsCompositionActiveNEW() && pAttrData->Attrib == WCA_DISALLOW_PEEK) // if user has DWM enabled, and is not using basic/classic
@@ -610,7 +601,7 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 	if (hwnd == GetThumbnailWnd()) // does this even do anything??
 		ForceActiveWindowAppearance(hwnd);
 
-	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || hwnd == GetThumbnailWnd()) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
+	if ( IsRTMDWM() && (hwnd == GetTaskbarWnd() || hwnd == GetStartMenuWnd() || (g_osVersion.BuildNumber() >= 10074 && hwnd == GetThumbnailWnd())) && g_bColorizationOptions != 0) //enable rtm pseudo-aero
 		pBlurBehind->fEnable = 0;
 	return DwmEnableBlurBehindWindow(hwnd, pBlurBehind);
 }
@@ -1032,19 +1023,6 @@ HANDLE WINAPI BrandingLoadImageNEW(
 		);
 }
 
-//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
-//Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
-void ShowWin32Menus()
-{
-	//The bytes are the same in both dlls for ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu function
-	char* immersiveBytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
-
-	//Load and patch both DLLs. ExplorerFrame gets called in later so we have to account for that
-	unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), immersiveBytes), bytes, sizeof(bytes));
-	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), immersiveBytes), bytes, sizeof(bytes));
-}
-
 void FixAuthUI()
 {
 	// Newer explorer versions use this
@@ -1317,7 +1295,7 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	if (g_bEnableImmersiveShellStack) // UWP enabled
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // UWP enabled
 	{
 		DWORD p0 = (DWORD)_ReturnAddress();
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
@@ -1672,9 +1650,9 @@ HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be
 // Ittr: Get rid of the immersive start menu and stop it appearing on TH1+ when UWP is on.
 // This is very important and also extremely fragile.
 // I'll also be honest - I haven't tested 1703 because who the fuck uses 1703 LOL
-void RemoveImmersiveStart()
+void DisableImmersiveStart()
 {
-	if (g_bEnableImmersiveShellStack) // because we don't want to run this thing if user isn't using UWP
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
 	{
 		char* ShowStartView; // XamlLauncher::ShowStartView
 		unsigned char bytes[] = { 0xC3 }; // retn
@@ -1682,8 +1660,10 @@ void RemoveImmersiveStart()
 		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell
 		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
 
+		// so far there's only a few major revisions of this function as of 06-11-24
+		// this may require further testing/advancement on windows 11 in co-ordination with partners
 		if (g_osVersion.BuildNumber() >= 16299) // RS3 onwards
-			ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00";
+			ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00 48 33 C4 48 89 84 24 ?? 01 00 00 48 83 B9 ?? ?? 00 00 00";
 		else if (g_osVersion.BuildNumber() >= 15063) // RS2
 			ShowStartView = "48 89 5C 24 20 55 56 57 48 83 EC 30 48 83 B9 F8 00 00 00 00 41 8B E8";
 		else if (g_osVersion.BuildNumber() >= 10074) // TH1 to RS1
@@ -1694,13 +1674,66 @@ void RemoveImmersiveStart()
 
 }
 
-// Ittr: Get rid of the half-broken virtual desktops interface and prevent it appearing on TH1+ when UWP is on.
-// This isn't detrimental to user experience to enable, but it completely breaks with the intended user experience.
-// Also causes crashing on earlier (pre-GE) Windows 11 which we can now avoid by disabling the remains of the feature.
-// For some reason, Germanium and later already disable this. We're not complaining
-void RemoveVirtualDesktops()
+// Ittr: Get rid of the immersive search interface and prevent it appearing on TH1+ with ImmersiveShell enabled
+// Otherwise, when invoked, takes up half the screen.
+// Just use the Windows 7 start menu search - the functionality is much superior to this crap
+void DisableImmersiveSearch()
 {
-	if (g_bEnableImmersiveShellStack) // because we don't want to run this thing if user isn't using UWP
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
+	{
+		char* CDEVSI; // CortanaDesktopExperienceView::ShowInternal
+		// (preceded by CCortanaExperienceManager::ShowInternal in TH1-RS1)
+		unsigned char bytes[] = { 0xC3 }; // retn
+
+		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
+		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+		
+		// seven different variants to account for as of 06-11-24
+		if (g_osVersion.BuildNumber() >= 19041) // VB onwards
+			CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
+		else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
+			CDEVSI = "40 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 81 EC 80 00 00 00";
+		else if (g_osVersion.BuildNumber() >= 17134) // RS4 to RS5
+			CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
+		else if (g_osVersion.BuildNumber() >= 16299) // RS3
+			CDEVSI = "40 55 53 56 57 41 56 48 8D 6C 24 C9 48 81 EC 90 00 00 00";
+		else if (g_osVersion.BuildNumber() >= 15063) // RS2
+			CDEVSI = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20 41 8B D9 41 8B E8 48 8B F2";
+		else if (g_osVersion.BuildNumber() >= 14393) // RS1
+			CDEVSI = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 70";
+		else if (g_osVersion.BuildNumber() >= 10240) // TH1 to TH2
+			CDEVSI = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 48 8D 68 A1 48 81 EC 90 00 00 00"; 
+
+		// if user is using 19H1 or higher, search was reimplemented, which means we kill it twice
+		if (g_osVersion.BuildNumber() >= 18362) 
+		{
+			// because once wasn't enough.
+
+			char* SCFOS; // XamlLauncherState::ShowCortanaFromOpenStart
+			// exists in RS5, but not used until 19H1
+			// replaced by XamlLauncherState::ShowSearchFromOpenStart in W11 Nickel
+
+			if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
+				SCFOS = "48 89 54 24 10 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 83 EC";
+			else if (g_osVersion.BuildNumber() >= 19041) // VB onwards
+				SCFOS = "48 89 54 24 10 55 53 56 57 41 56 41 57 48 8B EC 48 83 EC";
+			else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
+				SCFOS = "48 89 54 24 10 55 53 56 57 41 56 48 8B EC 48 83 EC 40 48 C7 45 E0 FE FF FF FF";
+
+			ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, SCFOS), bytes, sizeof(bytes)); //byebye again
+		}
+
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, CDEVSI), bytes, sizeof(bytes)); //byebye
+	}
+}
+
+// Ittr: Get rid of the half-broken TaskView interface and prevent it appearing on TH1+ when UWP is on.
+// This isn't detrimental to user experience to enable, but it completely breaks with the intended user experience.
+// TaskView also causes crashing on earlier (pre-GE) Windows 11 which we can now avoid by disabling the remains of the feature.
+// For some reason, Germanium and later already disable this. We're not complaining.
+void DisableTaskView()
+{
+	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
 	{
 		char* TaskViewHostShow; // XamlAllUpViewHost::Show 
 		// (preceded by CAllUpViewHost::Show in TH1-RS1, replaced by TaskViewHost::Show in W11 Nickel)
@@ -1709,39 +1742,76 @@ void RemoveVirtualDesktops()
 		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
 		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
 
-		// this function is particularly annoying - the signature is different in some way for almost every version of Windows 10/11
+		// this function is particularly annoying - the signature is different in some way for many versions of Windows 10/11
 		// in some cases, it changes and reverts again in later versions
 		// :/
-		if (g_osVersion.BuildNumber() >= 22621)
+		if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
 			TaskViewHostShow = "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00";
-		else if (g_osVersion.BuildNumber() >= 22000)
+		else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt
 			TaskViewHostShow = "48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00";
-		else if (g_osVersion.BuildNumber() >= 19041)
+		else if (g_osVersion.BuildNumber() >= 19041) // VB
 			TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC";
-		else if (g_osVersion.BuildNumber() >= 17763)
+		else if (g_osVersion.BuildNumber() >= 17763) // RS5 to 19H2
 			TaskViewHostShow = "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00";
-		else if (g_osVersion.BuildNumber() >= 15063)
+		else if (g_osVersion.BuildNumber() >= 15063) // RS2 to RS4
 			TaskViewHostShow = "4C 8B DC ?? 41 54 41 55 41 56 41 57 48 83 EC";
-		else if (g_osVersion.BuildNumber() >= 10586)
+		else if (g_osVersion.BuildNumber() >= 10586) // TH2 to RS1
 			TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00";
-		else if (g_osVersion.BuildNumber() >= 10074)
+		else if (g_osVersion.BuildNumber() >= 10074) // TH1
 			TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00";
 
-
-			//                      "48 89 5C 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 60 03 00 00" - W11 Germanium
-			//						"40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00" - W11 Nickel
-			//						"48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00" - W11 Cobalt
-			//TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC"; // VB
-			//						"4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00"; // 19H1 (???)
-			//                      "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC" - RS5, same as VB
-			//                      "4C 8B DC 56 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00" - RS4, same as RS3 with 2 bytes changed
-			//                      "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00" - RS3, same as RS4 with 2 bytes changed
-			//                      "4C 8B DC 57 41 54 41 55 41 56 41 57 48 83 EC 60" - RS2, similar to RS3 but shorter
-			//                      "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00" - RS1
-			//                      "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00" - TH2, SAME as RS1
-			//						"48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00" - TH1
-
 		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, TaskViewHostShow), bytes, sizeof(bytes)); //byebye
+	}
+}
+
+// Ittr: New method for removing immersive menus. Better inter-operability between Windows versions. Used alongside existing method.
+BOOL SystemParametersInfoWNEW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT fWinIni)
+{
+	if (uiAction == SPI_GETSCREENREADER)
+	{
+		*(BOOL*)pvParam = TRUE;
+		return TRUE;
+	}
+
+	return SystemParametersInfoW(uiAction, uiParam, pvParam, fWinIni);
+}
+
+//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
+//Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
+void ShowWin32Menus()
+{
+	if (g_osVersion.BuildNumber() >= 10074) // if user is using TH1 or later
+	{
+		char* CAODTM_SH32; // ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu
+		char* CAODTM_EF; // same function, in ExplorerFrame.dll
+		char unsigned bytes[] = { 0xC3 }; // retn
+
+		if (g_osVersion.BuildNumber() >= 26100) // W11 Germanium onwards
+		{
+			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 33 DB 48 8B F2 33 FF 48 8B E9";
+			CAODTM_EF = CAODTM_SH32;
+		}
+		else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt to W11 Nickel
+		{
+			// This is somewhat flawed on Cobalt, but it will have to do
+			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
+			CAODTM_EF = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
+		}
+		else if (g_osVersion.BuildNumber() >= 10074) // TH1 to VB
+		{
+			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
+			CAODTM_EF = CAODTM_SH32;
+		}
+
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), CAODTM_SH32), bytes, sizeof(bytes)); // shell32.dll
+		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), CAODTM_EF), bytes, sizeof(bytes)); // ExplorerFrame.dll
+
+		// Ensure as much as we can that it's gone, if the above isn't enough (Win11 Cobalt, I'm looking at you...)
+		if (g_osVersion.BuildNumber() >= 10074)
+		{
+			ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
+			ChangeImportedAddress(LoadLibrary(L"ExplorerFrame.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
+		}
 	}
 }
 
@@ -1816,8 +1886,11 @@ void HookAPIs()
 	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
 	
 	// thumbnail fix
-	void* _thumbnailrender = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 20 44 89 40 18 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 48 8B F9");
-	MH_CreateHook(static_cast<LPVOID>(_thumbnailrender), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
+	if (g_osVersion.BuildNumber() >= 10074) // we don't apply to 8.1 as only pseudo-aero is supported there
+	{
+		void* _thumbnailrender = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 20 44 89 40 18 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 48 8B F9");
+		MH_CreateHook(static_cast<LPVOID>(_thumbnailrender), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
+	}
 
 	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
@@ -1907,9 +1980,10 @@ void HookAPIs()
 	HookShell32();
 
 	// Assorted fixes and changes
-	RemoveImmersiveStart(); // Remove Windows 10+ immersive start menu for UWP mode (doesn't fix hotkeys yet)
-	RemoveVirtualDesktops(); // Remove Windows 10+ virtual desktops functionality for UWP mode
-	ShowWin32Menus(); // Remove immersive menus so taskbar behaves properly (TODO: Fix for windows 11)
+	DisableImmersiveStart(); // Remove Windows 10+ immersive start menu for UWP mode (doesn't fix hotkeys yet)
+	DisableImmersiveSearch(); // Remove Windows 10+ immersive search menu for UWP mode
+	DisableTaskView(); // Remove Windows 10+ virtual desktops functionality for UWP mode
+	ShowWin32Menus(); // Remove immersive menus so taskbar behaves properly
 	FixAuthUI(); // Responsible for fixing CLogoffOptions
 	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
 	FixWin11SearchIcon(); // Prevents search icon from being mangled by a buggy tablet mode implementation (cheers Microsoft)
@@ -1937,7 +2011,9 @@ void HookAPIs()
 	{
 		if (dwColorizationOptions == 2 && g_osVersion.BuildNumber() >= 22621) // BlurBehind is broken from Nickel onwards, so we enforce acrylic instead as an alternative blur effect...
 			g_bColorizationOptions = 3;
-		else if (dwColorizationOptions == 3 && g_osVersion.BuildNumber() < 17134) // Acrylic is not added to Win32 api until 1803, so fall back to pseudo-aero for wider OS consistency...
+		else if (dwColorizationOptions == 3 && g_osVersion.BuildNumber() < 17134) // Acrylic is not added to Win32 api until RS4, so fall back to pseudo-aero for wider OS consistency...
+			g_bColorizationOptions = 1;
+		else if (dwColorizationOptions >= 2 && g_osVersion.BuildNumber() < 10074) // BlurBehind, Acrylic, SolidColor unsupported on 8.x
 			g_bColorizationOptions = 1;
 		else // e.g. you're using a supported mode on your OS
 			g_bColorizationOptions = dwColorizationOptions;
