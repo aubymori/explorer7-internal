@@ -1447,7 +1447,6 @@ void FixWinXPUserPic()
 
 HRESULT(WINAPI* CloseThemeData_orig)(HTHEME hTheme);
 
-bool g_fEnableStartFix = false;
 DWORD g_dwStartFixThreadId = 0;
 
 // comctl32!Button_DrawThemed:
@@ -1463,14 +1462,10 @@ Button_DrawThemed_hook(void *pButton, HDC hdc, int iPartId, int iStateId)
 	{
 		// If we're the start button, then toggle the start text fix:
 		g_dwStartFixThreadId = GetCurrentThreadId();
-		g_fEnableStartFix = true;
 	}
 
 	HRESULT hr = Button_DrawThemed_orig(pButton, hdc, iPartId, iStateId);
-
 	g_dwStartFixThreadId = 0;
-	g_fEnableStartFix = false;
-
 	return hr;
 }
 
@@ -1489,14 +1484,11 @@ BOOL GetTextExtentPoint32W_hook(
 {
 	BOOL result = GetTextExtentPoint32W_orig(hdc, lpString, c, psizl);
 
-	if (g_fEnableStartFix)
+	if (GetCurrentThreadId() == g_dwStartFixThreadId)
 	{
 		dbgprintf(L"Performing start fix\n");
-		if (GetCurrentThreadId() == g_dwStartFixThreadId)
-		{
-			// Fix bounding size for drawing start text:
-			psizl->cx *= 2;
-		}
+		// Fix bounding size for drawing start text:
+		psizl->cx *= 2;
 	}
 
 	return result;
