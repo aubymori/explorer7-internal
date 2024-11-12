@@ -1809,8 +1809,8 @@ void ShowWin32Menus()
 		// Ensure as much as we can that it's gone, if the above isn't enough (Win11 Cobalt, I'm looking at you...)
 		if (g_osVersion.BuildNumber() >= 10074)
 		{
+			// Only applied to shell32, as application to ExplorerFrame breaks the program list hover behaviour.
 			ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
-			ChangeImportedAddress(LoadLibrary(L"ExplorerFrame.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
 		}
 	}
 }
