@@ -1711,6 +1711,18 @@ ULONG CTray__MainThreadProc_hook(PVOID ppvParam)
 	return CTray__MainThreadProc_orig(ppvParam);
 }
 
+// Launching modern Task Manager doesn't work because it requires
+// admin privilegs. Using ShellExecute instead of CreateProcess
+// circumvents this.
+void RunSystemMonitor_hook(void)
+{
+	SHELLEXECUTEINFOW sei = { sizeof(sei) };
+	sei.fMask = SEE_MASK_DOENVSUBST;
+	sei.lpFile = L"%SystemRoot%\\system32\\taskmgr.exe";
+	sei.nShow = SW_SHOWNORMAL;
+	ShellExecuteExW(&sei);
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -1726,6 +1738,18 @@ void HookAPIs()
 		GetShellWindow_hook
 	);
 #endif
+
+	void *RunSystemMonitor = (void *)FindPattern(
+		(uintptr_t)GetModuleHandle(NULL), "48 81 EC 08 03 00 00 48 8B 05 82 6E 02 00 48 89"
+	);
+	if (RunSystemMonitor)
+	{
+		MH_CreateHook(
+			RunSystemMonitor,
+			(void *)RunSystemMonitor_hook,
+			(void **)&RunSystemMonitor
+		);
+	}
 
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	//change desktop
