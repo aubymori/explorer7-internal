@@ -12,6 +12,7 @@
 #pragma comment(linker,"/export:SHOpenRegStream2W=SHOpenRegStream2WNEW")
 #pragma comment(linker,"/export:MurderSinofskyHardly=WinListInit,@110,NONAME")
 #pragma comment(linker,"/export:MurderSinofskySoftly=WinListUninit,@111,NONAME")
+#pragma comment(linker,"/export:IsOS=IsOSNEW,@437,NONAME")
 #else
 #pragma comment(linker,"/export:CoCreateInstance=_Explorer_CoCreateInstance@20")
 #pragma comment(linker,"/export:CoRegisterClassObject=_Explorer_CoRegisterClassObject@20")
@@ -109,7 +110,6 @@
 #pragma comment(linker,FORWARDO(SHLWAPI,388))
 #pragma comment(linker,FORWARDO(SHLWAPI,413))
 #pragma comment(linker,FORWARDO(SHLWAPI,433))
-#pragma comment(linker,FORWARDO(SHLWAPI,437))
 #pragma comment(linker,FORWARDO(SHLWAPI,439))
 #pragma comment(linker,FORWARDO(SHLWAPI,460))
 #pragma comment(linker,FORWARDO(SHLWAPI,467))

@@ -13,6 +13,7 @@ public:
 
 	LSTATUS QueryValue(LPCWSTR lpValueName, LPBYTE lpData, DWORD cbData, LPDWORD lpType = nullptr);
 	LSTATUS SetValue(LPCWSTR lpValueName, DWORD dwType, LPCBYTE lpData, DWORD cbData);
+	LSTATUS DeleteValue(LPCWSTR lpValueName);
 };
 
 static CRegistryManager g_registry;

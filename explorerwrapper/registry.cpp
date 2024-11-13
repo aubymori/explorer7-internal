@@ -46,3 +46,9 @@ LSTATUS CRegistryManager::SetValue(LPCWSTR lpValueName, DWORD dwType, LPCBYTE lp
 	_OpenKeys();
 	return RegSetValueExW(m_hKeyUser, lpValueName, NULL, dwType, lpData, cbData);
 }
+
+LSTATUS CRegistryManager::DeleteValue(LPCWSTR lpValueName)
+{
+	_OpenKeys();
+	return RegDeleteValueW(m_hKeyUser, lpValueName);
+}

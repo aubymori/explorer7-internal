@@ -60,6 +60,9 @@ bool g_bDisableComposition = false;
 #ifdef WITH_UWP
 bool g_enableImmersiveShellStack = false;
 #endif
+// When this is true, XP Explorer will act like the classic
+// GINA Logon UI is enabled.
+bool g_bGinaUI = false;
 
 static WNDPROC g_prevTrayProc;
 typedef DWORD(WINAPI* SHPtrParamAPI)(PVOID);
@@ -1301,9 +1304,7 @@ SHGetUserPicturePath_t SHGetUserPicturePath = nullptr;
 
 HRESULT WINAPI SHGetUserPicturePathNEW(LPCWSTR pszUsername, DWORD dwFlags, LPWSTR pszPath)
 {
-	DWORD dwHideUserPic = 0;
-	g_registry.QueryValue(L"HideUserPicture", (LPBYTE)&dwHideUserPic, sizeof(DWORD));
-	if (dwHideUserPic)
+	if (g_bGinaUI)
 	{
 		*pszPath = L'\0';
 		return E_FAIL;
@@ -1424,19 +1425,6 @@ HANDLE WINAPI LoadImageWNEW(HINSTANCE hInst, LPCWSTR name, UINT type, int cx, in
 // Fix user pic in XP Explorer
 void FixWinXPUserPic()
 {
-	BYTE *UpdateUserInfo = (BYTE *)FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 9C 24 ?? ?? ?? ?? 75 1B 85 C0 0F 84 ?? ?? ?? ?? B9 1B 00 00 00 FF 15 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ??");
-	const BYTE Patch[] = { 0xB8, 0x01, 0x00, 0x00, 0x00, 0x90 };
-	if (UpdateUserInfo)
-	{
-		ChangeImportedPattern(
-			UpdateUserInfo + 23,
-			Patch, sizeof(Patch)
-		);
-		dbgprintf(L"Found the pattern");
-	}
-	else
-		dbgprintf(L"Did not Found the pattern");
-
 	// This is the 10 SHGetUserPicturePath,
 	SHGetUserPicturePath = (SHGetUserPicturePath_t)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPCSTR)261);
 	// shunimpl'd
@@ -1766,8 +1754,6 @@ void HookAPIs()
 	//Ittr: Disable DWM composition as quickly as we can (if compile flag set)
 	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
 
-	//ChangeImportedAddress(GetModuleHandle(NULL), "shlwapi.dll", GetProcAddress(GetModuleHandle(L"shlwapi.dll"), "IUnknown_QueryService"), IUnknown_QueryServiceNEW);
-
 	FixWinXPUserPic();
 
 	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
@@ -1942,6 +1928,18 @@ void HookAPIs()
 		SetThemeAppProperties(NULL);
 	}
 
+	DWORD dwGinaUI = 0;
+	if (ERROR_SUCCESS == g_registry.QueryValue(L"GinaUI", (LPBYTE)&dwGinaUI, sizeof(DWORD)))
+	{
+		g_bGinaUI = (dwGinaUI != 0);
+	}
+	// Migrate user pic value
+	else if (ERROR_SUCCESS == g_registry.QueryValue(L"HideUserPicture", (LPBYTE)&dwGinaUI, sizeof(DWORD)))
+	{
+		g_registry.SetValue(L"GinaUI", REG_DWORD, (LPCBYTE)&dwGinaUI, sizeof(DWORD));
+		g_bGinaUI = (dwGinaUI != 0);
+	}
+	g_registry.DeleteValue(L"HideUserPicture");
 	HookLoadImageForSizeAndFont();
 
 	//enable hooks at end

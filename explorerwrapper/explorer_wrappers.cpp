@@ -60,3 +60,10 @@ extern "C" void WINAPI WinListUninit()
 	SUCH SkipDLLUnloadInitChecks = (SUCH)GetProcAddress(GetModuleHandle(L"dui70.dll"),"SkipDLLUnloadInitChecks");
 	SkipDLLUnloadInitChecks();
 }
+
+extern "C" BOOL WINAPI IsOSNEW(DWORD dwOS)
+{
+	if (dwOS == OS_WELCOMELOGONUI)
+		return !g_bGinaUI;
+	return IsOS(dwOS);
+}

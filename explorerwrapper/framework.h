@@ -17,6 +17,8 @@
 #include <propvarutil.h>
 #include <strsafe.h>
 
+extern bool g_bGinaUI;
+
 #define NOATOMICRELESEFUNC
 #ifndef ATOMICRELEASE
 #ifdef __cplusplus
