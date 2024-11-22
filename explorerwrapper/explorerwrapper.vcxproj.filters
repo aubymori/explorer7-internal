@@ -96,6 +96,9 @@
     <ClInclude Include="cregtree.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -175,5 +178,19 @@
     <ResourceCompile Include="wrapper.rc">
       <Filter>Resource files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\icon1.ico">
+      <Filter>Resource files</Filter>
+    </Image>
+    <Image Include="res\start%401.25x.bmp">
+      <Filter>Resource files</Filter>
+    </Image>
+    <Image Include="res\start%401.5x.bmp">
+      <Filter>Resource files</Filter>
+    </Image>
+    <Image Include="res\start.bmp">
+      <Filter>Resource files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

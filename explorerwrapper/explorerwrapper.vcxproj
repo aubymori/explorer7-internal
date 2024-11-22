@@ -74,6 +74,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <GenerateManifest>true</GenerateManifest>
+    <TargetName>wrp64</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -156,7 +157,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;EXPLORERWRAPPER_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;EXPLORERWRAPPER_EXPORTS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <ExceptionHandling>false</ExceptionHandling>
       <BufferSecurityCheck>false</BufferSecurityCheck>
@@ -186,6 +187,10 @@
     <PreBuildEvent>
       <Command>if exist ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib copy /Y ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib $(ProjectDir)</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="appresolvernotify.h" />
@@ -196,6 +201,7 @@
     <ClInclude Include="destinationlist.h" />
     <ClInclude Include="EnumStartMenu.h" />
     <ClInclude Include="forwards.h" />
+    <ClInclude Include="framework.h" />
     <ClInclude Include="immersivefactory.h" />
     <ClInclude Include="immersiveshell.h" />
     <ClInclude Include="MinHook.h" />
@@ -264,6 +270,12 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wrapper.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\icon1.ico" />
+    <Image Include="res\start%401.25x.bmp" />
+    <Image Include="res\start%401.5x.bmp" />
+    <Image Include="res\start.bmp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

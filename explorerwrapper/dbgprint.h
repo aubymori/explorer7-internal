@@ -1,5 +1,6 @@
 #pragma once
 #include "framework.h"
+#include <cstdint>
 
 extern "C" void * _ReturnAddress(void);
 #pragma intrinsic(_ReturnAddress)
@@ -206,3 +207,105 @@ inline PVOID FindPattern2(PVOID pBase, SIZE_T dwSize, LPCSTR lpPattern, LPCSTR l
 }
 
 extern BOOL g_bIsArm64;
+
+// small UNWIND_INFO implementation
+typedef struct _UNWIND_INFO {
+	unsigned char Version : 3;
+	unsigned char Flags : 5;
+} UNWIND_INFO, * PUNWIND_INFO;
+
+static uintptr_t GetFunctionStart(uintptr_t address, uintptr_t BaseAddress)
+{
+	DWORD64 ImgBase = 0;
+	PRUNTIME_FUNCTION Function = nullptr;
+	for (auto Func = RtlLookupFunctionEntry(address, &ImgBase, NULL); Func;
+		Func = RtlLookupFunctionEntry(BaseAddress + (Func->BeginAddress - 1), &ImgBase, NULL))
+	{
+		auto UnwindInfo = reinterpret_cast<PUNWIND_INFO>(BaseAddress + Func->UnwindInfoAddress);
+		if (UnwindInfo->Flags & UNW_FLAG_CHAININFO)
+			continue;
+
+		Function = Func;
+		break;
+	}
+
+	return Function ? BaseAddress + Function->BeginAddress : 0;
+}
+
+//adapted from dumper7 (ue4/5 sdk dumper), i wasnt bothered enough to write this shit from scratch
+inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
+{
+	uintptr_t ImageBase = baseaddress;
+	PIMAGE_DOS_HEADER DosHeader = (PIMAGE_DOS_HEADER)(ImageBase);
+	PIMAGE_NT_HEADERS NtHeader = (PIMAGE_NT_HEADERS)(ImageBase + DosHeader->e_lfanew);
+	PIMAGE_SECTION_HEADER Sections = IMAGE_FIRST_SECTION(NtHeader);
+
+	uint8_t* DataSection = nullptr;
+	uint8_t* TextSection = nullptr;
+	DWORD DataSize = 0;
+	DWORD TextSize = 0;
+
+	uint8_t* StringAddress = nullptr;
+
+	for (int i = 0; i < NtHeader->FileHeader.NumberOfSections; i++)
+	{
+		IMAGE_SECTION_HEADER& CurrentSection = Sections[i];
+
+		if (strcmp((const char*)CurrentSection.Name, ".rdata") == 0 && !DataSection)
+		{
+			DataSection = (uint8_t*)(CurrentSection.VirtualAddress + ImageBase);
+			DataSize = CurrentSection.Misc.VirtualSize;
+		}
+		else if (strcmp((const char*)CurrentSection.Name, ".text") == 0 && !TextSection)
+		{
+			TextSection = (uint8_t*)(CurrentSection.VirtualAddress + ImageBase);
+			TextSize = CurrentSection.Misc.VirtualSize;
+		}
+	}
+
+	size_t refStrLen = wcslen(RefStr) * sizeof(wchar_t);
+	uint64_t* refStr64 = (uint64_t*)RefStr;
+
+	for (size_t i = 0; i < DataSize; i++)
+	{
+		if (*((uint64_t*)(DataSection + i)) == *refStr64)
+		{
+			if (memcmp(RefStr, DataSection + i, refStrLen) == 0)
+			{
+				StringAddress = DataSection + i;
+				break;
+			}
+		}
+	}
+
+	if (!StringAddress)
+	{
+		for (size_t i = 0; i < TextSize; i++)
+		{
+			if (*((uint64_t*)(TextSection + i)) == *refStr64)
+			{
+				if (memcmp(RefStr, TextSection + i, refStrLen) == 0)
+				{
+					StringAddress = TextSection + i;
+					break;
+				}
+			}
+		}
+	}
+
+	for (size_t i = 0; i < TextSize; i++)
+	{
+		// opcode: lea
+		if ((TextSection[i] == uint8_t(0x4C) || TextSection[i] == uint8_t(0x48)) && TextSection[i + 1] == uint8_t(0x8D))
+		{
+			const uint8_t* StrPtr = *(int32_t*)(TextSection + i + 3) + 7 + TextSection + i;
+
+			if (StrPtr == StringAddress)
+			{
+				return { TextSection + i };
+			}
+		}
+	}
+
+	return nullptr;
+}

@@ -8,7 +8,7 @@
 #define USE_TIMEBOMB
 
 constexpr UINT TIMEBOMB_YEAR  = 2025;
-constexpr UINT TIMEBOMB_MONTH = 1;
+constexpr UINT TIMEBOMB_MONTH = 4;
 constexpr UINT TIMEBOMB_DAY   = 1;
 
 constexpr char MONTH_DAYS[] =
