@@ -114,12 +114,12 @@ void HookShell32()
 	//todo: evaluate if this is needed
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);
 
-	uintptr_t Cunt = FindPattern((uintptr_t)LoadLibrary(L"shell32.dll"), "41 8B E9 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
-	if (Cunt && g_osVersion.BuildNumber() >= 19045)
+	uintptr_t Win32PinCheck = FindPattern((uintptr_t)LoadLibrary(L"shell32.dll"), "41 8B E9 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
+	if (Win32PinCheck && g_osVersion.BuildNumber() >= 19045)
 	{
-		dbgprintf(L"Cunt %i", Cunt);
-		Cunt += 19;
-		uint8_t* bytes = (uint8_t*)(Cunt + 5 + *reinterpret_cast<int32_t*>(Cunt + 1));
+		dbgprintf(L"Win32PinCheck %i", Win32PinCheck);
+		Win32PinCheck += 19;
+		uint8_t* bytes = (uint8_t*)(Win32PinCheck + 5 + *reinterpret_cast<int32_t*>(Win32PinCheck + 1));
 		DWORD old;
 		VirtualProtect(bytes, 3, PAGE_EXECUTE_READWRITE, &old);
 		bytes[0] = 0xB0;

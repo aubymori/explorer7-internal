@@ -217,7 +217,7 @@ static uintptr_t GetFunctionStart(uintptr_t address, uintptr_t BaseAddress)
 	return Function ? BaseAddress + Function->BeginAddress : 0;
 }
 
-//adapted from dumper7 (ue4/5 sdk dumper), i wasnt bothered enough to write this shit from scratch
+//adapted from dumper7 (ue4/5 sdk dumper), i wasnt bothered enough to write this stuff from scratch
 inline void* FindByString(uintptr_t baseaddress, const wchar_t* RefStr)
 {
 	uintptr_t ImageBase = baseaddress;

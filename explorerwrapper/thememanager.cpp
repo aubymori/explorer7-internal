@@ -42,7 +42,7 @@ DWORD WINAPI DelayFreeThread(LPVOID lParam)
 
 void ThemeManagerInitialize()
 {
-	//dont bother error checking, if u dont got uxtheme, ur shit is prob already fucked and theres no saving u
+	//dont bother error checking, if u dont got uxtheme, ur system is prob already messed up and theres no saving u
 	HMODULE hUxTheme = GetModuleHandleW(L"uxtheme.dll");
 	GetThemeDefaults = (decltype(GetThemeDefaults))GetProcAddress(hUxTheme, (LPCSTR)7);
 	LoaderLoadTheme = (decltype(LoaderLoadTheme))GetProcAddress(hUxTheme, (LPCSTR)92);

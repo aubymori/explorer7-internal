@@ -575,7 +575,7 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 	{
 		int bNCRenderingEnabled = DWMNCRP_DISABLED;
 
-		// Disable DWM frames - thank FUCK this works
+		// Disable DWM frames
 		WINDOWCOMPOSITIONATTRIBDATA attrData;
 		attrData.Attrib = WCA_NCRENDERING_POLICY;
 		attrData.pvData = &bNCRenderingEnabled;
@@ -621,11 +621,6 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 	{
 		if (lstrcmp(pszSubAppName, L"VerticalShowDesktop") == 0) return SetWindowTheme(hwnd, L"VerticalShowDesktop8", pszSubIdList);
 		if (lstrcmp(pszSubAppName, L"ShowDesktop") == 0) return SetWindowTheme(hwnd, L"ShowDesktop8", pszSubIdList);
-
-		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedVertical") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedVertical8", pszSubIdList);
-		if (lstrcmp(pszSubAppName, L"TaskBand2Composited") == 0) return SetWindowTheme(hwnd, L"TaskBand2Composited8", pszSubIdList);
-		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIconsVertical") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIconsVertical8", pszSubIdList);
-		if (lstrcmp(pszSubAppName, L"TaskBand2CompositedSmallIcons") == 0) return SetWindowTheme(hwnd, L"TaskBand2CompositedSmallIcons8", pszSubIdList);
 
 		if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0) && IsCompositionActiveNEW()) // updated thumbnail classes misbehave without DWM
 			return SetWindowTheme(hwnd, L"W8", pszSubIdList);
@@ -1649,7 +1644,7 @@ HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be
 
 // Ittr: Get rid of the immersive start menu and stop it appearing on TH1+ when UWP is on.
 // This is very important and also extremely fragile.
-// I'll also be honest - I haven't tested 1703 because who the fuck uses 1703 LOL
+// I'll also be honest - I haven't tested 1703 because who actually uses 1703
 void DisableImmersiveStart()
 {
 	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
@@ -1676,7 +1671,7 @@ void DisableImmersiveStart()
 
 // Ittr: Get rid of the immersive search interface and prevent it appearing on TH1+ with ImmersiveShell enabled
 // Otherwise, when invoked, takes up half the screen.
-// Just use the Windows 7 start menu search - the functionality is much superior to this crap
+// Just use the Windows 7 start menu search - the functionality is much superior to this
 void DisableImmersiveSearch()
 {
 	if (g_bEnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
@@ -1975,7 +1970,7 @@ void HookAPIs()
 		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
 	
 	// 1. shell32.dll - hack created startmenupin instance
-	// 2. shell32.dll - patch delayload shit
+	// 2. shell32.dll - patch delayload stuff
 	StartMenuPin_PatchShell32();
 	HookShell32();
 
@@ -2110,7 +2105,7 @@ GetProcAddress_Hook(
 }
 
 // Basically this allows explorer to actually work on builds >9200
-void AssFuckShunimpl()
+void PatchShunimpl()
 {
 	uintptr_t shunImpl = (uintptr_t)GetModuleHandle(L"shunimpl.dll");
 	if (!shunImpl) return;
@@ -2202,7 +2197,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 {
 	CheckTimeBomb();
 
-	// Ittr: We initialise values for closing program if shitblinds is present
+	// Ittr: We initialise values for closing program if incompatible software is present
 	WCHAR programPath[MAX_PATH] = L"\\Stardock\\WindowBlinds 11\\unins000.exe";
 	WCHAR blacklistPath[MAX_PATH];
 	ExpandEnvironmentStringsW(L"%ProgramFiles%", (LPWSTR)blacklistPath, sizeof(blacklistPath));
@@ -2212,7 +2207,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	{
 	case DLL_PROCESS_ATTACH:
 	{
-		AssFuckShunimpl();
+		PatchShunimpl();
 
 		if (GetFileAttributesW((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
 			CrashError(); // The user-facing crash message - we do these blocks of code like this, so that the 0xc0000142 error doesn't appear

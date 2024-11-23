@@ -50,7 +50,7 @@ static void __fastcall SHComputeDPI(HWND a1, int* a2, int* a3)
 		*a3 = v11;
 }
 
-//custom versions of the functions because mfs use patched dlls and aerexplorer fucks this shit up
+//custom versions of the functions because ppl use patched dlls and aerexplorer messes this up
 static void __fastcall CNscTree_ScaleAndSetIndent(__int64 a1)
 {
 	int v1; // ebx

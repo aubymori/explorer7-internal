@@ -10,8 +10,8 @@
 #pragma comment(linker,"/export:SHGetSignature=SHGetSignature,@559,NONAME")
 #pragma comment(linker,"/export:SHInvokeCommandWithFlagsAndSite=SHInvokeCommandWithFlagsAndSite,@571")
 #pragma comment(linker,"/export:SHOpenRegStream2W=SHOpenRegStream2WNEW")
-#pragma comment(linker,"/export:MurderSinofskyHardly=WinListInit,@110,NONAME")
-#pragma comment(linker,"/export:MurderSinofskySoftly=WinListUninit,@111,NONAME")
+#pragma comment(linker,"/export:WinListInit=WinListInit,@110,NONAME")
+#pragma comment(linker,"/export:WinListUninit=WinListUninit,@111,NONAME")
 #else
 #pragma comment(linker,"/export:CoCreateInstance=_Explorer_CoCreateInstance@20")
 #pragma comment(linker,"/export:CoRegisterClassObject=_Explorer_CoRegisterClassObject@20")
@@ -21,8 +21,8 @@
 #pragma comment(linker,"/export:SHGetSignature=_SHGetSignature@12,@559,NONAME")
 #pragma comment(linker,"/export:SHInvokeCommandWithFlagsAndSite=_SHInvokeCommandWithFlagsAndSite@24,@571")
 #pragma comment(linker,"/export:SHOpenRegStream2W=_SHOpenRegStream2WNEW@16")
-#pragma comment(linker,"/export:MurderSinofskyHardly=_WinListInit@0,@110,NONAME")
-#pragma comment(linker,"/export:MurderSinofskySoftly=_WinListUninit@0,@111,NONAME")
+#pragma comment(linker,"/export:WinListInit=_WinListInit@0,@110,NONAME")
+#pragma comment(linker,"/export:WinListUninit=_WinListUninit@0,@111,NONAME")
 #endif
 
 //dui70 - names
