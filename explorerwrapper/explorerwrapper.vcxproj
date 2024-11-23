@@ -217,7 +217,6 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="taskscheduler.h" />
     <ClInclude Include="thememanager.h" />
-    <ClInclude Include="timebomb.h" />
     <ClInclude Include="trash.h" />
     <ClInclude Include="traynotify.h" />
     <ClInclude Include="userassist.h" />

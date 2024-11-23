@@ -19,7 +19,6 @@
 #include "taskscheduler.h"
 #include "registry.h"
 #include "nsctree.h"
-#include "timebomb.h"
 #include "cregtree.h"
 #include "shellapi.h"
 #include "autoplay.h"
@@ -2031,8 +2030,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
 {
-	CheckTimeBomb();
-
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
