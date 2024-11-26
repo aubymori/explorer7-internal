@@ -179,8 +179,8 @@ private:
 class CObjectWithSite : public IObjectWithSite
 {
 public:
-	CObjectWithSite() { _punkSite = NULL; };
-	virtual ~CObjectWithSite() { if (_punkSite) { _punkSite->Release(); } }
+	CObjectWithSite() { m_punkSite = NULL; };
+	virtual ~CObjectWithSite() { if (m_punkSite) { m_punkSite->Release(); } }
 
 	//*** IUnknown ****
 	// (client must provide!)
@@ -190,7 +190,7 @@ public:
 	STDMETHOD(GetSite)(REFIID riid, void** ppvSite);
 
 protected:
-	IUnknown* _punkSite;
+	IUnknown* m_punkSite;
 };
 
 #undef  INTERFACE
@@ -245,18 +245,14 @@ ITrayPriv2 : public ITrayPriv
 };
 #undef  INTERFACE
 
-class CStartMenuCallbackBase : public IShellMenuCallback,
-	public CObjectWithSite
+class CStartMenuCallbackBase
+	: public IShellMenuCallback
+	,public CObjectWithSite
 {
 public:
-	// *** IUnknown methods ***
 	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObj);
-	STDMETHODIMP_(ULONG) AddRef();
-	STDMETHODIMP_(ULONG)  Release();
-
-	// derived class is expected to implement IShellMenuCallback
-
-	// IObjectWithSite inherited from CObjectWithSite
+	ULONG STDMETHODCALLTYPE AddRef();
+	ULONG STDMETHODCALLTYPE Release();
 
 protected:
 	CStartMenuCallbackBase(BOOL fIsStartPanel = FALSE);
@@ -277,28 +273,27 @@ protected:
 
 	void _RefreshSettings();
 
-protected:
-	int _cRef;
+	int m_cRef;
 
-	DWORD _dwThreadID;
+	DWORD m_dwThreadId;
 
-	LPTSTR          _pszPrograms;
-	LPTSTR          _pszWindowsUpdate;
-	LPTSTR          _pszConfigurePrograms;
-	LPTSTR          _pszAdminTools;
+	LPWSTR m_pszPrograms;
+	LPWSTR m_pszWindowsUpdate;
+	LPWSTR m_pszConfigurePrograms;
+	LPWSTR m_pszAdminTools;
 
-	ITrayPriv2* _ptp2;
+	ITrayPriv2* m_pTrayPriv2;
 
-	BOOL            _fExpandoMenus;
-	BOOL            _fShowAdminTools;
-	BOOL            _fIsStartPanel;
-	BOOL            _fInitPrograms;
+	BOOL m_fExpandoMenus;
+	BOOL m_fShowAdminTools;
+	BOOL m_fIsStartPanel;
+	BOOL m_fInitPrograms;
 };
 
 class CPersonalProgramsMenuCallback : public CStartMenuCallbackBase
 {
 public:
-	CPersonalProgramsMenuCallback() : CStartMenuCallbackBase(TRUE) { _ptp2 = 0; }
+	CPersonalProgramsMenuCallback() : CStartMenuCallbackBase(TRUE) { m_pTrayPriv2 = 0; }
 
 	// *** IShellMenuCallback methods ***
 	STDMETHODIMP CallbackSM(LPSMDATA psmd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -360,48 +355,95 @@ public:
 
 };
 
+// <BEGIN RegStr.h COPIED CODE>
+#define REGSTR_PATH_EXPLORER             TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer")
+#define REGSTR_PATH_SETUP                TEXT("Software\\Microsoft\\Windows\\CurrentVersion")
+// <END RegStr.h COPIED CODE>
+
+// <BEGIN msi.h COPIED CODE>
+typedef enum tagINSTALLSTATE
+{
+	INSTALLSTATE_NOTUSED = -7,  // component disabled
+	INSTALLSTATE_BADCONFIG = -6,  // configuration data corrupt
+	INSTALLSTATE_INCOMPLETE = -5,  // installation suspended or in progress
+	INSTALLSTATE_SOURCEABSENT = -4,  // run from source, source is unavailable
+	INSTALLSTATE_MOREDATA = -3,  // return buffer overflow
+	INSTALLSTATE_INVALIDARG = -2,  // invalid function argument
+	INSTALLSTATE_UNKNOWN = -1,  // unrecognized product or feature
+	INSTALLSTATE_BROKEN = 0,  // broken
+	INSTALLSTATE_ADVERTISED = 1,  // advertised feature
+	INSTALLSTATE_REMOVED = 1,  // component being removed (action state, not settable)
+	INSTALLSTATE_ABSENT = 2,  // uninstalled (or action state absent but clients remain)
+	INSTALLSTATE_LOCAL = 3,  // installed on local drive
+	INSTALLSTATE_SOURCE = 4,  // run from source, CD or net
+	INSTALLSTATE_DEFAULT = 5,  // use default, local or source
+} INSTALLSTATE;
+#define MAX_FEATURE_CHARS  38   // maximum chars in feature name (same as string GUID)
+// </END msi.h COPIED CODE>
+
+class CDarwinAd
+{
+public:
+	LPWSTR m_szLocalPath;
+	LPWSTR m_szDescriptor;
+	INSTALLSTATE m_installState;
+	LPITEMIDLIST m_pidl;
+
+	CDarwinAd(LPITEMIDLIST pidl, LPWSTR psz);
+	~CDarwinAd();
+
+	void CheckInstalled();
+	BOOL IsAd();
+};
+
 class CStartMenuCallback : public CStartMenuCallbackBase
 {
 public:
-	// *** IUnknown methods *** inherited from CStartMenuBase
-
-	// *** IShellMenuCallback methods ***
+	// IShellMenuCallback:
 	STDMETHODIMP CallbackSM(LPSMDATA psmd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-	// *** IObjectWithSite methods *** (overriding CObjectWithSite)
+	// IObjectWithSite:
 	STDMETHODIMP SetSite(IUnknown* punk);
 	STDMETHODIMP GetSite(REFIID riid, void** ppvOut);
 
 	CStartMenuCallback();
+
+	HRESULT InitializeFastItemsShellMenu(IShellMenu* psm);
+	HRESULT InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR pszRoot, LPTSTR pszValue,
+		DWORD dwPassInitFlags, DWORD dwSetFlags, BOOL fAddOpen,
+		IShellMenu* psm);
+	HRESULT InitializeDocumentsShellMenu(IShellMenu* psm);
+	HRESULT InitializeSubShellMenu(int idCmd, IShellMenu* psm);
+
 private:
 	virtual ~CStartMenuCallback();
 
-	IContextMenu* _pcmFind;
-	ITrayPriv* _ptp;
-	IUnknown* _punkSite;
-	IOleCommandTarget* _poct;
-	BITBOOL         _fAddOpenFolder : 1;
-	BITBOOL         _fCascadeMyDocuments : 1;
-	BITBOOL         _fCascadePrinters : 1;
-	BITBOOL         _fCascadeControlPanel : 1;
-	BITBOOL         _fFindMenuInvalid : 1;
-	BITBOOL         _fCascadeNetConnections : 1;
-	BITBOOL         _fShowInfoTip : 1;
-	BITBOOL         _fInitedShowTopLevelStartMenu : 1;
-	BITBOOL         _fCascadeMyPictures : 1;
+	IContextMenu* m_pContextMenuFind;
+	ITrayPriv* m_pTrayPriv;
+	IUnknown* m_punkSite;
+	IOleCommandTarget* m_pOleCommandTarget;
+	bool m_fAddOpenFolder : 1;
+	bool m_fCascadeMyDocuments : 1;
+	bool m_fCascadePrinters : 1;
+	bool m_fCascadeControlPanel : 1;
+	bool m_fFindMenuInvalid : 1;
+	bool m_fCascadeNetConnections : 1;
+	bool m_fShowInfoTip : 1;
+	bool m_fHasInitShowTopLevelStartMenu : 1;
+	bool m_fCascadeMyPictures : 1;
 
-	BITBOOL         _fHasMyDocuments : 1;
-	BITBOOL         _fHasMyPictures : 1;
+	bool m_fHasMyDocuments : 1;
+	bool m_fHasMyPictures : 1;
 
-	TCHAR           _szFindMnemonic[2];
+	WCHAR m_szFindMnemonic[2];
 
-	HWND            _hwnd;
+	HWND m_hWnd;
 
-	IMruDataList* _pmruRecent;
-	DWORD           _cRecentDocs;
+	IMruDataList* m_pMruRecent;
+	DWORD m_cRecentDocs;
 
-	DWORD           _dwFlags;
-	DWORD           _dwChevronCount;
+	DWORD m_dwFlags;
+	DWORD m_dwChevronCount;
 
 	HRESULT _ExecHmenuItem(LPSMDATA psmdata);
 	HRESULT _Init(SMDATA* psmdata);
@@ -428,15 +470,6 @@ private:
 	HRESULT VerifyMergedGuy(BOOL fPrograms, IShellMenu* psm);
 	void _UpdateDocsMenuItemNames(IShellMenu* psm);
 	void _UpdateDocumentsShellMenu(IShellMenu* psm);
-
-public: // Make these public to this file. This is for the CreateInstance
-	// Sub Menu creation
-	HRESULT InitializeFastItemsShellMenu(IShellMenu* psm);
-	HRESULT InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR pszRoot, LPTSTR pszValue,
-		DWORD dwPassInitFlags, DWORD dwSetFlags, BOOL fAddOpen,
-		IShellMenu* psm);
-	HRESULT InitializeDocumentsShellMenu(IShellMenu* psm);
-	HRESULT InitializeSubShellMenu(int idCmd, IShellMenu* psm);
 };
 
 HRESULT SHCoInitialize(void);

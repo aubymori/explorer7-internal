@@ -14,102 +14,91 @@
 #include <shlwapi.h>
 #include <objbase.h>
 #include <shellapi.h>
+
 #pragma function(memset)
 
+#define REGSTR_EXPLORER_ADVANCED REGSTR_PATH_EXPLORER L"\\Advanced"
+
+#define STRLEN(STR) (sizeof(STR) - 1)
+
 extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
-	__in   REFCLSID rclsid,
-	__in   LPUNKNOWN pUnkOuter,
-	__in   DWORD dwClsContext,
-	__in   REFIID riid,
-	__out  LPVOID* ppv
+	REFCLSID rclsid,
+	LPUNKNOWN pUnkOuter,
+	DWORD dwClsContext,
+	REFIID riid,
+	LPVOID* ppv
 );
-#define GUIDSTR_MAX 38
-STDAPI_(HINSTANCE) SHPinDllOfCLSID(const CLSID* pclsid)
+
+extern "C" HINSTANCE WINAPI SHPinDllOfCLSID(const CLSID* pclsid)
 {
-	HKEY hk;
+	HKEY hKey;
 	DWORD dwSize;
-	HINSTANCE hinst = NULL;
-	TCHAR szClass[GUIDSTR_MAX + 64];    // CLSID\{...}\InProcServer32
+	HINSTANCE hInstance = NULL;
+	WCHAR szClass[102];
 	WCHAR szDllPath[MAX_PATH];
 
-	lstrcpy(szClass, TEXT("CLSID\\"));
-	StringFromCLSID(*pclsid, (LPOLESTR*)szClass + 6); // 6 = strlen("CLSID\\")
-	lstrcat(szClass, TEXT("\\InProcServer32"));
+	lstrcpyW(szClass, L"CLSID\\");
+	StringFromCLSID(*pclsid, (LPOLESTR*)szClass + STRLEN("CLSID\\"));
+	lstrcatW(szClass, L"\\InProcServer32");
 
-	if (RegOpenKeyEx(HKEY_CLASSES_ROOT, szClass, 0, KEY_QUERY_VALUE, &hk)
-		== ERROR_SUCCESS) {
-
-		// Explicitly read as unicode.  SHQueryValueEx handles REG_EXPAND_SZ
+	if (RegOpenKeyExW(HKEY_CLASSES_ROOT, szClass, 0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+	{
 		dwSize = sizeof(szDllPath);
-		if (SHQueryValueExW(hk, 0, 0, 0, szDllPath, &dwSize) == ERROR_SUCCESS) {
-			hinst = LoadLibraryExW(szDllPath, NULL, 0);
+		if (SHQueryValueExW(hKey, 0, 0, 0, szDllPath, &dwSize) == ERROR_SUCCESS)
+		{
+			hInstance = LoadLibraryExW(szDllPath, NULL, 0);
 		}
 
-		RegCloseKey(hk);
+		RegCloseKey(hKey);
 	}
 
-	return hinst;
+	return hInstance;
 }
 
-IUserAssist* g_uempUa;      // 0:uninit, -1:failed, o.w.:cached obj
+// This pointer may also be -1 to indicate failure.
+IUserAssist* g_pUserAssist = nullptr;
+
 IUserAssist* GetUserAssist()
 {
 	HRESULT hr;
-	IUserAssist* pua = NULL;
+	IUserAssist* pUserAssist = NULL;
 
-	if (g_uempUa == 0)
+	if (!g_pUserAssist)
 	{
-		// re: CLSCTX_NO_CODE_DOWNLOAD
-		// an ('impossible') failed CCI of UserAssist is horrendously slow.
-		// e.g. click on the start menu, wait 10 seconds before it pops up.
-		// we'd rather fail than hose perf like this, plus this class should
-		// never be remote.
-		// FEATURE: there must be a better way to tell if CLSCTX_NO_CODE_DOWNLOAD
-		// is supported, i've sent mail to 'com' to find out...
-		DWORD dwFlags = (CLSCTX_INPROC | CLSCTX_NO_CODE_DOWNLOAD);
-		hr = Explorer_CoCreateInstance(CLSID_UserAssist, NULL, dwFlags, IID_IUserAssist7, (void**)&pua);
-		assert(SUCCEEDED(hr) || pua == NULL);  // follow COM rules
+		DWORD dwFlags = CLSCTX_INPROC | CLSCTX_NO_CODE_DOWNLOAD;
+		hr = Explorer_CoCreateInstance(CLSID_UserAssist, nullptr, dwFlags, IID_IUserAssist7, (void**)&pUserAssist);
 
-		if (pua)
+		if (pUserAssist)
 		{
-			HINSTANCE hInst;
-
-			hInst = SHPinDllOfCLSID(&CLSID_UserAssist); // cached across threads
-			// we're toast if this fails!!! (but happily, that's 'impossible')
-			// e.g. during logon when grpconv.exe is ShellExec'ed, we do
-			// a GetUserAssist, which caches a ptr to browseui's singleton
-			// object.  then when the ShellExec returns, we do CoUninit,
-			// which would free up the (non-pinned) browseui.dll.  then
-			// a later use of the cache would go off into space.
+			HINSTANCE hInst = SHPinDllOfCLSID(&CLSID_UserAssist);
 		}
 
-		//ENTERCRITICAL;
-		if (g_uempUa == 0) {
-			g_uempUa = pua;     // xfer refcnt (if any)
-			if (!pua) {
-				// mark it failed so we won't try any more
-				g_uempUa = (IUserAssist*)-1;
+		if (!g_pUserAssist)
+		{
+			g_pUserAssist = pUserAssist;
+
+			if (!pUserAssist)
+			{
+				// Set the user assist pointer to -1 to indicate failure and
+				// not allow any retries.
+				g_pUserAssist = (IUserAssist*)-1;
 			}
-			pua = NULL;
+
+			pUserAssist = nullptr;
 		}
-		//LEAVECRITICAL;
-		if (pua)
-			pua->Release();
-		//TraceMsg(DM_UASSIST, "sl.gua: pua=0x%x g_uempUa=%x", pua, g_uempUa);
+
+		if (pUserAssist)
+			pUserAssist->Release();
 	}
 
-	return (g_uempUa == (IUserAssist*)-1) ? 0 : g_uempUa;
+	return (g_pUserAssist == (IUserAssist*)-1)
+		? nullptr
+		: g_pUserAssist;
 }
 
-extern "C"
-BOOL UEMIsLoaded()
+extern "C" BOOL WINAPI UEMIsLoaded()
 {
-	BOOL fRet;
-
-	fRet = GetModuleHandle(TEXT("ole32.dll")) &&
-		GetModuleHandle(TEXT("browseui.dll"));
-
-	return fRet;
+	return GetModuleHandleW(L"ole32.dll") && GetModuleHandleW(L"browseui.dll");
 }
 
 //***   UEMFireEvent, QueryEvent, SetEvent -- 'safe' thunks
@@ -117,40 +106,28 @@ BOOL UEMIsLoaded()
 //  call these so don't have to worry about cache or whether Uassist object
 // even was successfully created.
 //REFIID guid, PVOID wparam, LPWSTR lparam, int eCmd
-HRESULT UEMFireEvent(const GUID * pguidGrp, int eCmd, DWORD dwFlags, WPARAM wParam, LPARAM lParam)
+HRESULT UEMFireEvent(const GUID *guid, int eCmd, DWORD dwFlags, WPARAM wParam, LPARAM lParam)
 {
-	HRESULT hr = E_FAIL;
-	IUserAssist* pua;
-
-	pua = GetUserAssist();
-	if (pua) {
-		hr = pua->FireEvent(*pguidGrp, eCmd, wParam, lParam);
-	}
-	return hr;
+	IUserAssist *pUserAssist = nullptr;
+	return (pUserAssist = GetUserAssist())
+		? pUserAssist->FireEvent(*guid, eCmd, wParam, lParam)
+		: E_FAIL;
 }
 
-HRESULT UEMSetEvent(const GUID * pguidGrp, WPARAM wParam, UEMINFO* pui)
+HRESULT UEMSetEvent(const GUID *guid, WPARAM wParam, UEMINFO* pui)
 {
-	HRESULT hr = E_FAIL;
-	IUserAssist* pua;
-
-	pua = GetUserAssist();
-	if (pua) {
-		hr = pua->SetEntry(*pguidGrp, wParam, pui);
-	}
-	return hr;
+	IUserAssist *pUserAssist = nullptr;
+	return (pUserAssist = GetUserAssist())
+		? pUserAssist->SetEntry(*guid, wParam, pui)
+		: E_FAIL;
 }
 
-HRESULT UEMQueryEvent(const GUID* pguidGrp, WPARAM wParam, UEMINFO* pui)
+HRESULT UEMQueryEvent(const GUID *guid, WPARAM wParam, UEMINFO* pui)
 {
-	HRESULT hr = E_FAIL;
-	IUserAssist* pua;
-
-	pua = GetUserAssist();
-	if (pua) {
-		hr = pua->QueryEntry(*pguidGrp, wParam, pui);
-	}
-	return hr;
+	IUserAssist *pUserAssist = nullptr;
+	return (pUserAssist = GetUserAssist())
+		? pUserAssist->QueryEntry(*guid, wParam, pui)
+		: E_FAIL;
 }
 
 #define UEIM_HIT        0x01
@@ -184,43 +161,38 @@ void UEMDeletePidl(const GUID* pguidGrp, IShellFolder* psf, LPCITEMIDLIST pidl)
 
 void* WINAPI Alloc(long cb)
 {
-
 	return (void*)LocalAlloc(LPTR, cb);
-
 }
 
 BOOL WINAPI Free(void* pb)
 {
-
-	return (LocalFree((HLOCAL)pb) == NULL);
-
+	return (LocalFree((HLOCAL)pb) == nullptr);
 }
 
-BOOL WINAPI Str_SetPtr(LPTSTR* ppszCurrent, LPCTSTR pszNew)
+BOOL WINAPI Str_SetPtr(LPWSTR* ppszCurrent, LPCWSTR pszNew)
 {
-	int cchLength;
-	LPTSTR pszOld;
-	LPTSTR pszNewCopy = NULL;
+	LPWSTR pszOld;
+	LPWSTR pszNewCopy = nullptr;
 
 	if (pszNew)
 	{
-		cchLength = lstrlen(pszNew);
-
-		// alloc a new buffer w/ room for the null terminator
-		pszNewCopy = (LPTSTR)Alloc((cchLength + 1) * sizeof(TCHAR));
+		int cchLength = lstrlenW(pszNew) + STRLEN("\0");
+		pszNewCopy = (LPWSTR)Alloc(cchLength * sizeof(WCHAR));
 
 		if (!pszNewCopy)
+		{
 			return FALSE;
+		}
 
 		lstrcpynW(pszNewCopy, pszNew, cchLength + 1);
 	}
 	pszOld = *ppszCurrent;
 	*ppszCurrent = pszNewCopy;
 
-	//pszOld = (LPTSTR)InterlockedExchangePointer((LPVOID*)ppszCurrent, pszNewCopy);
-
 	if (pszOld)
+	{
 		Free(pszOld);
+	}
 
 	return TRUE;
 }
@@ -576,13 +548,13 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetStartMenuMFUList(unsigned int l
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::RegisterSMNotify(IUnknown* p1)
 {
-	dbgprintf(L"RegisterSMNotify");
+	dbgprintf(L"CStartMenuResolver::RegisterSMNotify");
 	return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::RegisterARNotify(IUnknown* p1)
 {
-	dbgprintf(L"RegisterARNotify");
+	dbgprintf(L"CStartMenuResolver::RegisterARNotify");
 	if (m_startmenuitemscache8)
 		return m_startmenuitemscache8->RegisterARNotify(new CAppResolverNotify8((IAppResolverNotify7*)p1));
 	else if (m_startmenuitemscache10)
@@ -617,133 +589,62 @@ STDMETHODIMP CStartMenuCallbackBase::QueryInterface(REFIID riid, void** ppvObj)
 
 STDMETHODIMP_(ULONG __stdcall) CStartMenuCallbackBase::AddRef()
 {
-	return ++_cRef;
+	return ++m_cRef;
 }
 
 STDMETHODIMP_(ULONG __stdcall) CStartMenuCallbackBase::Release()
 {
-	assert(_cRef > 0);
-	_cRef--;
+	assert(m_cRef > 0);
+	m_cRef--;
 
-	if (_cRef > 0)
-		return _cRef;
+	if (m_cRef > 0)
+		return m_cRef;
 
 	delete this;
 	return 0;
 }
 
-#define REGSTR_PATH_EXPLORER             TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer")
-#define REGSTR_EXPLORER_WINUPDATE REGSTR_PATH_EXPLORER TEXT("\\WindowsUpdate")
-#define REGSTR_PATH_SETUP                TEXT("Software\\Microsoft\\Windows\\CurrentVersion")
+HDPA g_hdpaDarwinAds = nullptr;
+extern "C" CRITICAL_SECTION g_csDarwinAds = { 0 };
 
-EXTERN_C CRITICAL_SECTION g_csDarwinAds = { 0 };
-
-#define ENTERCRITICAL_DARWINADS EnterCriticalSection(&g_csDarwinAds)
-#define LEAVECRITICAL_DARWINADS LeaveCriticalSection(&g_csDarwinAds)
-
-// The threading concern with this variable is create/delete/add/remove. We will only remove an item 
-// and delete the hdpa on the main thread. We will however add and create on both threads.
-// We need to serialize access to the dpa, so we're going to grab the shell crisec.
-HDPA g_hdpaDarwinAds = NULL;
-
-typedef enum tagINSTALLSTATE
+CDarwinAd::CDarwinAd(LPITEMIDLIST pidl, LPWSTR psz)
 {
-	INSTALLSTATE_NOTUSED = -7,  // component disabled
-	INSTALLSTATE_BADCONFIG = -6,  // configuration data corrupt
-	INSTALLSTATE_INCOMPLETE = -5,  // installation suspended or in progress
-	INSTALLSTATE_SOURCEABSENT = -4,  // run from source, source is unavailable
-	INSTALLSTATE_MOREDATA = -3,  // return buffer overflow
-	INSTALLSTATE_INVALIDARG = -2,  // invalid function argument
-	INSTALLSTATE_UNKNOWN = -1,  // unrecognized product or feature
-	INSTALLSTATE_BROKEN = 0,  // broken
-	INSTALLSTATE_ADVERTISED = 1,  // advertised feature
-	INSTALLSTATE_REMOVED = 1,  // component being removed (action state, not settable)
-	INSTALLSTATE_ABSENT = 2,  // uninstalled (or action state absent but clients remain)
-	INSTALLSTATE_LOCAL = 3,  // installed on local drive
-	INSTALLSTATE_SOURCE = 4,  // run from source, CD or net
-	INSTALLSTATE_DEFAULT = 5,  // use default, local or source
-} INSTALLSTATE;
-#define MAX_FEATURE_CHARS  38   // maximum chars in feature name (same as string GUID)
+	m_pidl = pidl;
+	Str_SetPtr(&m_szDescriptor, psz);
+}
 
-class CDarwinAd
+CDarwinAd::~CDarwinAd()
 {
-public:
-	LPITEMIDLIST    _pidl;
-	LPTSTR          _pszDescriptor;
-	LPTSTR          _pszLocalPath;
-	INSTALLSTATE    _state;
+	ILFree(m_pidl);
+	Str_SetPtr(&m_szDescriptor, nullptr);
+	Str_SetPtr(&m_szLocalPath, nullptr);
+}
 
-	CDarwinAd(LPITEMIDLIST pidl, LPTSTR psz)
-	{
-		// I take ownership of this pidl
-		_pidl = pidl;
-		//_pszDescriptor = psz;
-		Str_SetPtr(&_pszDescriptor, psz);
-	}
+void CDarwinAd::CheckInstalled()
+{
+	// NOTE: Unimplemented.
+	m_szLocalPath = nullptr;
+}
 
-	void CheckInstalled()
-	{
-		TCHAR szProduct[GUIDSTR_MAX];
-		TCHAR szFeature[MAX_FEATURE_CHARS];
-		TCHAR szComponent[GUIDSTR_MAX];
-		
-		//if (MsiDecomposeDescriptor(_pszDescriptor, szProduct, szFeature, szComponent, NULL) == ERROR_SUCCESS)
-		//{
-		//	_state = MsiQueryFeatureState(szProduct, szFeature);
-		//}
-		//else
-		//{
-		//	_state = INSTALLSTATE_INVALIDARG;
-		//}
-		
-		// Note: Cannot use ParseDarwinID since that bumps the usage count
-		// for the app and we're not running the app, just looking at it.
-		// Also because ParseDarwinID tries to install the app (eek!)
-		//
-		// Must ignore INSTALLSTATE_SOURCE because MsiGetComponentPath will
-		// try to install the app even though we're just querying...
-		TCHAR szCommand[MAX_PATH];
-		DWORD cch = ARRAYSIZE(szCommand);
-		_pszLocalPath = NULL;
-		//if (_state == INSTALLSTATE_LOCAL &&
-		//	MsiGetComponentPath(szProduct, szComponent, szCommand, &cch) == _state)
-		//{
-		//	PathUnquoteSpaces(szCommand);
-		//	_pszLocalPath = szCommand;
-		//}
-		//else
-		//{
-		//	_pszLocalPath = NULL;
-		//}
-	}
+BOOL CDarwinAd::IsAd()
+{
+	return m_installState == INSTALLSTATE_ADVERTISED;
+}
 
-	BOOL IsAd()
-	{
-		return _state == INSTALLSTATE_ADVERTISED;
-	}
-
-	~CDarwinAd()
-	{
-		ILFree(_pidl);
-		Str_SetPtr(&_pszDescriptor, NULL);
-		Str_SetPtr(&_pszLocalPath, NULL);
-	}
-};
-
-int GetDarwinIndex(LPCITEMIDLIST pidlFull, CDarwinAd** ppda)
+int GetDarwinIndex(LPCITEMIDLIST pidlFull, CDarwinAd** ppDarwinAd)
 {
 	int iRet = -1;
 	if (g_hdpaDarwinAds)
 	{
-		int chdpa = DPA_GetPtrCount(g_hdpaDarwinAds);
-		for (int ihdpa = 0; ihdpa < chdpa; ihdpa++)
+		int iCount = DPA_GetPtrCount(g_hdpaDarwinAds);
+		for (int i = 0; i < iCount; i++)
 		{
-			*ppda = (CDarwinAd*)DPA_FastGetPtr(g_hdpaDarwinAds, ihdpa);
-			if (*ppda)
+			*ppDarwinAd = (CDarwinAd*)DPA_FastGetPtr(g_hdpaDarwinAds, i);
+			if (*ppDarwinAd)
 			{
-				if (ILIsEqual((*ppda)->_pidl, pidlFull))
+				if (ILIsEqual((*ppDarwinAd)->m_pidl, pidlFull))
 				{
-					iRet = ihdpa;
+					iRet = i;
 					break;
 				}
 			}
@@ -752,75 +653,72 @@ int GetDarwinIndex(LPCITEMIDLIST pidlFull, CDarwinAd** ppda)
 	return iRet;
 }
 
-STDAPI_(void) SHReValidateDarwinCache()
+extern "C" void WINAPI SHReValidateDarwinCache()
 {
 	if (g_hdpaDarwinAds)
 	{
-		ENTERCRITICAL_DARWINADS;
-		int chdpa = DPA_GetPtrCount(g_hdpaDarwinAds);
-		for (int ihdpa = 0; ihdpa < chdpa; ihdpa++)
+		EnterCriticalSection(&g_csDarwinAds);
+		int iCount = DPA_GetPtrCount(g_hdpaDarwinAds);
+		for (int i = 0; i < iCount; i++)
 		{
-			CDarwinAd* pda = (CDarwinAd*)DPA_FastGetPtr(g_hdpaDarwinAds, ihdpa);
-			if (pda)
+			CDarwinAd* pDarwinAd = (CDarwinAd*)DPA_FastGetPtr(g_hdpaDarwinAds, i);
+			if (pDarwinAd)
 			{
-				pda->CheckInstalled();
+				pDarwinAd->CheckInstalled();
 			}
 		}
-		LEAVECRITICAL_DARWINADS;
+		LeaveCriticalSection(&g_csDarwinAds);
 	}
 }
 
-STDAPI_(void) SHReValidateDarwinCacheCustom()
+extern "C" void WINAPI SHReValidateDarwinCacheCustom()
 {
 	if (g_hdpaDarwinAds)
 	{
-		ENTERCRITICAL_DARWINADS;
-		int chdpa = DPA_GetPtrCount(g_hdpaDarwinAds);
-		for (int ihdpa = 0; ihdpa < chdpa; ihdpa++)
+		EnterCriticalSection(&g_csDarwinAds);
+		int iCount = DPA_GetPtrCount(g_hdpaDarwinAds);
+		for (int i = 0; i < iCount; i++)
 		{
-			CDarwinAd* pda = (CDarwinAd*)DPA_FastGetPtr(g_hdpaDarwinAds, ihdpa);
-			if (pda)
+			CDarwinAd* pDarwinAd = (CDarwinAd*)DPA_FastGetPtr(g_hdpaDarwinAds, i);
+			if (pDarwinAd)
 			{
-				pda->CheckInstalled();
+				pDarwinAd->CheckInstalled();
 			}
 		}
-		LEAVECRITICAL_DARWINADS;
+		LeaveCriticalSection(&g_csDarwinAds);
 	}
 }
 
 CStartMenuCallbackBase::CStartMenuCallbackBase(BOOL fIsStartPanel)
 {
-	memset(this,0,sizeof(CStartMenuCallbackBase));
+	memset(this, 0, sizeof(CStartMenuCallbackBase));
 
-	_fIsStartPanel = fIsStartPanel;
-	_cRef = 1;
-	_dwThreadID = GetCurrentThreadId();
+	m_fIsStartPanel = fIsStartPanel;
+	m_cRef = 1;
+	m_dwThreadId = GetCurrentThreadId();
 
-	TCHAR szBuf[MAX_PATH];
-	DWORD cbSize = sizeof(szBuf); // SHGetValue wants sizeof
+	WCHAR szBuf[MAX_PATH];
 
-	if (ERROR_SUCCESS == SHGetValue(HKEY_LOCAL_MACHINE, REGSTR_EXPLORER_WINUPDATE, TEXT("ShortcutName"),
-		NULL, szBuf, &cbSize))
+	// SHGetValue wants byte count.
+	DWORD cbSize = sizeof(szBuf);
+
+	if (SHGetValueW(HKEY_LOCAL_MACHINE, REGSTR_PATH_EXPLORER L"\\WindowsUpdate", L"ShortcutName", nullptr, szBuf, &cbSize) == ERROR_SUCCESS)
 	{
-		// Add ".lnk" if the file doesn't have an extension
-		PathAddExtension(szBuf, TEXT(".lnk"));
-		Str_SetPtr(&_pszWindowsUpdate, szBuf);
-		//_pszWindowsUpdate = szBuf;
+		// Add ".lnk" if the file doesn't have an extension.
+		PathAddExtensionW(szBuf, L".lnk");
+		Str_SetPtr(&m_pszWindowsUpdate, szBuf);
 	}
 
 	cbSize = sizeof(szBuf); // SHGetValue wants sizeof
-	if (ERROR_SUCCESS == SHGetValue(HKEY_LOCAL_MACHINE, REGSTR_PATH_SETUP, TEXT("SM_ConfigureProgramsName"),
-		NULL, szBuf, &cbSize))
+	if (SHGetValueW(HKEY_LOCAL_MACHINE, REGSTR_PATH_SETUP, L"SM_ConfigureProgramsName", nullptr, szBuf, &cbSize) == ERROR_SUCCESS)
 	{
-		PathAddExtension(szBuf, TEXT(".lnk"));
-		//_pszConfigurePrograms = szBuf;
-		Str_SetPtr(&_pszConfigurePrograms, szBuf);
+		PathAddExtensionW(szBuf, L".lnk");
+		Str_SetPtr(&m_pszConfigurePrograms, szBuf);
 	}
 
-	if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_COMMON_ADMINTOOLS | CSIDL_FLAG_CREATE, NULL, 0, szBuf)))
+	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_COMMON_ADMINTOOLS | CSIDL_FLAG_CREATE, NULL, 0, szBuf)))
 	{
-		//_pszAdminTools = szBuf;
-		Str_SetPtr(&_pszAdminTools, PathFindFileName(szBuf));
+		Str_SetPtr(&m_pszAdminTools, PathFindFileNameW(szBuf));
 	}
 
 	_RefreshSettings();
@@ -830,28 +728,26 @@ CStartMenuCallbackBase::CStartMenuCallbackBase(BOOL fIsStartPanel)
 
 CStartMenuCallbackBase::~CStartMenuCallbackBase()
 {
-	assert(_dwThreadID == GetCurrentThreadId());
+	assert(m_dwThreadId == GetCurrentThreadId());
 
-	_pszWindowsUpdate = NULL;
-	_pszConfigurePrograms = NULL;
-	_pszAdminTools = NULL;
-	_pszPrograms = NULL;
+	m_pszWindowsUpdate = nullptr;
+	m_pszConfigurePrograms = nullptr;
+	m_pszAdminTools = nullptr;
+	m_pszPrograms = nullptr;
 
-	if (_ptp2)
-		_ptp2->Release();
+	if (m_pTrayPriv2)
+		m_pTrayPriv2->Release();
 }
 
 void CStartMenuCallbackBase::_InitializePrograms()
 {
-	if (!_fInitPrograms)
+	if (!m_fInitPrograms)
 	{
-		// We're either initing these, or reseting them.
-		TCHAR szTemp[MAX_PATH];
-		SHGetFolderPath(NULL, CSIDL_PROGRAMS, NULL, 0, szTemp);
-		//_pszPrograms = PathFindFileName(szTemp);
-		Str_SetPtr(&_pszPrograms, PathFindFileName(szTemp));
+		WCHAR buf[MAX_PATH];
+		SHGetFolderPathW(nullptr, CSIDL_PROGRAMS, nullptr, 0, buf);
+		Str_SetPtr(&m_pszPrograms, PathFindFileNameW(buf));
 
-		_fInitPrograms = TRUE;
+		m_fInitPrograms = TRUE;
 	}
 }
 
@@ -875,55 +771,51 @@ void CStartMenuCallbackBase::_InitializePrograms()
 #define IDM_NETCONNECT          557
 #define IDM_FAVORITES               507
 
-STDAPI DisplayNameOf(IShellFolder* psf, LPCITEMIDLIST pidl, DWORD flags, LPTSTR psz, UINT cch)
+STDAPI DisplayNameOf(IShellFolder* psf, LPCITEMIDLIST pidl, DWORD flags, LPWSTR psz, UINT cch)
 {
-	*psz = 0;
+	*psz = L'\0';
+
 	STRRET sr;
 	HRESULT hr = psf->GetDisplayNameOf(pidl, flags, &sr);
+	
 	if (SUCCEEDED(hr))
-		hr = StrRetToBuf(&sr, pidl, psz, cch);
+	{
+		hr = StrRetToBufW(&sr, pidl, psz, cch);
+	}
+
 	return hr;
 }
 
 HRESULT CStartMenuCallbackBase::_FilterPidl(UINT uParent, IShellFolder* psf, LPCITEMIDLIST pidl)
 {
-	HRESULT hr = S_FALSE;
-
-	//assert(IS_VALID_PIDL(pidl));
-	//assert(IS_VALID_CODE_PTR(psf, IShellFolder));
-
 	if (uParent == IDM_PROGRAMS || uParent == IDM_TOPLEVELSTARTMENU)
 	{
-		TCHAR szChild[MAX_PATH];
+		WCHAR szChild[MAX_PATH];
+
 		if (SUCCEEDED(DisplayNameOf(psf, pidl, SHGDN_INFOLDER | SHGDN_FORPARSING, szChild, ARRAYSIZE(szChild))))
 		{
-			// HACKHACK (lamadio): This code assumes that the Display name
-			// of the Programs and Commons Programs folders are the same. It
-			// also assumes that the "programs" folder in the Start Menu folder
-			// is the same name as the one pointed to by CSIDL_PROGRAMS.
-			// Filter from top level start menu:
-			//      Programs, Windows Update, Configure Programs
 			if (_IsTopLevelStartMenu(uParent, psf, pidl))
 			{
-				if ((_pszPrograms && (0 == lstrcmpi(szChild, _pszPrograms))) ||
-					(SHRestricted(REST_NOUPDATEWINDOWS) && _pszWindowsUpdate && (0 == lstrcmpi(szChild, _pszWindowsUpdate))) ||
-					(SHRestricted(REST_NOSMCONFIGUREPROGRAMS) && _pszConfigurePrograms && (0 == lstrcmpi(szChild, _pszConfigurePrograms))))
+				if (
+					(m_pszPrograms && (lstrcmpiW(szChild, m_pszPrograms) == 0)) ||
+					(SHRestricted(REST_NOUPDATEWINDOWS) && m_pszWindowsUpdate && (lstrcmpiW(szChild, m_pszWindowsUpdate) == 0)) ||
+					(SHRestricted(REST_NOSMCONFIGUREPROGRAMS) && m_pszConfigurePrograms && (lstrcmpiW(szChild, m_pszConfigurePrograms) == 0))
+				)
 				{
-					hr = S_OK;
+					return S_OK;
 				}
 			}
 			else
 			{
-				// IDM_PROGRAMS
-				// Filter from Programs:  Administrative tools.
-				if (!_fShowAdminTools && _pszAdminTools && lstrcmpi(szChild, _pszAdminTools) == 0)
+				if (!m_fShowAdminTools && m_pszAdminTools && lstrcmpiW(szChild, m_pszAdminTools) == 0)
 				{
-					hr = S_OK;
+					return S_OK;
 				}
 			}
 		}
 	}
-	return hr;
+
+	return S_FALSE;
 }
 
 #define SMINV_FORCE          0x00000080
@@ -936,20 +828,32 @@ HRESULT CStartMenuCallbackBase::_FilterPidl(UINT uParent, IShellFolder* psf, LPC
 
 HRESULT CStartMenuCallbackBase::_Promote(LPSMDATA psmd, DWORD dwFlags)
 {
-	if ((_fExpandoMenus || (_fIsStartPanel && (dwFlags & SMINV_FORCE))) &&
-		(psmd->uIdAncestor == IDM_PROGRAMS ||
-			psmd->uIdAncestor == IDM_FAVORITES))
+	if (
+		(m_fExpandoMenus || (m_fIsStartPanel && (dwFlags & SMINV_FORCE))) &&
+		(
+			psmd->uIdAncestor == IDM_PROGRAMS ||
+			psmd->uIdAncestor == IDM_FAVORITES
+		)
+	)
 	{
-		UEMFireEvent(psmd->uIdAncestor == IDM_PROGRAMS ? &UEMIID_SHELL : &UEMIID_BROWSER,
-			UEME_RUNPIDL, UEMF_XEVENT, (WPARAM)psmd->psf, (LPARAM)psmd->pidlItem);
+		UEMFireEvent(
+			psmd->uIdAncestor == IDM_PROGRAMS
+				? &UEMIID_SHELL
+				: &UEMIID_BROWSER,
+			UEME_RUNPIDL,
+			UEMF_XEVENT,
+			(WPARAM)psmd->psf,
+			(LPARAM)psmd->pidlItem
+		);
 	}
+
 	return S_OK;
 }
 
 BOOL CStartMenuCallbackBase::_IsTopLevelStartMenu(UINT uParent, IShellFolder* psf, LPCITEMIDLIST pidl)
 {
 	return uParent == IDM_TOPLEVELSTARTMENU ||
-		(uParent == IDM_PROGRAMS && _fIsStartPanel && IsMergedFolderGUID(psf, pidl, CLSID_StartMenu));
+		(uParent == IDM_PROGRAMS && m_fIsStartPanel && IsMergedFolderGUID(psf, pidl, CLSID_StartMenu));
 }
 
 LPITEMIDLIST FullPidlFromSMData(LPSMDATA psmd)
@@ -980,397 +884,456 @@ LPITEMIDLIST FullPidlFromSMData(LPSMDATA psmd)
 #define UEMIID_SHELL    CLSID_ActiveDesktop     // FEATURE need better one
 #define UEMIID_BROWSER  CLSID_InternetToolbar   // FEATURE need better one
 
-STDMETHODIMP_(int) s_DarwinAdsDestroyCallback(LPVOID pData1, LPVOID pData2)
+// This function signature didn't make much sense to me.
+BOOL s_DarwinAdsDestroyCallback(LPVOID ppv, LPVOID a2)
 {
-	CDarwinAd* pda = (CDarwinAd*)pData1;
-	if (pda)
-		delete pda;
+	CDarwinAd* pDarwinAd = (CDarwinAd*)ppv;
+
+	if (pDarwinAd)
+	{
+		delete pDarwinAd;
+	}
+
 	return TRUE;
 }
 
 BOOL SHRegisterDarwinLink(LPITEMIDLIST pidlFull, LPWSTR pszDarwinID, BOOL fUpdate)
 {
-	BOOL fRetVal = FALSE;
+	BOOL fResult = FALSE;
 
-	ENTERCRITICAL_DARWINADS;
+	EnterCriticalSection(&g_csDarwinAds);
 
 	if (pidlFull)
 	{
-		CDarwinAd* pda = NULL;
+		CDarwinAd* pDarwinAd = nullptr;
 
-		if (GetDarwinIndex(pidlFull, &pda) != -1 && pda)
+		if (GetDarwinIndex(pidlFull, &pDarwinAd) != -1 && pDarwinAd)
 		{
-			// We already know about this link; don't need to add it
-			fRetVal = TRUE;
+			fResult = TRUE;
 		}
 		else
 		{
-			pda = new CDarwinAd(pidlFull, pszDarwinID);
-			if (pda)
-			{
-				pidlFull = NULL;    // take ownership
+			pDarwinAd = new CDarwinAd(pidlFull, pszDarwinID);
 
-				// Do we have a global cache?
-				if (g_hdpaDarwinAds == NULL)
+			if (pDarwinAd)
+			{
+				pidlFull = nullptr;
+
+				if (g_hdpaDarwinAds == nullptr)
 				{
-					// No; This is either the first time this is called, or we
-					// failed the last time.
+					// If we don't already have the dynamic pointer array created, then
+					// we'll attempt to create it here. Importantly, this code will not
+					// run if we failed to create the DPA, as the value will be -1 instead
+					// of nullptr.
 					g_hdpaDarwinAds = DPA_Create(5);
 				}
 
 				if (g_hdpaDarwinAds)
 				{
 					// DPA_AppendPtr returns the zero based index it inserted it at.
-					if (DPA_AppendPtr(g_hdpaDarwinAds, (void*)pda) >= 0)
+					if (DPA_AppendPtr(g_hdpaDarwinAds, (void*)pDarwinAd) >= 0)
 					{
-						fRetVal = TRUE;
+						fResult = TRUE;
 					}
-
 				}
 			}
 		}
 
-		if (!fRetVal)
+		if (!fResult)
 		{
-			// if we failed to create a dpa, delete this.
-			delete pda;
+			// If we failed to create a DPA, then free the memory we allocated for it.
+			delete pDarwinAd;
 		}
 		else if (fUpdate)
 		{
-			// update the entry if requested
-			pda->CheckInstalled();
+			pDarwinAd->CheckInstalled();
 		}
-		ILFree(pidlFull);
 
+		ILFree(pidlFull);
 	}
 	else if (!pszDarwinID)
 	{
 		// NULL, NULL means "destroy darwin info, we're shutting down"
 		HDPA hdpa = g_hdpaDarwinAds;
-		g_hdpaDarwinAds = NULL;
+		g_hdpaDarwinAds = nullptr;
+
 		if (hdpa)
-			DPA_DestroyCallback(hdpa, s_DarwinAdsDestroyCallback, NULL);
+		{
+			DPA_DestroyCallback(hdpa, s_DarwinAdsDestroyCallback, nullptr);
+		}
 	}
 
-	LEAVECRITICAL_DARWINADS;
+	LeaveCriticalSection(&g_csDarwinAds);
 
-	return fRetVal;
+	return fResult;
 }
 
-BOOL ProcessDarwinAd(IShellLinkDataList* psldl, LPCITEMIDLIST pidlFull)
+BOOL ProcessDarwinAd(IShellLinkDataList* pShellLinkDataList, LPCITEMIDLIST pidlFull)
 {
-	// This function does not check for the existance of a member before adding it,
-	// so it is entirely possible for there to be duplicates in the list....
-	BOOL fIsLoaded = FALSE;
-	BOOL fFreesldl = FALSE;
-	BOOL fRetVal = FALSE;
+	BOOL fResult = FALSE;
 
-	if (!psldl)
+	bool fLoaded = false;
+
+	// SLDL = ShellLinkDataList
+	bool fAllocatedSLDL = false;
+
+	if (!pShellLinkDataList)
 	{
 		// We will detect failure of this at use time.
-		if (FAILED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC, IID_PPV_ARGS(&psldl))))
+		if (FAILED(CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC, IID_PPV_ARGS(&pShellLinkDataList))))
 		{
 			return FALSE;
 		}
 
-		fFreesldl = TRUE;
+		fAllocatedSLDL = true;
 
-		IPersistFile* ppf;
+		IPersistFile *pPersistFile = nullptr;
 		OLECHAR sz[MAX_PATH];
 		if (SHGetPathFromIDListW(pidlFull, sz))
 		{
-			if (SUCCEEDED(psldl->QueryInterface(IID_PPV_ARGS(&ppf))))
+			if (SUCCEEDED(pShellLinkDataList->QueryInterface(IID_PPV_ARGS(&pPersistFile))))
 			{
-				if (SUCCEEDED(ppf->Load(sz, 0)))
+				if (SUCCEEDED(pPersistFile->Load(sz, 0)))
 				{
-					fIsLoaded = TRUE;
+					fLoaded = true;
 				}
-				ppf->Release();
+
+				pPersistFile->Release();
 			}
 		}
 	}
 	else
-		fIsLoaded = TRUE;
-
-	CDarwinAd* pda = NULL;
-	if (fIsLoaded)
 	{
-		EXP_DARWIN_LINK* pexpDarwin;
+		fLoaded = true;
+	}
 
-		if (SUCCEEDED(psldl->CopyDataBlock(EXP_DARWIN_ID_SIG, (void**)&pexpDarwin)))
+	if (fLoaded)
+	{
+		EXP_DARWIN_LINK *pDarwinExp;
+
+		if (SUCCEEDED(pShellLinkDataList->CopyDataBlock(EXP_DARWIN_ID_SIG, (void**)&pDarwinExp)))
 		{
-			fRetVal = SHRegisterDarwinLink(ILClone(pidlFull), pexpDarwin->szwDarwinID, TRUE);
-			LocalFree(pexpDarwin);
+			fResult = SHRegisterDarwinLink(ILClone(pidlFull), pDarwinExp->szwDarwinID, TRUE);
+			LocalFree(pDarwinExp);
 		}
 	}
 
-	if (fFreesldl)
-		psldl->Release();
+	if (fAllocatedSLDL)
+		pShellLinkDataList->Release();
 
-	return fRetVal;
+	return fResult;
 }
 
 HRESULT CStartMenuCallbackBase::_HandleNew(LPSMDATA psmd)
 {
 	HRESULT hr = S_FALSE;
-	if (_fExpandoMenus &&
-		(psmd->uIdAncestor == IDM_PROGRAMS ||
-			psmd->uIdAncestor == IDM_FAVORITES))
+
+	if (
+		m_fExpandoMenus &&
+		(
+			psmd->uIdAncestor == IDM_PROGRAMS ||
+			psmd->uIdAncestor == IDM_FAVORITES
+		)
+	)
 	{
 		UEMINFO uei;
 		uei.cbSize = sizeof(uei);
 		uei.dwMask = UEIM_HIT;
 		uei.R = UEM_NEWITEMCOUNT;
-		hr = UEMSetEvent(psmd->uIdAncestor == IDM_PROGRAMS ? &UEMIID_SHELL : &UEMIID_BROWSER, (WPARAM)psmd->psf, &uei);
+
+		hr = UEMSetEvent(
+			psmd->uIdAncestor == IDM_PROGRAMS 
+				? &UEMIID_SHELL
+				: &UEMIID_BROWSER,
+			(WPARAM)psmd->psf,
+			&uei
+		);
 	}
 
 	if (psmd->uIdAncestor == IDM_PROGRAMS)
 	{
 		LPITEMIDLIST pidlFull = FullPidlFromSMData(psmd);
+
 		if (pidlFull)
 		{
-			ProcessDarwinAd(NULL, pidlFull);
+			ProcessDarwinAd(nullptr, pidlFull);
 			ILFree(pidlFull);
 		}
 	}
+
 	return hr;
 }
 
 HRESULT CStartMenuCallbackBase::_GetSFInfo(SMDATA* psmd, SMINFO* psminfo)
 {
-	if (psminfo->dwMask & SMIM_FLAGS &&
-		(psmd->uIdAncestor == IDM_PROGRAMS ||
-			psmd->uIdAncestor == IDM_FAVORITES))
+	if (
+		psminfo->dwMask & SMIM_FLAGS &&
+		(
+			psmd->uIdAncestor == IDM_PROGRAMS ||
+			psmd->uIdAncestor == IDM_FAVORITES
+		)
+	)
 	{
-		if (_fExpandoMenus)
+		if (m_fExpandoMenus)
 		{
 			psminfo->dwFlags |= _GetDemote(psmd);
 		}
 
-		// This is a little backwards. If the Restriction is On, Then we allow the feature.
-		if (SHRestricted(REST_GREYMSIADS) &&
-			psmd->uIdAncestor == IDM_PROGRAMS)
+		// Restriction set enables this feature.
+		if (SHRestricted(REST_GREYMSIADS) && psmd->uIdAncestor == IDM_PROGRAMS)
 		{
 			LPITEMIDLIST pidlFull = FullPidlFromSMData(psmd);
+
 			if (pidlFull)
 			{
 				if (_IsDarwinAdvertisement(pidlFull))
 				{
 					psminfo->dwFlags |= SMIF_ALTSTATE;
 				}
+
 				ILFree(pidlFull);
 			}
 		}
 
-		if (_ptp2)
+		if (m_pTrayPriv2)
 		{
-			_ptp2->ModifySMInfo(psmd, psminfo);
+			m_pTrayPriv2->ModifySMInfo(psmd, psminfo);
 		}
 	}
 	return S_OK;
 }
 
-STDAPI_(BOOL) SMILIsAncestor(LPCITEMIDLIST pidlParent, LPCITEMIDLIST pidlBelow)
+extern "C" BOOL WINAPI SMILIsAncestor(LPCITEMIDLIST pidlParent, LPCITEMIDLIST pidlBelow)
 {
 	if (pidlParent && pidlBelow)
+	{
 		return ILIsParent(pidlParent, pidlBelow, FALSE);
+	}
 	else
+	{
 		return FALSE;
+	}
 }
 
 HRESULT CStartMenuCallbackBase::_ProcessChangeNotify(SMDATA* psmd, LONG lEvent, LPCITEMIDLIST pidl1, LPCITEMIDLIST pidl2)
 {
 	switch (lEvent)
 	{
-	case SHCNE_ASSOCCHANGED:
-		SHReValidateDarwinCache();
-		return S_OK;
-
-	case SHCNE_RENAMEFOLDER:
-		// NTRAID89654-2000/03/13 (lamadio): We should move the MenuOrder stream as well. 5.5.99
-	case SHCNE_RENAMEITEM:
-	{
-		LPITEMIDLIST pidlPrograms;
-		LPITEMIDLIST pidlProgramsCommon;
-		LPITEMIDLIST pidlFavorites;
-		SHGetFolderLocation(NULL, CSIDL_PROGRAMS, NULL, 0, &pidlPrograms);
-		SHGetFolderLocation(NULL, CSIDL_COMMON_PROGRAMS, NULL, 0, &pidlProgramsCommon);
-		SHGetFolderLocation(NULL, CSIDL_FAVORITES, NULL, 0, &pidlFavorites);
-
-		BOOL fPidl1InStartMenu = SMILIsAncestor(pidlPrograms, pidl1) ||
-			SMILIsAncestor(pidlProgramsCommon, pidl1);
-		BOOL fPidl1InFavorites = SMILIsAncestor(pidlFavorites, pidl1);
-
-
-		// If we're renaming something from the Start Menu
-		if (fPidl1InStartMenu || fPidl1InFavorites)
+		case SHCNE_ASSOCCHANGED:
 		{
-			IShellFolder* psfFrom;
-			LPCITEMIDLIST pidlFrom;
-			if (SUCCEEDED(SHBindToParent(pidl1, IID_PPV_ARGS(&psfFrom), &pidlFrom)))
+			SHReValidateDarwinCache();
+			return S_OK;
+		}
+		break;
+
+		case SHCNE_RENAMEITEM:
+		case SHCNE_RENAMEFOLDER:
+		{
+			LPITEMIDLIST pidlPrograms;
+			LPITEMIDLIST pidlProgramsCommon;
+			LPITEMIDLIST pidlFavorites;
+			SHGetFolderLocation(NULL, CSIDL_PROGRAMS, NULL, 0, &pidlPrograms);
+			SHGetFolderLocation(NULL, CSIDL_COMMON_PROGRAMS, NULL, 0, &pidlProgramsCommon);
+			SHGetFolderLocation(NULL, CSIDL_FAVORITES, NULL, 0, &pidlFavorites);
+
+			BOOL fPidl1InStartMenu = SMILIsAncestor(pidlPrograms, pidl1) ||
+				SMILIsAncestor(pidlProgramsCommon, pidl1);
+			BOOL fPidl1InFavorites = SMILIsAncestor(pidlFavorites, pidl1);
+
+			if (fPidl1InStartMenu || fPidl1InFavorites)
 			{
-				// Into the Start Menu
-				BOOL fPidl2InStartMenu = SMILIsAncestor(pidlPrograms, pidl2) ||
-					SMILIsAncestor(pidlProgramsCommon, pidl2);
-				BOOL fPidl2InFavorites = SMILIsAncestor(pidlFavorites, pidl2);
-				if (fPidl2InStartMenu || fPidl2InFavorites)
-				{
-					IShellFolder* psfTo;
-					LPCITEMIDLIST pidlTo;
+				IShellFolder* psfFrom;
+				LPCITEMIDLIST pidlFrom;
 
-					if (SUCCEEDED(SHBindToParent(pidl2, IID_PPV_ARGS(&psfTo), &pidlTo)))
+				if (SUCCEEDED(SHBindToParent(pidl1, IID_PPV_ARGS(&psfFrom), &pidlFrom)))
+				{
+					BOOL fPidl2InStartMenu =
+						SMILIsAncestor(pidlPrograms, pidl2) ||
+						SMILIsAncestor(pidlProgramsCommon, pidl2);
+					BOOL fPidl2InFavorites = SMILIsAncestor(pidlFavorites, pidl2);
+
+					if (fPidl2InStartMenu || fPidl2InFavorites)
 					{
-						// Then we need to rename it
-						UEMRenamePidl(fPidl1InStartMenu ? &UEMIID_SHELL : &UEMIID_BROWSER,
-							psfFrom, pidlFrom,
-							fPidl2InStartMenu ? &UEMIID_SHELL : &UEMIID_BROWSER,
-							psfTo, pidlTo);
-						psfTo->Release();
+						IShellFolder* psfTo;
+						LPCITEMIDLIST pidlTo;
+
+						if (SUCCEEDED(SHBindToParent(pidl2, IID_PPV_ARGS(&psfTo), &pidlTo)))
+						{
+							UEMRenamePidl(
+								// From:
+								fPidl1InStartMenu
+									? &UEMIID_SHELL
+									: &UEMIID_BROWSER,
+								psfFrom,
+								pidlFrom,
+
+								// To:
+								fPidl2InStartMenu
+									? &UEMIID_SHELL
+									: &UEMIID_BROWSER,
+								psfTo,
+								pidlTo
+							);
+							psfTo->Release();
+						}
 					}
-				}
-				else
-				{
-					// Otherwise, we delete it.
-					UEMDeletePidl(fPidl1InStartMenu ? &UEMIID_SHELL : &UEMIID_BROWSER,
-						psfFrom, pidlFrom);
-				}
+					else
+					{
+						UEMDeletePidl(
+							fPidl1InStartMenu
+								? &UEMIID_SHELL
+								: &UEMIID_BROWSER,
+							psfFrom,
+							pidlFrom
+						);
+					}
 
-				psfFrom->Release();
+					psfFrom->Release();
+				}
 			}
+
+			ILFree(pidlPrograms);
+			ILFree(pidlProgramsCommon);
+			ILFree(pidlFavorites);
 		}
+		break;
 
-		ILFree(pidlPrograms);
-		ILFree(pidlProgramsCommon);
-		ILFree(pidlFavorites);
-	}
-	break;
-
-	case SHCNE_DELETE:
-		// NTRAID89654-2000/03/13 (lamadio): We should nuke the MenuOrder stream as well. 5.5.99
-	case SHCNE_RMDIR:
-	{
-		IShellFolder* psf;
-		LPCITEMIDLIST pidl;
-
-		if (SUCCEEDED(SHBindToParent(pidl1, IID_PPV_ARGS(&psf), &pidl)))
+		case SHCNE_CREATE:
+		case SHCNE_MKDIR:
 		{
-			// NOTE favorites is the only that will be initialized
-			UEMDeletePidl(psmd->uIdAncestor == IDM_FAVORITES ? &UEMIID_BROWSER : &UEMIID_SHELL,
-				psf, pidl);
-			psf->Release();
+			IShellFolder* psf;
+			LPCITEMIDLIST pidl;
+
+			if (SUCCEEDED(SHBindToParent(pidl1, IID_PPV_ARGS(&psf), &pidl)))
+			{
+				UEMINFO uei;
+				uei.cbSize = sizeof(uei);
+				uei.dwMask = UEIM_HIT;
+				uei.R = UEM_NEWITEMCOUNT;
+				UEMSetEvent(
+					psmd->uIdAncestor == IDM_FAVORITES
+						? &UEMIID_BROWSER
+						: &UEMIID_SHELL,
+					(WPARAM)psf,
+					&uei
+				);
+				psf->Release();
+			}
+
 		}
+		break;
 
-	}
-	break;
-
-	case SHCNE_CREATE:
-	case SHCNE_MKDIR:
-	{
-		IShellFolder* psf;
-		LPCITEMIDLIST pidl;
-
-		if (SUCCEEDED(SHBindToParent(pidl1, IID_PPV_ARGS(&psf), &pidl)))
+		case SHCNE_DELETE:
+		case SHCNE_RMDIR:
 		{
-			UEMINFO uei;
-			uei.cbSize = sizeof(uei);
-			uei.dwMask = UEIM_HIT;
-			uei.R = UEM_NEWITEMCOUNT;
-			UEMSetEvent(psmd->uIdAncestor == IDM_FAVORITES ? &UEMIID_BROWSER : &UEMIID_SHELL, (WPARAM)psf, &uei);
-			psf->Release();
-		}
+			IShellFolder* psf;
+			LPCITEMIDLIST pidl;
 
-	}
-	break;
+			if (SUCCEEDED(SHBindToParent(pidl1, IID_PPV_ARGS(&psf), &pidl)))
+			{
+				UEMDeletePidl(
+					psmd->uIdAncestor == IDM_FAVORITES
+						? &UEMIID_BROWSER
+						: &UEMIID_SHELL,
+					psf,
+					pidl
+				);
+				psf->Release();
+			}
+
+		}
+		break;
 	}
 
 	return S_FALSE;
 }
 
-#define REGSTR_EXPLORER_ADVANCED REGSTR_PATH_EXPLORER TEXT("\\Advanced")
-
-BOOL FeatureEnabled(LPTSTR pszFeature)
+BOOL FeatureEnabled(LPWSTR pszFeature)
 {
-	return SHRegGetBoolUSValue(REGSTR_EXPLORER_ADVANCED, pszFeature,
-		FALSE, // Don't ignore HKCU
-		FALSE); // Disable this cool feature.
+	return SHRegGetBoolUSValue(
+		L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+		pszFeature,
+		FALSE,
+		FALSE
+	);
 }
 
-BOOL GetExplorerUserSetting(HKEY hkeyRoot, LPCTSTR pszSubKey, LPCTSTR pszValue)
+// Returns:
+// -1 if a key does not exist
+// 0 if a key is 0
+// 1 i a key is not 0
+int GetExplorerUserSetting(HKEY hkeyRoot, LPCWSTR pszSubKey, LPCWSTR pszValue)
 {
-	TCHAR szPath[MAX_PATH];
-	TCHAR szPathExplorer[MAX_PATH];
+	WCHAR szPath[MAX_PATH];
+	WCHAR szPathExplorer[MAX_PATH];
 	DWORD cbSize = ARRAYSIZE(szPath);
 	DWORD dwType;
 
-	PathCombine(szPathExplorer, REGSTR_PATH_EXPLORER, pszSubKey);
-	if (ERROR_SUCCESS == SHGetValue(hkeyRoot, szPathExplorer, pszValue,
-		&dwType, szPath, &cbSize))
+	PathCombineW(szPathExplorer, REGSTR_PATH_EXPLORER, pszSubKey);
+
+	if (SHGetValueW(hkeyRoot, szPathExplorer, pszValue, &dwType, szPath, &cbSize) == ERROR_SUCCESS)
 	{
-		// Zero in the DWORD case or NULL in the string case
-		// indicates that this item is not available.
 		if (dwType == REG_DWORD)
+		{
 			return *((DWORD*)szPath) != 0;
+		}
 		else
-			return (TCHAR)szPath[0] != 0;
+		{
+			return (WCHAR)szPath[0] != 0;
+		}
 	}
 
 	return -1;
 }
 
-#define ROUS_DEFAULTALLOW       0x0000
-#define ROUS_DEFAULTRESTRICT    0x0001
-#define ROUS_KEYALLOWS          0x0000
-#define ROUS_KEYRESTRICTS       0x0002
+// Flags for IsRestrictedOrUserSetting:
+#define IROUSF_RESTRICT_BY_DEFAULT     0x0001
+#define IROUSF_RESTRICT_WITH_KEY       0x0002
 
-STDAPI_(BOOL) IsRestrictedOrUserSetting(HKEY hkeyRoot, RESTRICTIONS rest, LPCTSTR pszSubKey, LPCTSTR pszValue, UINT flags)
+extern "C" BOOL WINAPI IsRestrictedOrUserSetting(HKEY hkeyRoot, RESTRICTIONS rest, LPCWSTR pszSubKey, LPCWSTR pszValue, UINT uFlags)
 {
-	// See if the system policy restriction trumps
-
 	DWORD dwRest = SHRestricted(rest);
 
 	if (dwRest == 1)
-		return TRUE;
-
-	if (dwRest == 2)
-		return FALSE;
-
-	//
-	//  Restriction not in place or defers to user setting.
-	//
-	BOOL fValidKey = GetExplorerUserSetting(hkeyRoot, pszSubKey, pszValue);
-
-	switch (fValidKey)
 	{
-	case 0:     // Key is present and zero
-		if (flags & ROUS_KEYRESTRICTS)
-			return FALSE;       // restriction not present
-		else
-			return TRUE;        // ROUS_KEYALLOWS, value is 0 -> restricted
-
-	case 1:     // Key is present and nonzero
-
-		if (flags & ROUS_KEYRESTRICTS)
-			return TRUE;        // restriction present -> restricted
-		else
-			return FALSE;       // ROUS_KEYALLOWS, value is 1 -> not restricted
-
-	default:
-		assert(0);  // _GetExplorerUserSetting returns exactly 0, 1 or -1.
-		// Fall through
-
-	case -1:    // Key is not present
-		return (flags & ROUS_DEFAULTRESTRICT);
+		return TRUE;
 	}
 
-	/*NOTREACHED*/
+	if (dwRest == 2)
+	{
+		return FALSE;
+	}
+
+	int iUserSettingKeyInfo = GetExplorerUserSetting(hkeyRoot, pszSubKey, pszValue);
+
+	switch (iUserSettingKeyInfo)
+	{
+		// Key exists
+		case 0:
+		case 1:
+		{
+			return uFlags & IROUSF_RESTRICT_WITH_KEY;
+		}
+
+		// Key does not exist:
+		case -1:
+		{
+			return uFlags & IROUSF_RESTRICT_BY_DEFAULT;
+		}
+	}
+
+	return FALSE;
 }
 
 BOOL IsStartMenuChangeNotAllowed(BOOL fStartPanel)
 {
-	return(IsRestrictedOrUserSetting(HKEY_CURRENT_USER, REST_NOCHANGESTARMENU,
-		TEXT("Advanced"),
-		(fStartPanel ? TEXT("Start_EnableDragDrop") : TEXT("StartMenuChange")),
-		ROUS_DEFAULTALLOW | ROUS_KEYALLOWS));
+	return IsRestrictedOrUserSetting(
+		HKEY_CURRENT_USER,
+		REST_NOCHANGESTARMENU,
+		L"Advanced",
+		(fStartPanel ? L"Start_EnableDragDrop" : L"StartMenuChange"),
+		0
+	);
 }
 
 #define SMINIT_DEFAULT              0x00000000  // No Options
@@ -1387,47 +1350,49 @@ BOOL IsStartMenuChangeNotAllowed(BOOL fStartPanel)
 #define SMINIT_HORIZONTAL           0x20000000  // This is a horizontal menu    (does not inherit)
 #define SMINIT_MULTICOLUMN          0x40000000  // this is a multi column menu
 
-#define STRREG_STARTMENU TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MenuOrder\\Start Menu")
-#define STRREG_STARTMENU2 TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MenuOrder\\Start Menu2")
+#define STRREG_STARTMENU L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MenuOrder\\Start Menu"
+#define STRREG_STARTMENU2 L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MenuOrder\\Start Menu2"
 #define SMSET_SEPARATEMERGEFOLDER   0x00000200    //Insert separator when MergedFolder host changes
-
-
-
 
 BOOL IsCSIDLChild(int csidlParent, int csidlChild)
 {
-	BOOL fChild = FALSE;
-	TCHAR sz1[MAX_PATH];
-	if (SUCCEEDED(SHGetFolderPath(NULL, csidlParent, NULL, 0, sz1)))
+	BOOL fIsChild = FALSE;
+	WCHAR szBuffer[MAX_PATH];
+
+	if (SUCCEEDED(SHGetFolderPathW(nullptr, csidlParent, nullptr, 0, szBuffer)))
 	{
-		TCHAR sz2[MAX_PATH];
-		if (SUCCEEDED(SHGetFolderPath(NULL, csidlChild, NULL, 0, sz2)))
+		WCHAR szBuffer2[MAX_PATH];
+		if (SUCCEEDED(SHGetFolderPathW(nullptr, csidlChild, nullptr, 0, szBuffer2)))
 		{
-			TCHAR szCommonRoot[MAX_PATH];
-			if (PathCommonPrefix(sz1, sz2, szCommonRoot) ==
-				lstrlen(sz1))
+			WCHAR szCommonRoot[MAX_PATH];
+
+			if (PathCommonPrefixW(szBuffer, szBuffer2, szCommonRoot) == lstrlenW(szBuffer))
 			{
-				fChild = TRUE;
+				fIsChild = TRUE;
 			}
 		}
 	}
 
-	return fChild;
+	return fIsChild;
 }
 
 HRESULT GetFolderAndPidl(UINT csidl, IShellFolder** ppsf, LPITEMIDLIST* ppidl)
 {
-	*ppsf = NULL;
-	HRESULT hr = SHGetFolderLocation(NULL, csidl, NULL, 0, ppidl);
+	*ppsf = nullptr;
+
+	HRESULT hr = SHGetFolderLocation(nullptr, csidl, nullptr, 0, ppidl);
+
 	if (SUCCEEDED(hr))
 	{
-		hr = SHBindToObject(NULL, *ppidl, 0, IID_PPV_ARGS(ppsf));
+		hr = SHBindToObject(nullptr, *ppidl, 0, IID_PPV_ARGS(ppsf));
+
 		if (FAILED(hr))
 		{
 			ILFree(*ppidl);
-			*ppidl = NULL;
+			*ppidl = nullptr;
 		}
 	}
+
 	return hr;
 }
 
@@ -1437,40 +1402,44 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 	HKEY hkeyPrograms = NULL;
 	LPITEMIDLIST pidl = NULL;
 
-	//_fIsStartPanel = true;
-
 	DWORD dwInitFlags = SMINIT_VERTICAL;
-	if (!FeatureEnabled(_fIsStartPanel ? TEXT("Start_ScrollPrograms") : TEXT("StartMenuScrollPrograms")))
+
+	if (!FeatureEnabled(m_fIsStartPanel ? L"Start_ScrollPrograms" : L"StartMenuScrollPrograms"))
+	{
 		dwInitFlags |= SMINIT_MULTICOLUMN;
+	}
 
-	if (IsStartMenuChangeNotAllowed(_fIsStartPanel))
+	if (IsStartMenuChangeNotAllowed(m_fIsStartPanel))
+	{
 		dwInitFlags |= SMINIT_RESTRICT_DRAGDROP | SMINIT_RESTRICT_CONTEXTMENU;
+	}
 
-	if (_fIsStartPanel)
+	if (m_fIsStartPanel)
+	{
 		dwInitFlags |= SMINIT_TOPLEVEL;
+	}
 
 	//HRESULT hr = psm->Initialize(this, 0, 0, SMINIT_VERTICAL | SMINIT_TOPLEVEL);
 	HRESULT hr = psm->Initialize(this, IDM_PROGRAMS, IDM_PROGRAMS, dwInitFlags);
+
 	if (SUCCEEDED(hr))
 	{
 		_InitializePrograms();
 
-		LPCTSTR pszOrderKey = _fIsStartPanel ?
-			STRREG_STARTMENU2 TEXT("\\Programs") :
-			STRREG_STARTMENU TEXT("\\Programs");
+		LPCWSTR pszOrderKey = m_fIsStartPanel ?
+			STRREG_STARTMENU2 L"\\Programs" :
+			STRREG_STARTMENU L"\\Programs";
 
 		RegCreateKeyEx(HKEY_CURRENT_USER, pszOrderKey, NULL, NULL,
 			REG_OPTION_NON_VOLATILE, KEY_READ | KEY_WRITE,
 			NULL, &hkeyPrograms, NULL);
 
 		IShellFolder* psf;
-		BOOL fOptimize = FALSE;
+		bool fOptimize = false;
 		DWORD dwSmset = SMSET_TOP;
 
-		if (_fIsStartPanel)
+		if (m_fIsStartPanel)
 		{
-			// Start Panel: Menu:  The Programs section is a merge of the
-			// Fast Items and Programs folders with a separator between them.
 			// WIKTOR: TEMP REMOVE FOR NON MERGED
 			//dwSmset |= SMSET_SEPARATEMERGEFOLDER;
 
@@ -1478,33 +1447,21 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 			//hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolderAndFastItems, 4);
 			hr = GetFolderAndPidl(CSIDL_COMMON_PROGRAMS, &psf, &pidl);
 			if (!psf)
+			{
 				MessageBox(0, L"psf", L"psf", 0);
+			}
 		}
 		else
 		{
-			// Classic Start Menu:  The Programs section is just the per-user
-			// and common Programs folders merged together
 			//hr = GetMergedFolder(&psf, &pidl, c_rgmfiProgramsFolder, 2);
 			hr = GetFolderAndPidl(CSIDL_COMMON_PROGRAMS, &psf, &pidl);
 			if (!psf)
 				MessageBox(0, L"psf2", L"psf2", 0);
-			// We used to register for change notify at CSIDL_STARTMENU and assumed
-			// that CSIDL_PROGRAMS was a child of CSIDL_STARTMENU. Since this wasn't always the 
-			// case, I removed the optimization.
 
-			// Both panes are registered recursive. So, When CSIDL_PROGRAMS _IS_ a 
-			// child of CSIDL_STARTMENU we can enter a code path where when destroying 
-			// CSIDL_PROGRAMS, we unregister it. This will flush the change nofiy queue 
-			// of CSIDL_STARTMENU, and blow away all of the children, including CSIDL_PROGRAMS, 
-			// while we are in the middle of destroying it... See the problem? I have been adding 
-			// reentrance "Blockers" but this only delayed where we crashed. 
-			// What was needed was to determine if Programs was a child of the Start Menu directory.
-			// if it was we need to add the optmimization. If it's not we don't have a problem.
+			fOptimize =
+				IsCSIDLChild(CSIDL_STARTMENU, CSIDL_PROGRAMS) ||
+				IsCSIDLChild(CSIDL_COMMON_STARTMENU, CSIDL_COMMON_PROGRAMS);
 
-			// WINDOWS BUG 135156(tybeam): If one of the two is redirected, then this will get optimized
-			// we can't do better than this because both are registed recursive, and this will fault...
-			fOptimize = IsCSIDLChild(CSIDL_STARTMENU, CSIDL_PROGRAMS)
-				|| IsCSIDLChild(CSIDL_COMMON_STARTMENU, CSIDL_COMMON_PROGRAMS);
 			if (fOptimize)
 			{
 				dwSmset |= SMSET_DONTREGISTERCHANGENOTIFY;
@@ -1513,10 +1470,10 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 
 		if (SUCCEEDED(hr))
 		{
-			// We should have a pidl from CSIDL_Programs
+			// We should have a pidl from CSIDL_Programs.
 			assert(pidl);
 
-			// We should have a shell folder from the bind.
+			// We should have an IShellFolder from the bind.
 			assert(psf);
 
 			//IEnumIDList* pEnumIDList;
@@ -1525,7 +1482,7 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 			//LPITEMIDLIST pidl = NULL;
 			//while (pEnumIDList->Next(1, &pidl, NULL) == S_OK) {
 			//	count++;
-			//	CoTaskMemFree(pidl);  // Free the PIDL after use
+			//	CoTaskMemFree(pidl);
 			//}
 			//pEnumIDList->Release();
 			//dbgprintf(L"count %i",count);
@@ -1536,7 +1493,9 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 		}
 
 		if (FAILED(hr))
+		{
 			RegCloseKey(hkeyPrograms);
+		}
 	}
 
 	return hr;
@@ -1545,26 +1504,25 @@ HRESULT CStartMenuCallbackBase::InitializeProgramsShellMenu(IShellMenu* psm)
 BOOL CStartMenuCallbackBase::_IsDarwinAdvertisement(LPCITEMIDLIST pidlFull)
 {
 	//return false;
-	ENTERCRITICAL_DARWINADS;
+	EnterCriticalSection(&g_csDarwinAds);
 	
-	// NOTE: There can be two items in the hdpa. This is ok.
-	BOOL fAd = FALSE;
-	CDarwinAd* pda = NULL;
-	int iIndex = GetDarwinIndex(pidlFull, &pda);
-	// Are there any ads?
-	if (iIndex != -1 && pda != NULL)
+	BOOL fResult = FALSE;
+	CDarwinAd* pDarwinAd = nullptr;
+	int iIndex = GetDarwinIndex(pidlFull, &pDarwinAd);
+
+	if (iIndex != -1 && pDarwinAd)
 	{
-		//This is a Darwin pidl. Is it installed?
-		fAd = pda->IsAd();
+		fResult = pDarwinAd->IsAd();
 	}
 	
-	LEAVECRITICAL_DARWINADS;
-	return fAd;
+	LeaveCriticalSection(&g_csDarwinAds);
+
+	return fResult;
 }
 
 void CStartMenuCallbackBase::_RefreshSettings()
 {
-	_fShowAdminTools = FeatureEnabled(TEXT("StartMenuAdminTools"));
+	m_fShowAdminTools = FeatureEnabled(L"StartMenuAdminTools");
 }
 
 #define SMC_FILTERPIDL          0x10000000  // The callback is called to see if an item is visible
@@ -1576,50 +1534,68 @@ STDMETHODIMP CPersonalProgramsMenuCallback::CallbackSM(LPSMDATA psmd, UINT uMsg,
 
 	switch (uMsg)
 	{
-
-	case SMC_INITMENU:
-		_UpdateTrayPriv();
+		case SMC_INITMENU:
+		{
+			_UpdateTrayPriv();
+		}
 		break;
 
-	case SMC_GETSFINFO:
-		hr = _GetSFInfo(psmd, (SMINFO*)lParam);
+		case SMC_GETSFINFO:
+		{
+			hr = _GetSFInfo(psmd, (SMINFO*)lParam);
+		}
 		break;
 
-	case SMC_NEWITEM:
-		hr = _HandleNew(psmd);
+		case SMC_NEWITEM:
+		{
+			hr = _HandleNew(psmd);
+		}
 		break;
 
-	case SMC_FILTERPIDL:
-		assert(psmd->dwMask & SMDM_SHELLFOLDER);
-		hr = _FilterPidl(psmd->uIdParent, psmd->psf, psmd->pidlItem);
+		case SMC_FILTERPIDL:
+		{
+			assert(psmd->dwMask & SMDM_SHELLFOLDER);
+			hr = _FilterPidl(psmd->uIdParent, psmd->psf, psmd->pidlItem);
+		}
 		break;
 
-	case SMC_GETSFINFOTIP:
-		if (!FeatureEnabled(TEXT("ShowInfoTip")))
-			hr = E_FAIL;  // E_FAIL means don't show. S_FALSE means show default
+		case SMC_GETSFINFOTIP:
+		{
+			if (!FeatureEnabled(L"ShowInfoTip"))
+			{
+				// E_FAIL means to not show. S_FALSE means to show the default.
+				hr = E_FAIL;
+			}
+		}
 		break;
 
-	case SMC_PROMOTE:
-		hr = _Promote(psmd, (DWORD)wParam);
+		case SMC_PROMOTE:
+		{
+			hr = _Promote(psmd, (DWORD)wParam);
+			
+		}
 		break;
 
-	case SMC_SHCHANGENOTIFY:
-	{
-		PSMCSHCHANGENOTIFYSTRUCT pshf = (PSMCSHCHANGENOTIFYSTRUCT)lParam;
-		hr = _ProcessChangeNotify(psmd, pshf->lEvent, pshf->pidl1, pshf->pidl2);
-	}
-	break;
+		case SMC_SHCHANGENOTIFY:
+		{
+			PSMCSHCHANGENOTIFYSTRUCT pshf = (PSMCSHCHANGENOTIFYSTRUCT)lParam;
+			hr = _ProcessChangeNotify(psmd, pshf->lEvent, pshf->pidl1, pshf->pidl2);
+			
+		}
+		break;
 
-	case SMC_REFRESH:
-		_RefreshSettings();
+		case SMC_REFRESH:
+		{
+			_RefreshSettings();
+			
+		}
 		break;
 	}
 
 	return hr;
 }
 
-
-STDMETHODIMP_(HRESULT __stdcall) CPersonalProgramsMenuCallback::SetSite(IUnknown* punk)
+STDMETHODIMP CPersonalProgramsMenuCallback::SetSite(IUnknown* punk)
 {
 	HRESULT hr = CObjectWithSite::SetSite(punk);
 	_UpdateTrayPriv();
@@ -1628,23 +1604,26 @@ STDMETHODIMP_(HRESULT __stdcall) CPersonalProgramsMenuCallback::SetSite(IUnknown
 
 void CPersonalProgramsMenuCallback::_UpdateTrayPriv()
 {
-	if (_ptp2)
-		_ptp2->Release();
-	IObjectWithSite* pows;
-	if (SUCCEEDED(IUnknown_QueryService(_punkSite, SID_SMenuPopup, IID_PPV_ARGS(&pows))))
+	if (m_pTrayPriv2)
 	{
-		pows->GetSite(IID_PPV_ARGS(&_ptp2));
-		pows->Release();
+		m_pTrayPriv2->Release();
+	}
+
+	IObjectWithSite* pObjWithSite;
+	if (SUCCEEDED(IUnknown_QueryService(m_punkSite, SID_SMenuPopup, IID_PPV_ARGS(&pObjWithSite))))
+	{
+		pObjWithSite->GetSite(IID_PPV_ARGS(&m_pTrayPriv2));
+		pObjWithSite->Release();
 	}
 }
 
-STDMETHODIMP_(HRESULT __stdcall) CObjectWithSite::SetSite(IUnknown* punkSite)
+STDMETHODIMP CObjectWithSite::SetSite(IUnknown* punkSite)
 {
-	IUnknown_Set(&_punkSite, punkSite);
+	IUnknown_Set(&m_punkSite, punkSite);
 	return S_OK;
 }
 
-STDMETHODIMP_(HRESULT __stdcall) CObjectWithSite::GetSite(REFIID riid, void** ppvSite)
+STDMETHODIMP CObjectWithSite::GetSite(REFIID riid, void** ppvSite)
 {
 	return E_NOTIMPL;
 }
@@ -1663,23 +1642,32 @@ STDMETHODIMP_(HRESULT __stdcall) CObjectWithSite::GetSite(REFIID riid, void** pp
 
 DWORD GetClickCount()
 {
-
-	//This function retrieves the number of times the user has clicked on the chevron item.
-
 	DWORD dwType;
 	DWORD cbSize = sizeof(DWORD);
-	DWORD dwCount = 1;      // Default to three clicks before we give up.
-	// PMs what it to 1 now. Leaving back end in case they change their mind.
-	SHGetValue(HKEY_CURRENT_USER, REGSTR_EXPLORER_ADVANCED, TEXT("StartMenuChevron"),
-		&dwType, (BYTE*)&dwCount, &cbSize);
+	DWORD dwCount = 1;
+
+	SHGetValueW(
+		HKEY_CURRENT_USER,
+		REGSTR_EXPLORER_ADVANCED,
+		L"StartMenuChevron",
+		&dwType,
+		(BYTE*)&dwCount,
+		&cbSize
+	);
 
 	return dwCount;
-
 }
 
 void SetClickCount(DWORD dwClickCount)
 {
-	SHSetValue(HKEY_CURRENT_USER, REGSTR_EXPLORER_ADVANCED, TEXT("StartMenuChevron"), REG_DWORD, &dwClickCount, sizeof(DWORD));
+	SHSetValueW(
+		HKEY_CURRENT_USER, 
+		REGSTR_EXPLORER_ADVANCED, 
+		L"StartMenuChevron", 
+		REG_DWORD,
+		&dwClickCount,
+		sizeof(DWORD)
+	);
 }
 
 HRESULT CreateRecentMRUList(IMruDataList** ppmru)
@@ -1689,266 +1677,325 @@ HRESULT CreateRecentMRUList(IMruDataList** ppmru)
 }
 
 #define RESTOPT_INTELLIMENUS_USER       0
-#define RESTOPT_INTELLIMENUS_DISABLED   1       // Match Restriction assumption: 1 == Off
+#define RESTOPT_INTELLIMENUS_DISABLED   1
 #define RESTOPT_INTELLIMENUS_ENABLED    2
+
 BOOL AreIntelliMenusEnabled()
 {
-	DWORD dwRest = SHRestricted(REST_INTELLIMENUS);
-	if (dwRest != RESTOPT_INTELLIMENUS_USER)
-		return (dwRest == RESTOPT_INTELLIMENUS_ENABLED);
+	DWORD dwRestriction = SHRestricted(REST_INTELLIMENUS);
 
-	return SHRegGetBoolUSValue(REGSTR_EXPLORER_ADVANCED, TEXT("IntelliMenus"),
-		FALSE, TRUE); // Don't ignore HKCU, Enable Menus by default
+	if (dwRestriction != RESTOPT_INTELLIMENUS_USER)
+	{
+		return (dwRestriction == RESTOPT_INTELLIMENUS_ENABLED);
+	}
+
+	return SHRegGetBoolUSValueW(
+		REGSTR_EXPLORER_ADVANCED,
+		L"IntelliMenus",
+		FALSE,
+		TRUE
+	);
 }
 
-STDMETHODIMP_(HRESULT __stdcall) CStartMenuCallback::CallbackSM(LPSMDATA psmd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+STDMETHODIMP CStartMenuCallback::CallbackSM(LPSMDATA psmd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HRESULT hr = S_FALSE;
 	switch (uMsg)
 	{
-
-	case SMC_CREATE:
-		hr = _Create(psmd, (void**)lParam);
-		break;
-
-	case SMC_DESTROY:
-		hr = _Destroy(psmd);
-		break;
-
-	case SMC_INITMENU:
-		hr = _Init(psmd);
-		break;
-
-	case SMC_SFEXEC:
-		hr = _ExecItem(psmd, uMsg);
-		break;
-
-	case SMC_EXEC:
-		hr = _ExecHmenuItem(psmd);
-		break;
-
-	case SMC_GETOBJECT:
-		hr = _GetObject(psmd, (GUID) * ((GUID*)wParam), (void**)lParam);
-		break;
-
-	case SMC_GETINFO:
-		hr = _GetHmenuInfo(psmd, (SMINFO*)lParam);
-		break;
-
-	case SMC_GETSFINFOTIP:
-		if (!_fShowInfoTip)
-			hr = E_FAIL;  // E_FAIL means don't show. S_FALSE means show default
-		break;
-
-	case SMC_GETINFOTIP:
-		hr = _GetStaticInfoTip(psmd, (LPWSTR)wParam, (int)lParam);
-		break;
-
-	case SMC_GETSFINFO:
-		hr = _GetSFInfo(psmd, (SMINFO*)lParam);
-		break;
-
-	case SMC_BEGINENUM:
-		if (psmd->uIdParent == IDM_RECENT)
+		case SMC_CREATE:
 		{
-			assert(_cRecentDocs == -1);
-			assert(!_pmruRecent);
-			CreateRecentMRUList(&_pmruRecent);
-
-			_cRecentDocs = 0;
-			hr = S_OK;
+			hr = _Create(psmd, (void**)lParam);
 		}
 		break;
 
-	case SMC_ENDENUM:
-		if (psmd->uIdParent == IDM_RECENT)
+		case SMC_DESTROY:
 		{
-			assert(_cRecentDocs != -1);
-			ATOMICRELEASE(_pmruRecent);
-
-			_cRecentDocs = -1;
-			hr = S_OK;
+			hr = _Destroy(psmd);
 		}
 		break;
 
-	case SMC_DUMPONUPDATE:
-		if (psmd->uIdParent == IDM_RECENT)
+		case SMC_INITMENU:
 		{
-			hr = S_OK;
+			hr = _Init(psmd);
 		}
 		break;
 
-	case SMC_FILTERPIDL:
-		assert(psmd->dwMask & SMDM_SHELLFOLDER);
-
-		if (psmd->uIdParent == IDM_RECENT)
+		case SMC_SFEXEC:
 		{
-			//  we need to filter out all but the first MAXRECENTITEMS
-			//  and no folders allowed!
-			hr = _FilterRecentPidl(psmd->psf, psmd->pidlItem);
-		}
-		else
-		{
-			hr = _FilterPidl(psmd->uIdParent, psmd->psf, psmd->pidlItem);
+			hr = _ExecItem(psmd, uMsg);
 		}
 		break;
 
-	case SMC_INSERTINDEX:
-		//ASSERT(lParam && IS_VALID_WRITE_PTR(lParam, int));
-		*((int*)lParam) = 0;
-		hr = S_OK;
+		case SMC_EXEC:
+		{
+			hr = _ExecHmenuItem(psmd);
+		}
 		break;
 
-	case SMC_SHCHANGENOTIFY:
-	{
-		PSMCSHCHANGENOTIFYSTRUCT pshf = (PSMCSHCHANGENOTIFYSTRUCT)lParam;
-		hr = _ProcessChangeNotify(psmd, pshf->lEvent, pshf->pidl1, pshf->pidl2);
-	}
-	break;
-
-	case SMC_REFRESH:
-		if (psmd->uIdParent == IDM_TOPLEVELSTARTMENU)
+		case SMC_GETOBJECT:
 		{
-			hr = S_OK;
+			hr = _GetObject(psmd, (GUID) * ((GUID*)wParam), (void**)lParam);
+		}
+		break;
 
-			// Refresh is only called on the top level.
-			HMENU hmenu;
-			IShellMenu* psm;
-			_GetStaticStartMenu(&hmenu, &_hwnd);
-			if (hmenu && psmd->punk && SUCCEEDED(psmd->punk->QueryInterface(IID_PPV_ARGS(&psm))))
+		case SMC_GETINFO:
+		{
+			hr = _GetHmenuInfo(psmd, (SMINFO*)lParam);
+		}
+		break;
+
+		case SMC_GETSFINFOTIP:
+		{
+			if (!m_fShowInfoTip)
 			{
-				hr = psm->SetMenu(hmenu, _hwnd, SMSET_BOTTOM | SMSET_MERGE);
-				psm->Release();
-			}
-
-			_RefreshSettings();
-			_fExpandoMenus = !_fIsStartPanel && AreIntelliMenusEnabled();
-			_fCascadeMyDocuments = FeatureEnabled(TEXT("CascadeMyDocuments"));
-			_fCascadePrinters = FeatureEnabled(TEXT("CascadePrinters"));
-			_fCascadeControlPanel = FeatureEnabled(TEXT("CascadeControlPanel"));
-			_fCascadeNetConnections = FeatureEnabled(TEXT("CascadeNetworkConnections"));
-			_fAddOpenFolder = FeatureEnabled(TEXT("StartMenuOpen"));
-			_fShowInfoTip = FeatureEnabled(TEXT("ShowInfoTip"));
-			_fCascadeMyPictures = FeatureEnabled(TEXT("CascadeMyPictures"));
-			_fFindMenuInvalid = TRUE;
-			_dwFlags = GetInitFlags();
-		}
-		break;
-
-	case SMC_DEMOTE:
-		hr = _Demote(psmd);
-		break;
-
-	case SMC_PROMOTE:
-		hr = _Promote(psmd, (DWORD)wParam);
-		break;
-
-	case SMC_NEWITEM:
-		hr = _HandleNew(psmd);
-		break;
-
-	case SMC_MAPACCELERATOR:
-		hr = _HandleAccelerator((TCHAR)wParam, (SMDATA*)lParam);
-		break;
-
-	case SMC_DEFAULTICON:
-		assert(psmd->uIdAncestor == IDM_FAVORITES); // This is only valid for the Favorites menu
-		hr = _GetDefaultIcon((LPWSTR)wParam, (int*)lParam);
-		break;
-
-	case SMC_GETMINPROMOTED:
-		// Only do this for the programs menu
-		if (psmd->uIdParent == IDM_PROGRAMS)
-			*((int*)lParam) = 4;        // 4 was choosen by RichSt 9.15.98
-		break;
-
-	case SMC_CHEVRONEXPAND:
-
-		// Has the user already seen the chevron tip enough times? (We set the bit when the count goes to zero.
-		if (!(_dwFlags & STARTMENU_CHEVRONCLICKED))
-		{
-			// No; Then get the current count from the registry. We set a default of 3, but an admin can set this
-			// to -1, that would make it so that they user sees it all the time.
-			DWORD dwClickCount = GetClickCount();
-			if (dwClickCount > 0)
-			{
-				// Since they clicked, take one off.
-				dwClickCount--;
-
-				// Set it back in.
-				SetClickCount(dwClickCount);
-			}
-
-			if (dwClickCount == 0)
-			{
-				// Ah, the user has seen the chevron tip enought times... Stop being annoying.
-				_dwFlags |= STARTMENU_CHEVRONCLICKED;
-				SetInitFlags(_dwFlags);
+				hr = E_FAIL;
 			}
 		}
-		hr = S_OK;
 		break;
 
-	case SMC_DISPLAYCHEVRONTIP:
-
-		// We only want to see the tip on the top level programs case, no where else. We also don't
-		// want to see it if they've had enough.
-		if (psmd->uIdParent == IDM_PROGRAMS &&
-			!(_dwFlags & STARTMENU_CHEVRONCLICKED) &&
-			!SHRestricted(REST_NOSMBALLOONTIP))
+		case SMC_GETINFOTIP:
 		{
+			hr = _GetStaticInfoTip(psmd, (LPWSTR)wParam, (int)lParam);
+		}
+		break;
+
+		case SMC_GETSFINFO:
+		{
+			hr = _GetSFInfo(psmd, (SMINFO*)lParam);
+		}
+		break;
+
+		case SMC_BEGINENUM:
+		{
+			if (psmd->uIdParent == IDM_RECENT)
+			{
+				assert(m_cRecentDocs == -1);
+				assert(!m_pMruRecent);
+				CreateRecentMRUList(&m_pMruRecent);
+
+				m_cRecentDocs = 0;
+				hr = S_OK;
+			}
+		}
+		break;
+
+		case SMC_ENDENUM:
+		{
+			if (psmd->uIdParent == IDM_RECENT)
+			{
+				assert(m_cRecentDocs != -1);
+				ATOMICRELEASE(m_pMruRecent);
+
+				m_cRecentDocs = -1;
+				hr = S_OK;
+			}
+		}
+		break;
+
+		case SMC_DUMPONUPDATE:
+		{
+			if (psmd->uIdParent == IDM_RECENT)
+			{
+				hr = S_OK;
+			}
+		}
+		break;
+
+		case SMC_FILTERPIDL:
+		{
+			assert(psmd->dwMask & SMDM_SHELLFOLDER);
+
+			if (psmd->uIdParent == IDM_RECENT)
+			{
+				//  we need to filter out all but the first MAXRECENTITEMS
+				//  and no folders allowed!
+				hr = _FilterRecentPidl(psmd->psf, psmd->pidlItem);
+			}
+			else
+			{
+				hr = _FilterPidl(psmd->uIdParent, psmd->psf, psmd->pidlItem);
+			}
+		}
+		break;
+
+		case SMC_INSERTINDEX:
+		{
+			*((int*)lParam) = 0;
 			hr = S_OK;
 		}
 		break;
 
-	case SMC_CHEVRONGETTIP:
-		if (!SHRestricted(REST_NOSMBALLOONTIP))
-			hr = _GetTip((LPWSTR)wParam, (LPWSTR)lParam);
+		case SMC_SHCHANGENOTIFY:
+		{
+			PSMCSHCHANGENOTIFYSTRUCT pshf = (PSMCSHCHANGENOTIFYSTRUCT)lParam;
+			hr = _ProcessChangeNotify(psmd, pshf->lEvent, pshf->pidl1, pshf->pidl2);
+		}
+		break;
+
+		case SMC_REFRESH:
+		{
+			if (psmd->uIdParent == IDM_TOPLEVELSTARTMENU)
+			{
+				hr = S_OK;
+
+				// Refresh is only called on the top level.
+				HMENU hmenu;
+				IShellMenu* psm;
+				_GetStaticStartMenu(&hmenu, &m_hWnd);
+				if (hmenu && psmd->punk && SUCCEEDED(psmd->punk->QueryInterface(IID_PPV_ARGS(&psm))))
+				{
+					hr = psm->SetMenu(hmenu, m_hWnd, SMSET_BOTTOM | SMSET_MERGE);
+					psm->Release();
+				}
+
+				_RefreshSettings();
+				m_fExpandoMenus = !m_fIsStartPanel && AreIntelliMenusEnabled();
+				m_fCascadeMyDocuments = FeatureEnabled(L"CascadeMyDocuments");
+				m_fCascadePrinters = FeatureEnabled(L"CascadePrinters");
+				m_fCascadeControlPanel = FeatureEnabled(L"CascadeControlPanel");
+				m_fCascadeNetConnections = FeatureEnabled(L"CascadeNetworkConnections");
+				m_fAddOpenFolder = FeatureEnabled(L"StartMenuOpen");
+				m_fShowInfoTip = FeatureEnabled(L"ShowInfoTip");
+				m_fCascadeMyPictures = FeatureEnabled(L"CascadeMyPictures");
+				m_fFindMenuInvalid = TRUE;
+				m_dwFlags = GetInitFlags();
+			}
+		}
+		break;
+
+		case SMC_DEMOTE:
+		{
+			hr = _Demote(psmd);
+		}
+		break;
+
+		case SMC_PROMOTE:
+		{
+			hr = _Promote(psmd, (DWORD)wParam);
+		}
+		break;
+
+		case SMC_NEWITEM:
+		{
+			hr = _HandleNew(psmd);
+		}
+		break;
+
+		case SMC_MAPACCELERATOR:
+		{
+			hr = _HandleAccelerator((WCHAR)wParam, (SMDATA*)lParam);
+		}
+		break;
+
+		case SMC_DEFAULTICON:
+		{
+			assert(psmd->uIdAncestor == IDM_FAVORITES);
+			hr = _GetDefaultIcon((LPWSTR)wParam, (int*)lParam);
+		}
+		break;
+
+		case SMC_GETMINPROMOTED:
+		{
+			if (psmd->uIdParent == IDM_PROGRAMS)
+			{
+				*((int*)lParam) = 4;
+			}
+		}
+		break;
+
+		case SMC_CHEVRONEXPAND:
+		{
+			if (!(m_dwFlags & STARTMENU_CHEVRONCLICKED))
+			{
+				// No; Then get the current count from the registry. We set a default of 3, but an admin can set this
+				// to -1, that would make it so that they user sees it all the time.
+				DWORD dwClickCount = GetClickCount();
+				if (dwClickCount > 0)
+				{
+					// Since they clicked, take one off.
+					dwClickCount--;
+
+					// Set it back in.
+					SetClickCount(dwClickCount);
+				}
+
+				if (dwClickCount == 0)
+				{
+					// Ah, the user has seen the chevron tip enought times... Stop being annoying.
+					m_dwFlags |= STARTMENU_CHEVRONCLICKED;
+					SetInitFlags(m_dwFlags);
+				}
+			}
+			hr = S_OK;
+		}
+		break;
+
+		case SMC_DISPLAYCHEVRONTIP:
+		{
+			if (
+				psmd->uIdParent == IDM_PROGRAMS &&
+				!(m_dwFlags & STARTMENU_CHEVRONCLICKED) &&
+				!SHRestricted(REST_NOSMBALLOONTIP)
+			)
+			{
+				hr = S_OK;
+			}
+		}
+		break;
+
+		case SMC_CHEVRONGETTIP:
+		{
+			if (!SHRestricted(REST_NOSMBALLOONTIP))
+			{
+				hr = _GetTip((LPWSTR)wParam, (LPWSTR)lParam);
+			}
+		}
 		break;
 	}
 
 	return hr;
 }
 
-STDMETHODIMP_(HRESULT __stdcall) CStartMenuCallback::SetSite(IUnknown* punk)
+STDMETHODIMP CStartMenuCallback::SetSite(IUnknown* punk)
 {
-	ATOMICRELEASE(_punkSite);
-	_punkSite = punk;
+	ATOMICRELEASE(m_punkSite);
+
+	m_punkSite = punk;
 	if (punk)
 	{
-		_punkSite->AddRef();
+		m_punkSite->AddRef();
 	}
 
 	return S_OK;
 }
 
-STDMETHODIMP_(HRESULT __stdcall) CStartMenuCallback::GetSite(REFIID riid, void** ppvOut)
+STDMETHODIMP CStartMenuCallback::GetSite(REFIID riid, void** ppvOut)
 {
-	if (_ptp)
-		return _ptp->QueryInterface(riid, ppvOut);
+	if (m_pTrayPriv)
+		return m_pTrayPriv->QueryInterface(riid, ppvOut);
 	else
 		return E_NOINTERFACE;
 }
 
 #define IDS_FIND_MNEMONIC       0x7674 
-CStartMenuCallback::CStartMenuCallback() : _cRecentDocs(-1)
+CStartMenuCallback::CStartMenuCallback() : m_cRecentDocs(-1)
 {
 	memset((void*)(__int64(this) + sizeof(CStartMenuCallbackBase)),0,sizeof(CStartMenuCallback) - sizeof(CStartMenuCallbackBase));
-	_cRecentDocs = -1;
-	_punkSite = 0;
-	LoadString(LoadLibraryW(L"shell32.dll"), IDS_FIND_MNEMONIC, _szFindMnemonic, ARRAYSIZE(_szFindMnemonic));
+	m_cRecentDocs = -1;
+	m_punkSite = 0;
+	LoadString(LoadLibraryW(L"shell32.dll"), IDS_FIND_MNEMONIC, m_szFindMnemonic, ARRAYSIZE(m_szFindMnemonic));
 }
 
 CStartMenuCallback::~CStartMenuCallback()
 {
-	ATOMICRELEASE(_pcmFind);
-	ATOMICRELEASE(_ptp);
-	ATOMICRELEASE(_pmruRecent);
+	ATOMICRELEASE(m_pContextMenuFind);
+	ATOMICRELEASE(m_pTrayPriv);
+	ATOMICRELEASE(m_pMruRecent);
 }
 #define IsInRange(item,min_val,max_val) \
             (((item) >= min_val) && ((item) <= max_val))
 
-STDAPI_(void) SetICIKeyModifiers(DWORD* pfMask)
+extern "C" void WINAPI SetICIKeyModifiers(DWORD* pfMask)
 {
 	assert(pfMask);
 
@@ -1977,29 +2024,28 @@ HRESULT ShowFolder(UINT csidl)
 		shei.cbSize = sizeof(shei);
 		shei.fMask = SEE_MASK_IDLIST;
 		shei.nShow = SW_SHOWNORMAL;
-		shei.lpVerb = TEXT("open");
+		shei.lpVerb = L"open";
 		shei.lpIDList = pidl;
-		ShellExecuteEx(&shei);
+		ShellExecuteExW(&shei);
 		ILFree(pidl);
 	}
 	return S_OK;
 }
 
-void _ExecRegValue(LPCTSTR pszValue)
+void _ExecRegValue(LPCWSTR pszValue)
 {
-	TCHAR szPath[MAX_PATH];
+	WCHAR szPath[MAX_PATH];
 	DWORD cbSize = ARRAYSIZE(szPath);
 
-	if (ERROR_SUCCESS == SHGetValue(HKEY_LOCAL_MACHINE, REGSTR_EXPLORER_ADVANCED, pszValue,
-		NULL, szPath, &cbSize))
+	if (SHGetValueW(HKEY_LOCAL_MACHINE, REGSTR_EXPLORER_ADVANCED, pszValue, nullptr, szPath, &cbSize) == ERROR_SUCCESS)
 	{
 		SHELLEXECUTEINFO shei = { 0 };
 		shei.cbSize = sizeof(shei);
 		shei.nShow = SW_SHOWNORMAL;
-		shei.lpParameters = PathGetArgs(szPath);
-		PathRemoveArgs(szPath);
+		shei.lpParameters = PathGetArgsW(szPath);
+		PathRemoveArgsW(szPath);
 		shei.lpFile = szPath;
-		ShellExecuteEx(&shei);
+		ShellExecuteExW(&shei);
 	}
 }
 
@@ -2008,17 +2054,55 @@ HRESULT ExecStaticStartMenuItem(int idCmd, BOOL fAllUsers, BOOL fOpen)
 	int csidl = -1;
 	HRESULT hr = E_OUTOFMEMORY;
 	SHELLEXECUTEINFO shei = { 0 };
+
 	switch (idCmd)
 	{
-	case IDM_PROGRAMS:          csidl = fAllUsers ? CSIDL_COMMON_PROGRAMS : CSIDL_PROGRAMS; break;
-	case IDM_FAVORITES:         csidl = CSIDL_FAVORITES; break;
-	case IDM_MYDOCUMENTS:       csidl = CSIDL_PERSONAL; break;
-	case IDM_MYPICTURES:        csidl = CSIDL_MYPICTURES; break;
-	case IDM_CONTROLS:          csidl = CSIDL_CONTROLS;  break;
-	case IDM_PRINTERS:          csidl = CSIDL_PRINTERS;  break;
-	case IDM_NETCONNECT:        csidl = CSIDL_CONNECTIONS; break;
-	default:
-		return E_FAIL;
+		case IDM_PROGRAMS:
+		{
+			csidl = fAllUsers ? CSIDL_COMMON_PROGRAMS : CSIDL_PROGRAMS;
+		}
+		break;
+
+		case IDM_FAVORITES:
+		{
+			csidl = CSIDL_FAVORITES;
+		}
+		break;
+
+		case IDM_MYDOCUMENTS:
+		{
+			csidl = CSIDL_PERSONAL;
+		}
+		break;
+
+		case IDM_MYPICTURES:
+		{
+			csidl = CSIDL_MYPICTURES;
+		}
+		break;
+
+		case IDM_CONTROLS:
+		{
+			csidl = CSIDL_CONTROLS;
+		}
+		break;
+
+		case IDM_PRINTERS:
+		{
+			csidl = CSIDL_PRINTERS;
+		}
+		break;
+
+		case IDM_NETCONNECT:
+		{
+			csidl = CSIDL_CONNECTIONS;
+		}
+		break;
+
+		default:
+		{
+			return E_FAIL;
+		}
 	}
 
 	if (csidl != -1)
@@ -2031,8 +2115,8 @@ HRESULT ExecStaticStartMenuItem(int idCmd, BOOL fAllUsers, BOOL fOpen)
 		shei.cbSize = sizeof(shei);
 		shei.fMask = SEE_MASK_IDLIST;
 		shei.nShow = SW_SHOWNORMAL;
-		shei.lpVerb = fOpen ? TEXT("open") : TEXT("explore");
-		hr = ShellExecuteEx(&shei) ? S_OK : E_FAIL;
+		shei.lpVerb = fOpen ? L"open" : L"explore";
+		hr = ShellExecuteExW(&shei) ? S_OK : E_FAIL;
 		ILFree((LPITEMIDLIST)shei.lpIDList);
 	}
 
@@ -2042,7 +2126,7 @@ HRESULT ExecStaticStartMenuItem(int idCmd, BOOL fAllUsers, BOOL fOpen)
 HRESULT CStartMenuCallback::_ExecHmenuItem(LPSMDATA psmd)
 {
 	HRESULT hr = S_FALSE;
-	if (IsInRange(psmd->uId, TRAY_IDM_FINDFIRST, TRAY_IDM_FINDLAST) && _pcmFind)
+	if (IsInRange(psmd->uId, TRAY_IDM_FINDFIRST, TRAY_IDM_FINDLAST) && m_pContextMenuFind)
 	{
 		CMINVOKECOMMANDINFOEX ici = { 0 };
 		ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
@@ -2052,7 +2136,7 @@ HRESULT CStartMenuCallback::_ExecHmenuItem(LPSMDATA psmd)
 		// record if shift or control was being held down
 		SetICIKeyModifiers(&ici.fMask);
 
-		_pcmFind->InvokeCommand((LPCMINVOKECOMMANDINFO)&ici);
+		m_pContextMenuFind->InvokeCommand((LPCMINVOKECOMMANDINFO)&ici);
 		hr = S_OK;
 	}
 	else
@@ -2097,7 +2181,7 @@ HRESULT CStartMenuCallback::_ExecHmenuItem(LPSMDATA psmd)
 			break;
 
 		case IDM_CSC:
-			_ExecRegValue(TEXT("StartMenuSyncAll"));
+			_ExecRegValue(L"StartMenuSyncAll");
 			break;
 
 		default:
@@ -2112,100 +2196,113 @@ typedef struct
 {
 	BITBOOL _fInitialized;
 } SMUSERDATA;
-typedef char TBOOL;              
+
+typedef char TBOOL;
+
 HRESULT CStartMenuCallback::_Init(SMDATA* psmdata)
 {
 	HRESULT hr = S_FALSE;
-	IShellMenu* psm;
+
+	IShellMenu* psm = nullptr;
 	if (psmdata->punk && SUCCEEDED(hr = psmdata->punk->QueryInterface(IID_PPV_ARGS(&psm))))
 	{
 		switch (psmdata->uIdParent)
 		{
-		case IDM_TOPLEVELSTARTMENU:
-		{
-			if (psmdata->pvUserData && !((SMUSERDATA*)psmdata->pvUserData)->_fInitialized)
+			case IDM_TOPLEVELSTARTMENU:
 			{
-				//TraceMsg(TF_MENUBAND, "CStartMenuCallback::_Init : Initializing Toplevel Start Menu");
-				//((SMUSERDATA*)psmdata->pvUserData)->_fInitialized = TRUE;
-
-				HMENU hmenu;
-
-				//TraceMsg(TF_MENUBAND, "CStartMenuCallback::_Init : First Time, and correct parameters");
-
-				_GetStaticStartMenu(&hmenu, &_hwnd);
-				if (hmenu)
+				if (psmdata->pvUserData && !((SMUSERDATA*)psmdata->pvUserData)->_fInitialized)
 				{
-					HMENU   hmenuOld = NULL;
-					HWND    hwnd;
-					DWORD   dwFlags;
+					HMENU hmenu;
 
-					psm->GetMenu(&hmenuOld, &hwnd, &dwFlags);
-					if (hmenuOld != NULL)
+					_GetStaticStartMenu(&hmenu, &m_hWnd);
+					if (hmenu)
 					{
-						TBOOL(DestroyMenu(hmenuOld));
+						HMENU   hmenuOld = NULL;
+						HWND    hwnd;
+						DWORD   dwFlags;
+
+						psm->GetMenu(&hmenuOld, &hwnd, &dwFlags);
+						if (hmenuOld != NULL)
+						{
+							TBOOL(DestroyMenu(hmenuOld));
+						}
+						hr = psm->SetMenu(hmenu, m_hWnd, SMSET_BOTTOM);
 					}
-					hr = psm->SetMenu(hmenu, _hwnd, SMSET_BOTTOM);
-					//TraceMsg(TF_MENUBAND, "CStartMenuCallback::_Init : SetMenu(HMENU 0x%x, HWND 0x%x", hmenu, _hwnd);
+
+					m_fExpandoMenus = !m_fIsStartPanel && AreIntelliMenusEnabled();
+					m_fCascadeMyDocuments = FeatureEnabled(L"CascadeMyDocuments");
+					m_fCascadePrinters = FeatureEnabled(L"CascadePrinters");
+					m_fCascadeControlPanel = FeatureEnabled(L"CascadeControlPanel");
+					m_fCascadeNetConnections = FeatureEnabled(L"CascadeNetworkConnections");
+					m_fAddOpenFolder = FeatureEnabled(L"StartMenuOpen");
+					m_fShowInfoTip = FeatureEnabled(L"ShowInfoTip");
+					m_fCascadeMyPictures = FeatureEnabled(L"CascadeMyPictures");
+					m_dwFlags = GetInitFlags();
+				}
+				else if (!m_fHasInitShowTopLevelStartMenu)
+				{
+					m_fHasInitShowTopLevelStartMenu = true;
+					psm->InvalidateItem(NULL, SMINV_REFRESH);
 				}
 
-				_fExpandoMenus = !_fIsStartPanel && AreIntelliMenusEnabled();
-				_fCascadeMyDocuments = FeatureEnabled(TEXT("CascadeMyDocuments"));
-				_fCascadePrinters = FeatureEnabled(TEXT("CascadePrinters"));
-				_fCascadeControlPanel = FeatureEnabled(TEXT("CascadeControlPanel"));
-				_fCascadeNetConnections = FeatureEnabled(TEXT("CascadeNetworkConnections"));
-				_fAddOpenFolder = FeatureEnabled(TEXT("StartMenuOpen"));
-				_fShowInfoTip = FeatureEnabled(TEXT("ShowInfoTip"));
-				_fCascadeMyPictures = FeatureEnabled(TEXT("CascadeMyPictures"));
-				_dwFlags = GetInitFlags();
+				// Verify that the Fast items is still pointing to the right location
+				if (SUCCEEDED(hr))
+				{
+					hr = VerifyMergedGuy(FALSE, psm);
+				}
 			}
-			else if (!_fInitedShowTopLevelStartMenu)
+			break;
+
+			case IDM_MENU_FIND:
 			{
-				_fInitedShowTopLevelStartMenu = TRUE;
-				psm->InvalidateItem(NULL, SMINV_REFRESH);
+				if (m_fFindMenuInvalid)
+				{
+					hr = _InitializeFindMenu(psm);
+					m_fFindMenuInvalid = FALSE;
+				}
 			}
+			break;
 
-			// Verify that the Fast items is still pointing to the right location
-			if (SUCCEEDED(hr))
+			case IDM_PROGRAMS:
 			{
-				hr = VerifyMergedGuy(FALSE, psm);
+				hr = VerifyMergedGuy(TRUE, psm);
 			}
 			break;
-		}
-		case IDM_MENU_FIND:
-			if (_fFindMenuInvalid)
+
+			case IDM_FAVORITES:
 			{
-				hr = _InitializeFindMenu(psm);
-				_fFindMenuInvalid = FALSE;
+				hr = VerifyCSIDL(IDM_FAVORITES, CSIDL_FAVORITES, psm);
 			}
 			break;
 
-		case IDM_PROGRAMS:
-			// Verify the programs menu is still pointing to the right location
-			hr = VerifyMergedGuy(TRUE, psm);
+			case IDM_MYDOCUMENTS:
+			{
+				hr = VerifyCSIDL(IDM_MYDOCUMENTS, CSIDL_PERSONAL, psm);
+			}
 			break;
 
-		case IDM_FAVORITES:
-			hr = VerifyCSIDL(IDM_FAVORITES, CSIDL_FAVORITES, psm);
+			case IDM_MYPICTURES:
+			{
+				hr = VerifyCSIDL(IDM_MYPICTURES, CSIDL_MYPICTURES, psm);
+			}
 			break;
 
-		case IDM_MYDOCUMENTS:
-			hr = VerifyCSIDL(IDM_MYDOCUMENTS, CSIDL_PERSONAL, psm);
+			case IDM_RECENT:
+			{
+				_UpdateDocumentsShellMenu(psm);
+				_UpdateDocsMenuItemNames(psm);
+				hr = VerifyCSIDL(IDM_RECENT, CSIDL_RECENT, psm);
+			}
 			break;
-
-		case IDM_MYPICTURES:
-			hr = VerifyCSIDL(IDM_MYPICTURES, CSIDL_MYPICTURES, psm);
+			case IDM_CONTROLS:
+			{
+				hr = VerifyCSIDL(IDM_CONTROLS, CSIDL_CONTROLS, psm);
+			}
 			break;
-
-		case IDM_RECENT:
-			_UpdateDocumentsShellMenu(psm);
-			_UpdateDocsMenuItemNames(psm);
-			hr = VerifyCSIDL(IDM_RECENT, CSIDL_RECENT, psm);
-			break;
-		case IDM_CONTROLS:
-			hr = VerifyCSIDL(IDM_CONTROLS, CSIDL_CONTROLS, psm);
-			break;
-		case IDM_PRINTERS:
-			hr = VerifyCSIDL(IDM_PRINTERS, CSIDL_PRINTERS, psm);
+			case IDM_PRINTERS:
+			{
+				hr = VerifyCSIDL(IDM_PRINTERS, CSIDL_PRINTERS, psm);
+			}
 			break;
 		}
 
@@ -2218,7 +2315,6 @@ HRESULT CStartMenuCallback::_Init(SMDATA* psmdata)
 HRESULT CStartMenuCallback::_Create(SMDATA* psmdata, void** ppvUserData)
 {
 	*ppvUserData = new SMUSERDATA;
-
 	return S_OK;
 }
 
@@ -2314,10 +2410,12 @@ typedef struct
 	WCHAR wszHelpText[MAX_PATH];
 	int   iIcon;
 } SEARCHEXTDATA, * LPSEARCHEXTDATA;
+
 #define IS_VALID_WRITE_PTR(ptr, type) \
    (IsBadWritePtr((PVOID)(ptr), sizeof(type)) ? \
     (dbgprintf(L"invalid %s write pointer - %#08lx", (PCSTR)"P"#type, (ptr)), FALSE) : \
     TRUE)
+
 HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 {
 	if (!psminfo || IsBadReadPtr(psminfo, 8))
@@ -2327,28 +2425,27 @@ HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 	{
 		UINT idCmd;
 		int  iImage;
-	} s_mpcmdimg[] = { // Top level menu
-					   { IDM_PROGRAMS,       -IDI_CLASSICSM_PROGS },
-					   { IDM_FAVORITES,      -IDI_CLASSICSM_FAVORITES },
-					   { IDM_RECENT,         -IDI_CLASSICSM_RECENTDOCS },
-					   { IDM_SETTINGS,       -IDI_CLASSICSM_SETTINGS },
-					   { IDM_MENU_FIND,      -IDI_CLASSICSM_FIND },
-					   { IDM_HELPSEARCH,     -IDI_CLASSICSM_HELP },
-					   { IDM_FILERUN,        -IDI_CLASSICSM_RUN },
-					   { IDM_LOGOFF,         -IDI_CLASSICSM_LOGOFF },
-					   { IDM_EJECTPC,        -IDI_CLASSICSM_UNDOCK },
-					   { IDM_EXITWIN,        -IDI_CLASSICSM_SHUTDOWN },
-					   { IDM_MU_SECURITY,    II_MU_STSECURITY },
-					   { IDM_MU_DISCONNECT,  II_MU_STDISCONN  },
-					   { IDM_SETTINGSASSIST, -IDI_CLASSICSM_SETTINGS },
-					   { IDM_CONTROLS,       II_STCPANEL },
-					   { IDM_PRINTERS,       II_STPRNTRS },
-					   { IDM_TRAYPROPERTIES, II_STTASKBR },
-					   { IDM_MYDOCUMENTS,    -IDI_MYDOCS},
-					   { IDM_CSC,            -IDI_CSC},
-					   { IDM_NETCONNECT,     -IDI_NETCONNECT},
+	} s_mpcmdimg[] = {
+		{ IDM_PROGRAMS,       -IDI_CLASSICSM_PROGS },
+		{ IDM_FAVORITES,      -IDI_CLASSICSM_FAVORITES },
+		{ IDM_RECENT,         -IDI_CLASSICSM_RECENTDOCS },
+		{ IDM_SETTINGS,       -IDI_CLASSICSM_SETTINGS },
+		{ IDM_MENU_FIND,      -IDI_CLASSICSM_FIND },
+		{ IDM_HELPSEARCH,     -IDI_CLASSICSM_HELP },
+		{ IDM_FILERUN,        -IDI_CLASSICSM_RUN },
+		{ IDM_LOGOFF,         -IDI_CLASSICSM_LOGOFF },
+		{ IDM_EJECTPC,        -IDI_CLASSICSM_UNDOCK },
+		{ IDM_EXITWIN,        -IDI_CLASSICSM_SHUTDOWN },
+		{ IDM_MU_SECURITY,    II_MU_STSECURITY },
+		{ IDM_MU_DISCONNECT,  II_MU_STDISCONN  },
+		{ IDM_SETTINGSASSIST, -IDI_CLASSICSM_SETTINGS },
+		{ IDM_CONTROLS,       II_STCPANEL },
+		{ IDM_PRINTERS,       II_STPRNTRS },
+		{ IDM_TRAYPROPERTIES, II_STTASKBR },
+		{ IDM_MYDOCUMENTS,    -IDI_MYDOCS },
+		{ IDM_CSC,            -IDI_CSC },
+		{ IDM_NETCONNECT,     -IDI_NETCONNECT },
 	};
-
 
 	assert(IS_VALID_WRITE_PTR(psminfo, SMINFO));
 
@@ -2361,18 +2458,20 @@ HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 	{
 		if (IsInRange(psmd->uId, TRAY_IDM_FINDFIRST, TRAY_IDM_FINDLAST))
 		{
-			// The find menu extensions pack their icon into their data member of
-			// Menuiteminfo....
 			mii.cbSize = sizeof(mii);
 			mii.fMask = MIIM_DATA;
-			if (GetMenuItemInfo(psmd->hmenu, psmd->uId, MF_BYCOMMAND, &mii))
+			if (GetMenuItemInfoW(psmd->hmenu, psmd->uId, MF_BYCOMMAND, &mii))
 			{
 				LPSEARCHEXTDATA psed = (LPSEARCHEXTDATA)mii.dwItemData;
 
-				if (psed /* && !IsBadReadPtr(psed, 8)*/)
+				if (psed)
+				{
 					psminfo->iIcon = mii.dwItemData;
+				}
 				else
+				{
 					psminfo->iIcon = -1;
+				}
 
 				dwFlags |= SMIF_ICON;
 				hr = S_OK;
@@ -2415,7 +2514,7 @@ HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 				if (iIcon != -1)
 				{
 					dwFlags |= SMIF_ICON;
-					psminfo->iIcon = Shell_GetCachedImageIndex(TEXT("shell32.dll"), iIcon, 0);
+					psminfo->iIcon = Shell_GetCachedImageIndex(L"shell32.dll", iIcon, 0);
 					hr = S_OK;
 				}
 			}
@@ -2426,22 +2525,29 @@ HRESULT CStartMenuCallback::_GetHmenuInfo(SMDATA* psmd, SMINFO* psminfo)
 	{
 		psminfo->dwFlags = dwFlags;
 
-		if ((psmd->uId == IDM_CONTROLS && _fCascadeControlPanel) ||
-			(psmd->uId == IDM_PRINTERS && _fCascadePrinters) ||
-			(psmd->uId == IDM_MYDOCUMENTS && _fCascadeMyDocuments) ||
-			(psmd->uId == IDM_NETCONNECT && _fCascadeNetConnections) ||
-			(psmd->uId == IDM_MYPICTURES && _fCascadeMyPictures))
+		if (
+			(psmd->uId == IDM_CONTROLS && m_fCascadeControlPanel) ||
+			(psmd->uId == IDM_PRINTERS && m_fCascadePrinters) ||
+			(psmd->uId == IDM_MYDOCUMENTS && m_fCascadeMyDocuments) ||
+			(psmd->uId == IDM_NETCONNECT && m_fCascadeNetConnections) ||
+			(psmd->uId == IDM_MYPICTURES && m_fCascadeMyPictures)
+		)
 		{
 			psminfo->dwFlags |= SMIF_SUBMENU;
 			hr = S_OK;
 		}
-		else switch (psmd->uId)
+		else
 		{
-		case IDM_FAVORITES:
-		case IDM_PROGRAMS:
-			psminfo->dwFlags |= SMIF_DROPCASCADE;
-			hr = S_OK;
-			break;
+			switch (psmd->uId)
+			{
+				case IDM_FAVORITES:
+				case IDM_PROGRAMS:
+				{
+					psminfo->dwFlags |= SMIF_DROPCASCADE;
+					hr = S_OK;
+				}
+				break;
+			}
 		}
 	}
 
@@ -2471,7 +2577,6 @@ private:
 
 STDMETHODIMP CStartContextMenu::QueryInterface(REFIID riid, void** ppvObj)
 {
-
 	static const QITAB qit[] =
 	{
 		QITABENT(CStartContextMenu, IContextMenu),
@@ -2481,12 +2586,12 @@ STDMETHODIMP CStartContextMenu::QueryInterface(REFIID riid, void** ppvObj)
 	return QISearch(this, qit, riid, ppvObj);
 }
 
-STDMETHODIMP_(ULONG) CStartContextMenu::AddRef(void)
+ULONG STDMETHODCALLTYPE CStartContextMenu::AddRef(void)
 {
 	return ++_cRef;
 }
 
-STDMETHODIMP_(ULONG) CStartContextMenu::Release(void)
+ULONG STDMETHODCALLTYPE CStartContextMenu::Release(void)
 {
 	assert(_cRef > 0);
 	_cRef--;
@@ -2513,49 +2618,45 @@ HMENU SHLoadMenuPopup(HINSTANCE hinst, UINT id)
 #define SMCM_EXPLORE_ALLUSERS       (SMCM_STARTMENU_FIRST + 3)
 #define MENU_STARTMENUSTATICITEMS   359
 
-STDAPI_(BOOL) _SHIsMenuSeparator2(HMENU hm, int i, BOOL* pbIsNamed)
+STDAPI_(BOOL) _SHIsMenuSeparator2(HMENU hm, int i, BOOL *pfIsNamed)
 {
 	MENUITEMINFO mii;
-	BOOL bLocal;
+	BOOL fLocal;
 
-	if (!pbIsNamed)
-		pbIsNamed = &bLocal;
+	if (!pfIsNamed)
+	{
+		pfIsNamed = &fLocal;
+	}
 
-	*pbIsNamed = FALSE;
+	*pfIsNamed = FALSE;
 
 	mii.cbSize = sizeof(mii);
 	mii.fMask = MIIM_TYPE | MIIM_ID;
-	mii.cch = 0;    // WARNING: We MUST initialize it to 0!!!
-	if (GetMenuItemInfo(hm, i, TRUE, &mii) && (mii.fType & MFT_SEPARATOR))
+	mii.cch = 0;
+	if (GetMenuItemInfoW(hm, i, TRUE, &mii) && (mii.fType & MFT_SEPARATOR))
 	{
-		// NOTE that there is a bug in either 95 or NT user!!!
-		// 95 returns 16 bit ID's and NT 32 bit therefore there is a
-		// the following may fail, on win9x, to evaluate to false
-		// without casting
-		*pbIsNamed = ((WORD)mii.wID != (WORD)-1);
+		*pfIsNamed = ((WORD)mii.wID != (WORD)-1);
 		return TRUE;
 	}
 	return FALSE;
 }
 
-STDAPI_(void) _SHPrettyMenu(HMENU hm)
+extern "C" void WINAPI _SHPrettyMenu(HMENU hm)
 {
-	BOOL bSeparated = TRUE;
-	BOOL bWasNamed = TRUE;
+	bool fSeparated = true;
+	bool fWasNamed = true;
 
 	for (int i = GetMenuItemCount(hm) - 1; i > 0; --i)
 	{
-		BOOL bIsNamed;
-		if (_SHIsMenuSeparator2(hm, i, &bIsNamed))
+		BOOL fIsNamed = false;
+		if (_SHIsMenuSeparator2(hm, i, &fIsNamed))
 		{
-			if (bSeparated)
+			if (fSeparated)
 			{
-				// if we have two separators in a row, only one of which is named
-				// remove the non named one!
-				if (bIsNamed && !bWasNamed)
+				if (fIsNamed && !fWasNamed)
 				{
 					DeleteMenu(hm, i + 1, MF_BYPOSITION);
-					bWasNamed = bIsNamed;
+					fWasNamed = fIsNamed;
 				}
 				else
 				{
@@ -2564,24 +2665,25 @@ STDAPI_(void) _SHPrettyMenu(HMENU hm)
 			}
 			else
 			{
-				bWasNamed = bIsNamed;
-				bSeparated = TRUE;
+				fWasNamed = fIsNamed;
+				fSeparated = true;
 			}
 		}
 		else
 		{
-			bSeparated = FALSE;
+			fSeparated = false;
 		}
 	}
 
 	// The above loop does not handle the case of many separators at
 	// the beginning of the menu
-	while (_SHIsMenuSeparator2(hm, 0, NULL))
+	while (_SHIsMenuSeparator2(hm, 0, nullptr))
 	{
 		DeleteMenu(hm, 0, MF_BYPOSITION);
 	}
 }
 #define ResultFromShort(i)  ResultFromScode(MAKE_SCODE(SEVERITY_SUCCESS, 0, (USHORT)(i)))
+
 // IContextMenu
 STDMETHODIMP CStartContextMenu::QueryContextMenu(HMENU hmenu, UINT indexMenu, UINT idCmdFirst, UINT idCmdLast, UINT uFlags)
 {
@@ -2594,7 +2696,7 @@ STDMETHODIMP CStartContextMenu::QueryContextMenu(HMENU hmenu, UINT indexMenu, UI
 
 	if (hmenuStartMenu)
 	{
-		TCHAR szCommon[MAX_PATH];
+		WCHAR szCommon[MAX_PATH];
 		BOOL fAddCommon = (S_OK == SHGetFolderPath(NULL, CSIDL_COMMON_STARTMENU, NULL, 0, szCommon));
 	
 		if (fAddCommon)
@@ -2655,9 +2757,7 @@ STDMETHODIMP CStartContextMenu::InvokeCommand(LPCMINVOKECOMMANDINFO lpici)
 		hr = ExecStaticStartMenuItem(_idCmd, fAllUsers, fOpen);
 	}
 
-	// Ahhh Don't handle verbs!!!
 	return hr;
-
 }
 
 STDMETHODIMP CStartContextMenu::GetCommandString(UINT_PTR idCmd, UINT uType, UINT* pRes, LPSTR pszName, UINT cchMax)
@@ -2669,9 +2769,6 @@ HRESULT CStartMenuCallback::_GetObject(LPSMDATA psmd, REFIID riid, void** ppvOut
 {
 	HRESULT hr = E_FAIL;
 	UINT    uId = psmd->uId;
-
-	//ASSERT(ppvOut);
-	//ASSERT(IS_VALID_READ_PTR(psmd, SMDATA));
 
 	*ppvOut = NULL;
 
@@ -2694,30 +2791,28 @@ HRESULT CStartMenuCallback::_GetObject(LPSMDATA psmd, REFIID riid, void** ppvOut
 	}
 	else if (IsEqualGUID(riid, IID_IContextMenu))
 	{
-		//
-		//  NOTE - we dont allow users to open the recent folder this way - ZekeL - 1-JUN-99
-		//  because this is really an internal folder and not a user folder.
-		//
-
 		switch (uId)
 		{
-		case IDM_PROGRAMS:
-		case IDM_FAVORITES:
-		case IDM_MYDOCUMENTS:
-		case IDM_MYPICTURES:
-		case IDM_CONTROLS:
-		case IDM_PRINTERS:
-		case IDM_NETCONNECT:
-		{
-			CStartContextMenu* pcm = new CStartContextMenu(uId);
-			if (pcm)
+			case IDM_PROGRAMS:
+			case IDM_FAVORITES:
+			case IDM_MYDOCUMENTS:
+			case IDM_MYPICTURES:
+			case IDM_CONTROLS:
+			case IDM_PRINTERS:
+			case IDM_NETCONNECT:
 			{
-				hr = pcm->QueryInterface(riid, ppvOut);
-				pcm->Release();
+				CStartContextMenu* pcm = new CStartContextMenu(uId);
+
+				if (pcm)
+				{
+					hr = pcm->QueryInterface(riid, ppvOut);
+					pcm->Release();
+				}
+				else
+				{
+					hr = E_OUTOFMEMORY;
+				}
 			}
-			else
-				hr = E_OUTOFMEMORY;
-		}
 		}
 	}
 	return hr;
@@ -2727,15 +2822,18 @@ HRESULT CStartMenuCallback::_CheckRestricted(DWORD dwRestrict, BOOL* fRestricted
 {
 	return E_NOTIMPL;
 }
+
 #define SHGetAttributesOf(pidl, prgfInOut) SHGetNameAndFlags(pidl, 0, NULL, 0, prgfInOut)
 
 HRESULT SHCoInitialize(void)
 {
 	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
 	if (FAILED(hr))
 	{
 		hr = CoInitializeEx(NULL, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
 	}
+
 	return hr;
 }
 
@@ -2758,7 +2856,9 @@ enum {
 	OBJCOMPATF_NOLEGACYWEBVIEW = 0x00000400,
 	OBJCOMPATF_BLOCKSHELLSERVICEOBJECT = 0x00000800,
 };
+
 typedef DWORD OBJCOMPATFLAGS;
+
 typedef struct _CLSIDCOMPAT
 {
 	const GUID* pclsid;
@@ -2809,7 +2909,7 @@ static const GUID CLSID_HERCULES_HCTNT_V1001 = // {921BD320-8CB5-11CF-84CF-88583
 
 typedef struct {
 	DWORD flag;
-	LPCTSTR psz;
+	LPCWSTR psz;
 } FLAGMAP;
 
 DWORD _GetMappedFlags(HKEY hk, const FLAGMAP* pmaps, DWORD cmaps)
@@ -2823,18 +2923,18 @@ DWORD _GetMappedFlags(HKEY hk, const FLAGMAP* pmaps, DWORD cmaps)
 
 	return dwRet;
 }
-#define OCFMAPPING(ocf)     {OBJCOMPATF_##ocf, TEXT(#ocf)}
-#define ACFMAPPING(acf)     {ACF_##acf, TEXT(#acf)}
+#define OCFMAPPING(ocf)     {OBJCOMPATF_##ocf, L#ocf}
+#define ACFMAPPING(acf)     {ACF_##acf, L#acf}
 
 DWORD _GetRegistryObjectCompatFlags(REFGUID clsid)
 {
 	DWORD dwRet = 0;
-	TCHAR szGuid[GUIDSTR_MAX];
-	TCHAR sz[MAX_PATH];
+	WCHAR szGuid[38];
+	WCHAR sz[MAX_PATH];
 	HKEY hk;
 
 	StringFromCLSID(clsid, (LPOLESTR*)szGuid);
-	wnsprintf(sz, ARRAYSIZE(sz), TEXT("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ShellCompatibility\\Objects\\%s"), szGuid);
+	wnsprintf(sz, ARRAYSIZE(sz), L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ShellCompatibility\\Objects\\%s", szGuid);
 
 	if (NOERROR == RegOpenKeyEx(HKEY_LOCAL_MACHINE, sz, 0, KEY_QUERY_VALUE, &hk))
 	{
@@ -2858,6 +2958,9 @@ DWORD _GetRegistryObjectCompatFlags(REFGUID clsid)
 
 	return dwRet;
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+// kawapure: Stopped editing here.
 
 STDAPI_(OBJCOMPATFLAGS) SHGetObjectCompatFlags(IUnknown* punk, const CLSID* pclsid)
 {
@@ -2903,10 +3006,10 @@ STDAPI_(OBJCOMPATFLAGS) SHGetObjectCompatFlags(IUnknown* punk, const CLSID* pcls
 				//
 				//  WARNING DONT ADD NEW COMPATIBILITY HERE - ZekeL - 18-OCT-99
 				//  Add new entries to the registry.  each component 
-				//  that needs compatibility flags should register 
+				//  that needs compatibility uFlags should register 
 				//  during selfregistration.  (see the RegExternal
 				//  section of selfreg.inx in shell32 for an example.)  
-				//  all new flags should be added to the FLAGMAP array.
+				//  all new uFlags should be added to the FLAGMAP array.
 				//
 				//  the register under:
 				//  HKLM\SW\MS\Win\CV\ShellCompatibility\Objects
@@ -2915,7 +3018,7 @@ STDAPI_(OBJCOMPATFLAGS) SHGetObjectCompatFlags(IUnknown* punk, const CLSID* pcls
 				//
 				//  NOTE: there is no version checking
 				//  but we could add it as the data attached to 
-				//  the flags, and compare with the version 
+				//  the uFlags, and compare with the version 
 				//  of the LocalServer32 dll.
 				//  
 				{NULL, 0}
@@ -2977,11 +3080,11 @@ STDAPI_(DWORD) SHGetAttributes(IShellFolder* psf, LPCITEMIDLIST pidl, DWORD dwAt
 	return dw;
 }
 #define SHCoUninitialize(hr) if (SUCCEEDED(hr)) CoUninitialize()
-HRESULT SHGetNameAndFlags(LPCITEMIDLIST pidl, DWORD dwFlags, LPTSTR pszName, UINT cchName, DWORD* pdwAttribs)
+HRESULT SHGetNameAndFlags(LPCITEMIDLIST pidl, DWORD dwFlags, LPWSTR pszName, UINT cchName, DWORD* pdwAttribs)
 {
 	if (pszName)
 	{
-		//VDATEINPUTBUF(pszName, TCHAR, cchName);
+		//VDATEINPUTBUF(pszName, WCHAR, cchName);
 		*pszName = 0;
 	}
 
@@ -3037,12 +3140,12 @@ HRESULT CStartMenuCallback::_FilterRecentPidl(IShellFolder* psf, LPCITEMIDLIST p
 
 	//ASSERT(IS_VALID_PIDL(pidl));
 	//ASSERT(IS_VALID_CODE_PTR(psf, IShellFolder));
-	//ASSERT(_cRecentDocs != -1);
+	//ASSERT(m_cRecentDocs != -1);
 	//
-	//ASSERT(_cRecentDocs <= MAXRECENTDOCS);
+	//ASSERT(m_cRecentDocs <= MAXRECENTDOCS);
 
 	//  if we already reached our limit, dont go over...
-	if (_pmruRecent && (_cRecentDocs < MAXRECENTDOCS))
+	if (m_pMruRecent && (m_cRecentDocs < MAXRECENTDOCS))
 	{
 		//  we now must take a looksee for it...
 		int iItem;
@@ -3051,14 +3154,14 @@ HRESULT CStartMenuCallback::_FilterRecentPidl(IShellFolder* psf, LPCITEMIDLIST p
 
 		//  need to find out if the link points to a folder...
 		//  because we dont want
-		if (SUCCEEDED(_pmruRecent->FindData((BYTE*)pidl, ILGetSize(pidl), &iItem))
+		if (SUCCEEDED(m_pMruRecent->FindData((BYTE*)pidl, ILGetSize(pidl), &iItem))
 			&& LinkGetInnerPidl(psf, pidl, &pidlTrue, &dwAttr))
 		{
 			if (!(dwAttr & SFGAO_FOLDER))
 			{
 				//  we have a link to something that isnt a folder 
 				hr = S_FALSE;
-				_cRecentDocs++;
+				m_cRecentDocs++;
 			}
 
 			ILFree(pidlTrue);
@@ -3077,7 +3180,7 @@ HRESULT CStartMenuCallback::_Demote(LPSMDATA psmd)
 	// to invalidate this pidl.
 	HRESULT hr = S_FALSE;
 
-	if (_fExpandoMenus &&
+	if (m_fExpandoMenus &&
 		(psmd->uIdAncestor == IDM_PROGRAMS ||
 			psmd->uIdAncestor == IDM_FAVORITES))
 	{
@@ -3125,7 +3228,7 @@ DWORD CStartMenuCallback::_GetDemote(SMDATA* psmd)
 	return dwFlags;
 }
 
-HRESULT CStartMenuCallback::_HandleAccelerator(TCHAR ch, SMDATA* psmdata)
+HRESULT CStartMenuCallback::_HandleAccelerator(WCHAR ch, SMDATA* psmdata)
 {
 	// Since we renamed the 'Find' menu to 'Search' the PMs wanted to have
 	// an upgrade path for users (So they can continue to use the old accelerator
@@ -3133,7 +3236,7 @@ HRESULT CStartMenuCallback::_HandleAccelerator(TCHAR ch, SMDATA* psmdata)
 	// To enable this, when toolbar detects that there is not an item in the menu
 	// that contains the key that has been pressed, then it sends a TBN_ACCL.
 	// This is intercepted by mnbase, and translated into SMC_ACCEL. 
-	if (CharUpper((LPTSTR)ch) == CharUpper((LPTSTR)_szFindMnemonic[0]))
+	if (CharUpper((LPWSTR)ch) == CharUpper((LPWSTR)m_szFindMnemonic[0]))
 	{
 		psmdata->uId = IDM_MENU_FIND;
 		return S_OK;
@@ -3145,7 +3248,7 @@ HRESULT CStartMenuCallback::_HandleAccelerator(TCHAR ch, SMDATA* psmdata)
 HRESULT CStartMenuCallback::_GetDefaultIcon(LPWSTR psz, int* piIndex)
 {
 	DWORD cbSize = MAX_PATH;
-	HRESULT hr = AssocQueryString(0, ASSOCSTR_DEFAULTICON, TEXT("InternetShortcut"), NULL, psz, &cbSize);
+	HRESULT hr = AssocQueryString(0, ASSOCSTR_DEFAULTICON, L"InternetShortcut", NULL, psz, &cbSize);
 	if (SUCCEEDED(hr))
 	{
 		*piIndex = PathParseIconLocation(psz);
@@ -3161,19 +3264,19 @@ void CStartMenuCallback::_GetStaticStartMenu(HMENU* phmenu, HWND* phwnd)
 
 	IMenuPopup* pmp;
 	// The first one should be the bar that the start menu is sitting in.
-	if (SUCCEEDED(IUnknown_QueryService(_punkSite, SID_SMenuPopup, IID_PPV_ARGS(&pmp))))
+	if (SUCCEEDED(IUnknown_QueryService(m_punkSite, SID_SMenuPopup, IID_PPV_ARGS(&pmp))))
 	{
 		// Its site should be CStartMenuHost;
-		if (SUCCEEDED(IUnknown_GetSite(pmp, IID_PPV_ARGS(&_ptp))))
+		if (SUCCEEDED(IUnknown_GetSite(pmp, IID_PPV_ARGS(&m_pTrayPriv))))
 		{
 			// Don't get upset if this fails
-			_ptp->QueryInterface(IID_PPV_ARGS(&_ptp2));
+			m_pTrayPriv->QueryInterface(IID_PPV_ARGS(&m_pTrayPriv2));
 
-			_ptp->GetStaticStartMenu(phmenu);
-			IUnknown_GetWindow(_ptp, phwnd);
+			m_pTrayPriv->GetStaticStartMenu(phmenu);
+			IUnknown_GetWindow(m_pTrayPriv, phwnd);
 
-			if (!_poct)
-				_ptp->QueryInterface(IID_PPV_ARGS(&_poct));
+			if (!m_pOleCommandTarget)
+				m_pTrayPriv->QueryInterface(IID_PPV_ARGS(&m_pOleCommandTarget));
 		}
 		//else
 		//	TraceMsg(TF_MENUBAND, "CStartMenuCallback::_SetSite : Failed to aquire CStartMenuHost");
@@ -3189,7 +3292,7 @@ void CStartMenuCallback::_GetStaticStartMenu(HMENU* phmenu, HWND* phwnd)
 #define IDS_MYPICS_TIP          0x76A5
 HRESULT CStartMenuCallback::_GetStaticInfoTip(SMDATA* psmd, LPWSTR pszTip, int cch)
 {
-	if (!_fShowInfoTip)
+	if (!m_fShowInfoTip)
 		return E_FAIL;
 
 	HRESULT hr = E_FAIL;
@@ -3228,7 +3331,7 @@ HRESULT CStartMenuCallback::_GetStaticInfoTip(SMDATA* psmd, LPWSTR pszTip, int c
 	{
 		if (s_mpcmdTip[i].idCmd == psmd->uId)
 		{
-			TCHAR szTip[MAX_PATH];
+			WCHAR szTip[MAX_PATH];
 			if (LoadString(LoadLibraryW(L"shell32.dll"), s_mpcmdTip[i].idInfoTip, szTip, ARRAYSIZE(szTip)))
 			{
 				SHTCharToUnicode(szTip, pszTip, cch);
@@ -3246,14 +3349,14 @@ DWORD CStartMenuCallback::GetInitFlags()
 	DWORD dwType;
 	DWORD cbSize = sizeof(DWORD);
 	DWORD dwFlags = 0;
-	SHGetValue(HKEY_CURRENT_USER, REGSTR_EXPLORER_ADVANCED, TEXT("StartMenuInit"),
+	SHGetValue(HKEY_CURRENT_USER, REGSTR_EXPLORER_ADVANCED, L"StartMenuInit",
 		&dwType, (BYTE*)&dwFlags, &cbSize);
 	return dwFlags;
 }
 
 void CStartMenuCallback::SetInitFlags(DWORD dwFlags)
 {
-	//SHSetValue(HKEY_CURRENT_USER, REGSTR_EXPLORER_ADVANCED, TEXT("StartMenuInit"), REG_DWORD, &dwFlags, sizeof(DWORD));
+	//SHSetValue(HKEY_CURRENT_USER, REGSTR_EXPLORER_ADVANCED, L"StartMenuInit", REG_DWORD, &dwFlags, sizeof(DWORD));
 }
 
 HRESULT CStartMenuCallback::_InitializeFindMenu(IShellMenu* psm)
@@ -3265,14 +3368,14 @@ HRESULT CStartMenuCallback::_InitializeFindMenu(IShellMenu* psm)
 	HMENU hmenu = CreatePopupMenu();
 	if (hmenu)
 	{
-		ATOMICRELEASE(_pcmFind);
+		ATOMICRELEASE(m_pContextMenuFind);
 
-		if (_ptp)
+		if (m_pTrayPriv)
 		{
-			if (SUCCEEDED(_ptp->GetFindCM(hmenu, TRAY_IDM_FINDFIRST, TRAY_IDM_FINDLAST, &_pcmFind)))
+			if (SUCCEEDED(m_pTrayPriv->GetFindCM(hmenu, TRAY_IDM_FINDFIRST, TRAY_IDM_FINDLAST, &m_pContextMenuFind)))
 			{
 				IContextMenu2* pcm2;
-				_pcmFind->QueryInterface(IID_PPV_ARGS(&pcm2));
+				m_pContextMenuFind->QueryInterface(IID_PPV_ARGS(&pcm2));
 				if (pcm2)
 				{
 					pcm2->HandleMenuMsg(WM_INITMENUPOPUP, (WPARAM)hmenu, 0);
@@ -3280,10 +3383,9 @@ HRESULT CStartMenuCallback::_InitializeFindMenu(IShellMenu* psm)
 				}
 			}
 
-			if (_pcmFind)
+			if (m_pContextMenuFind)
 			{
 				hr = psm->SetMenu(hmenu, NULL, SMSET_TOP);
-				// Don't Release _pcmFind
 			}
 		}
 
@@ -3298,8 +3400,8 @@ HRESULT CStartMenuCallback::_InitializeFindMenu(IShellMenu* psm)
 
 HRESULT CStartMenuCallback::_ExecItem(LPSMDATA psmd, UINT uMsg)
 {
-	assert(_dwThreadID == GetCurrentThreadId());
-	return _ptp->ExecItem(psmd->psf, psmd->pidlItem);
+	assert(m_dwThreadId == GetCurrentThreadId());
+	return m_pTrayPriv->ExecItem(psmd->psf, psmd->pidlItem);
 }
 
 HRESULT CStartMenuCallback::VerifyCSIDL(int idCmd, int csidl, IShellMenu* psm)
@@ -3389,7 +3491,7 @@ HRESULT CStartMenuCallback::VerifyMergedGuy(BOOL fPrograms, IShellMenu* psm)
 							// we need to update the string cache
 							// so that we do proper filtering of 
 							// the programs item.
-							_fInitPrograms = FALSE;
+							m_fInitPrograms = FALSE;
 							if (fPrograms)
 								hr = InitializeProgramsShellMenu(psm);
 							else
@@ -3412,7 +3514,7 @@ HRESULT CStartMenuCallback::VerifyMergedGuy(BOOL fPrograms, IShellMenu* psm)
 	return hr;
 }
 
-STDAPI GetMyDocumentsDisplayName(LPTSTR pszPath, UINT cch)
+STDAPI GetMyDocumentsDisplayName(LPWSTR pszPath, UINT cch)
 {
 	*pszPath = 0;
 	LPITEMIDLIST pidl;
@@ -3424,19 +3526,19 @@ STDAPI GetMyDocumentsDisplayName(LPTSTR pszPath, UINT cch)
 	return *pszPath ? S_OK : E_FAIL;
 }
 
-void _FixMenuItemName(IShellMenu* psm, UINT uID, LPTSTR pszNewMenuName)
+void _FixMenuItemName(IShellMenu* psm, UINT uID, LPWSTR pszNewMenuName)
 {
 	HMENU hMenu;
 	assert(NULL != psm);
 	if (SUCCEEDED(psm->GetMenu(&hMenu, NULL, NULL)))
 	{
 		MENUITEMINFO mii = { 0 };
-		TCHAR szMenuName[256];
+		WCHAR szMenuName[256];
 		mii.cbSize = sizeof(mii);
 		mii.fMask = MIIM_TYPE;
 		mii.dwTypeData = szMenuName;
 		mii.cch = ARRAYSIZE(szMenuName);
-		szMenuName[0] = TEXT('\0');
+		szMenuName[0] = L'\0';
 		if (::GetMenuItemInfo(hMenu, uID, FALSE, &mii))
 		{
 			if (0 != StrCmp(szMenuName, pszNewMenuName))
@@ -3455,7 +3557,7 @@ void _FixMenuItemName(IShellMenu* psm, UINT uID, LPTSTR pszNewMenuName)
 	}
 }
 
-HRESULT GetMyPicsDisplayName(LPTSTR pszBuffer, UINT cchBuffer)
+HRESULT GetMyPicsDisplayName(LPWSTR pszBuffer, UINT cchBuffer)
 {
 	LPITEMIDLIST pidlMyPics = SHCloneSpecialIDList(NULL, CSIDL_MYPICTURES, FALSE);
 	if (pidlMyPics)
@@ -3469,15 +3571,15 @@ HRESULT GetMyPicsDisplayName(LPTSTR pszBuffer, UINT cchBuffer)
 
 void CStartMenuCallback::_UpdateDocsMenuItemNames(IShellMenu* psm)
 {
-	TCHAR szBuffer[MAX_PATH];
+	WCHAR szBuffer[MAX_PATH];
 
-	if (_fHasMyDocuments)
+	if (m_fHasMyDocuments)
 	{
 		if (SUCCEEDED(GetMyDocumentsDisplayName(szBuffer, _ARRAYSIZE(szBuffer))))
 			_FixMenuItemName(psm, IDM_MYDOCUMENTS, szBuffer);
 	}
 
-	if (_fHasMyPictures)
+	if (m_fHasMyPictures)
 	{
 		if (SUCCEEDED(GetMyPicsDisplayName(szBuffer, _ARRAYSIZE(szBuffer))))
 			_FixMenuItemName(psm, IDM_MYPICTURES, szBuffer);
@@ -3509,7 +3611,7 @@ void CStartMenuCallback::_UpdateDocumentsShellMenu(IShellMenu* psm)
 	}
 
 	// Do not update menu if not different than currently have
-	if (fMyDocs != (BOOL)_fHasMyDocuments || fMyPics != (BOOL)_fHasMyPictures)
+	if (fMyDocs != (BOOL)m_fHasMyDocuments || fMyPics != (BOOL)m_fHasMyPictures)
 	{
 		HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shell32.dll"), MENU_STARTMENU_MYDOCS);
 		if (hMenu)
@@ -3519,12 +3621,12 @@ void CStartMenuCallback::_UpdateDocumentsShellMenu(IShellMenu* psm)
 			if (!fMyPics)
 				DeleteMenu(hMenu, IDM_MYPICTURES, MF_BYCOMMAND);
 			// Reset section of menu
-			psm->SetMenu(hMenu, _hwnd, SMSET_TOP);
+			psm->SetMenu(hMenu, m_hWnd, SMSET_TOP);
 		}
 
 		// Cache what folders are available
-		_fHasMyDocuments = fMyDocs;
-		_fHasMyPictures = fMyPics;
+		m_fHasMyDocuments = fMyDocs;
+		m_fHasMyPictures = fMyPics;
 	}
 }
 #define SMSET_NOEMPTY               0x00000004
@@ -3532,7 +3634,7 @@ HRESULT CStartMenuCallback::InitializeFastItemsShellMenu(IShellMenu* psm)
 {
 	DWORD dwFlags = SMINIT_TOPLEVEL | SMINIT_VERTICAL;
 
-	if (IsStartMenuChangeNotAllowed(_fIsStartPanel))
+	if (IsStartMenuChangeNotAllowed(m_fIsStartPanel))
 		dwFlags |= SMINIT_RESTRICT_DRAGDROP | SMINIT_RESTRICT_CONTEXTMENU;
 
 	HRESULT hr = psm->Initialize(this, 0, ANCESTORDEFAULT, dwFlags);
@@ -3569,11 +3671,11 @@ HRESULT CStartMenuCallback::InitializeFastItemsShellMenu(IShellMenu* psm)
 
 
 #define MENU_STARTMENU_OPENFOLDER       402
-HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR pszRoot, LPTSTR pszValue, DWORD dwPassInitFlags, DWORD dwSetFlags, BOOL fAddOpen, IShellMenu* psm)
+HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPWSTR pszRoot, LPWSTR pszValue, DWORD dwPassInitFlags, DWORD dwSetFlags, BOOL fAddOpen, IShellMenu* psm)
 {
 	DWORD dwInitFlags = SMINIT_VERTICAL | dwPassInitFlags;
 
-	if (IsStartMenuChangeNotAllowed(_fIsStartPanel))
+	if (IsStartMenuChangeNotAllowed(m_fIsStartPanel))
 		dwInitFlags |= SMINIT_RESTRICT_DRAGDROP | SMINIT_RESTRICT_CONTEXTMENU;
 
 	psm->Initialize(this, uId, uId, dwInitFlags);
@@ -3587,7 +3689,7 @@ HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR 
 
 		if (pszRoot)
 		{
-			TCHAR szPath[MAX_PATH];
+			WCHAR szPath[MAX_PATH];
 			StrCpyN(szPath, pszRoot, ARRAYSIZE(szPath));
 			if (pszValue)
 			{
@@ -3603,12 +3705,12 @@ HRESULT CStartMenuCallback::InitializeCSIDLShellMenu(int uId, int csidl, LPTSTR 
 		hr = psm->SetShellFolder(psfFolder, pidl, hKey, dwSetFlags);
 		if (SUCCEEDED(hr))
 		{
-			if (fAddOpen && _fAddOpenFolder)
+			if (fAddOpen && m_fAddOpenFolder)
 			{
 				HMENU hMenu = SHLoadMenuPopup(LoadLibraryW(L"shell32.dll"), MENU_STARTMENU_OPENFOLDER);
 				if (hMenu)
 				{
-					psm->SetMenu(hMenu, _hwnd, SMSET_BOTTOM);
+					psm->SetMenu(hMenu, m_hWnd, SMSET_BOTTOM);
 				}
 			}
 		}
@@ -3629,12 +3731,12 @@ HRESULT CStartMenuCallback::InitializeDocumentsShellMenu(IShellMenu* psm)
 		psm);
 
 	// Initializing, reset cache bits for top part of menu
-	_fHasMyDocuments = FALSE;
-	_fHasMyPictures = FALSE;
+	m_fHasMyDocuments = FALSE;
+	m_fHasMyPictures = FALSE;
 
 	return hr;
 }
-#define STRREG_FAVORITES TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MenuOrder\\Favorites")
+#define STRREG_FAVORITES L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MenuOrder\\Favorites"
 
 #define SMSET_USEBKICONEXTRACTION   0x00000008   // Use the background icon extractor
 #define SMSET_HASEXPANDABLEFOLDERS  0x00000010   // Need to call SHIsExpandableFolder
@@ -3664,31 +3766,31 @@ HRESULT CStartMenuCallback::InitializeSubShellMenu(int idCmd, IShellMenu* psm)
 
 	case IDM_CONTROLS:
 		hr = InitializeCSIDLShellMenu(IDM_CONTROLS, CSIDL_CONTROLS, STRREG_STARTMENU,
-			TEXT("ControlPanel"), 0, 0, TRUE,
+			L"ControlPanel", 0, 0, TRUE,
 			psm);
 		break;
 
 	case IDM_PRINTERS:
 		hr = InitializeCSIDLShellMenu(IDM_PRINTERS, CSIDL_PRINTERS, STRREG_STARTMENU,
-			TEXT("Printers"), 0, 0, TRUE,
+			L"Printers", 0, 0, TRUE,
 			psm);
 		break;
 
 	case IDM_MYDOCUMENTS:
 		hr = InitializeCSIDLShellMenu(IDM_MYDOCUMENTS, CSIDL_PERSONAL, STRREG_STARTMENU,
-			TEXT("MyDocuments"), 0, 0, TRUE,
+			L"MyDocuments", 0, 0, TRUE,
 			psm);
 		break;
 
 	case IDM_MYPICTURES:
 		hr = InitializeCSIDLShellMenu(IDM_MYPICTURES, CSIDL_MYPICTURES, STRREG_STARTMENU,
-			TEXT("MyPictures"), 0, 0, TRUE,
+			L"MyPictures", 0, 0, TRUE,
 			psm);
 		break;
 
 	case IDM_NETCONNECT:
 		hr = InitializeCSIDLShellMenu(IDM_NETCONNECT, CSIDL_CONNECTIONS, STRREG_STARTMENU,
-			TEXT("NetConnections"), 0, 0, TRUE,
+			L"NetConnections", 0, 0, TRUE,
 			psm);
 		break;
 	}
