@@ -90,9 +90,6 @@
     <ClInclude Include="nsctree.h">
       <Filter>Header files</Filter>
     </ClInclude>
-    <ClInclude Include="timebomb.h">
-      <Filter>Header files</Filter>
-    </ClInclude>
     <ClInclude Include="cregtree.h">
       <Filter>Header files</Filter>
     </ClInclude>
