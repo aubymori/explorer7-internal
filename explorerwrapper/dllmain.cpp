@@ -1,4 +1,5 @@
 #define INITGUID
+#define PRERELEASE_COPY
 #include "framework.h"
 #include "forwards.h"
 #include "startmenuresolver.h"
@@ -609,7 +610,7 @@ int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 {
 	//don't allow to reset start menu rgn - rtm pseudo aero glitches
 	// TODO in future: more sophisticated RGN fixes so this isn't necessary?
-	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
+	if (hRgn == NULL && hwnd == GetStartMenuWnd() && g_bColorizationOptions > 0) return 0;
 	return SetWindowRgn(hwnd, hRgn, bRedraw);
 }
 
@@ -2165,6 +2166,21 @@ void FirstRunCompatibilityWarning()
 	}
 }
 
+// One-off warning for pre-release version
+void FirstRunPrereleaseWarning()
+{
+	DWORD value = 0;
+	RegGetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunPrereleaseCheck", &value);
+	if (value != 1)
+	{
+#ifdef PRERELEASE_COPY
+		MessageBoxW(NULL, L"Evaluation copy.\nFor testing purposes only.", L"explorer7", MB_ICONEXCLAMATION);
+		DWORD newValue = 1;
+		RegSetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunPrereleaseCheck", &newValue);
+#endif
+	}
+}
+
 // Where we need to close explorer silently (such as to block people from using awful, horrendous software...)
 void ExitExplorerSilently()
 {
@@ -2194,7 +2210,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
 {
-
 	// Ittr: We initialise values for closing program if incompatible software is present
 	WCHAR programPath[MAX_PATH] = L"\\Stardock\\WindowBlinds 11\\unins000.exe";
 	WCHAR blacklistPath[MAX_PATH];
@@ -2213,6 +2228,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		CreateShellFolder(); // Fix shell folder for 1607+...
 		EnsureWindowColorization(); // Correct colorization enablement setting for Win10/11
 		FirstRunCompatibilityWarning(); // Warn users on Windows 11 (for milestone 2) and Server 2022 of potential problems
+		FirstRunPrereleaseWarning(); // Warn users if this is a pre-release build that this is the case on first run ONLY
 		ThemeHandlesInit(); // Basically start the inactive theme management process
 
 		dbgprintf(L"Dll Attach\n");
