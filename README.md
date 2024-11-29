@@ -15,22 +15,28 @@ explorer7 is a **wrapper library** that allows Windows 7's explorer.exe to run p
 
 </details>
 
-## Known issues (Milestone 2)
+## Known issues (Milestone 2, last updated 29/11/24)
 
 **MAKE SURE YOU READ THESE FIRST SO YOU ARE AWARE OF WHAT YOU ARE GETTING INTO!**
 
 **Windows 8.1**
 - No proper strings for the "Customize Start Menu" dialog (fixed system-wide in Windows 10).
+- The start menu expanding animation is broken (persists in later versions).
 
 **Windows 10**
-- Autoplay does not work.
-- System msstyles with the name "aero.msstyles" will screw up the start menu and taskbar colorization (only when ColorizationOptions is set to 0).
-- Notification Area Icon settings in Control Panel are missing.
+- Autoplay does not work (persists in later versions).
+- System msstyles with the name "aero.msstyles" will screw up the start menu and taskbar colorization (only when ColorizationOptions is set to 0, persists in later versions).
+- "Notification Area Icon" settings in Control Panel are missing (persists in later versions).
+- The start menu cannot be correctly invoked from its relevant hotkey whilst immersive shell is enabled (persists in later versions).
+- The taskbar might overlap fullscreen applications whilst immersive shell is enabled (persists in later versions).
+- If a user has StartIsBack++ installed, it may attempt to erroneously hook into the shell, causing both visual and functional issues.
+- "Settings" is duplicated in the start menu program list (1607 onwards, ceases to be an issue in Windows 11).
 
 **Windows 11**
-- Taskbar and start menu pin creation is broken due to confirmation dialog introduction (currently fixed in Windows 10 22H2, not in 11 23H2+).
+- Taskbar and start menu pin creation is broken due to an internal shell32.dll code logic change (currently fixed in Windows 10 22H2, but not in 11 23H2+).
 - XAML-based UI dialogs invoked by the keyboard can cause the shell to crash (each must be disabled respectively, likely to be fixed in M3).
-- Further changes and regressions are yet to be listed here, as each version needs to be examined in turn.
+- Attempting to invoke context menus for executable files will cause the explorer.exe shell to hang and require a restart.
+- BlurBehind colorization mode no longer works due to the removal of the relevant accent policy (starting from 22H2+).
 
 **Windows 7 limitations/bugs**
 
