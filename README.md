@@ -15,7 +15,7 @@ explorer7 is a **wrapper library** that allows Windows 7's explorer.exe to run p
 
 </details>
 
-## Known issues (Milestone 1)
+## Known issues (Milestone 2)
 
 **MAKE SURE YOU READ THESE FIRST SO YOU ARE AWARE OF WHAT YOU ARE GETTING INTO!**
 
@@ -25,8 +25,6 @@ explorer7 is a **wrapper library** that allows Windows 7's explorer.exe to run p
 **Windows 10**
 - Autoplay does not work.
 - System msstyles with the name "aero.msstyles" will screw up the start menu and taskbar colorization (only when ColorizationOptions is set to 0).
-- The wallpaper stops working or, the desktop becomes buggy when plugging another monitor in or changing multi-monitor configuration while explorer is running.
-- Desktop area sticks to a specific resolution and requires going into the Wallpaper control panel page to fix (i.e going from 1920x1080 to 1024x768, the desktop area/wallpaper would be rendered as 1080p still, vice versa).
 - Notification Area Icon settings in Control Panel are missing.
 
 **Windows 11**
