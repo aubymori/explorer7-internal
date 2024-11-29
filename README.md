@@ -254,5 +254,3 @@ If you're having linker errors because of the prebuilt minhook, do the following
 
 Contributors: DON'T COMMIT YOUR MODIFIED `libMinHook.x64.lib` UNLESS SPECIFIED!
 
-## Note - Private Repo
-Tihiy did not put a license on this so we're not releasing this source. This is for source control only.
