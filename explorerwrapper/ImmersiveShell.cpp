@@ -173,7 +173,6 @@ void CreateTwinUI_UWP()
 	SetTaskmanWindowFunc = (SetTaskmanWindow)GetProcAddress(user32, "SetTaskmanWindow");
 	SetShellWindowFunc = (SetShellWindow)GetProcAddress(user32, "SetShellWindow");
 
-
 	CreateTaskManWindow();
 
 	IImmersiveShellCreator* ImmersiveShellCreator;

@@ -187,12 +187,18 @@
     <PreBuildEvent>
       <Command>if exist ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib copy /Y ..\minhook\build\VC17\lib\Release\libMinHook.x64.lib $(ProjectDir)</Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AddressImports.h" />
     <ClInclude Include="AppResolverNotify.h" />
     <ClInclude Include="AugmentedShellFolder.h" />
     <ClInclude Include="AuthUI.h" />
     <ClInclude Include="AutoPlay.h" />
+    <ClInclude Include="PatternImports.h" />
     <ClInclude Include="RegTreeOptions.h" />
     <ClInclude Include="dbgprint.h" />
     <ClInclude Include="DestinationList.h" />
@@ -218,15 +224,18 @@
     <ClInclude Include="ThemeManager.h" />
     <ClInclude Include="trash.h" />
     <ClInclude Include="TrayNotify.h" />
+    <ClInclude Include="TypeDefinitions.h" />
     <ClInclude Include="UserAssist.h" />
     <ClInclude Include="OSVersion.h" />
     <ClInclude Include="OptionConfig.h" />
+    <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AppResolverNotify.cpp" />
     <ClCompile Include="AuthUI.cpp" />
     <ClCompile Include="AutoPlay.cpp" />
     <ClCompile Include="OptionConfig.cpp" />
+    <ClCompile Include="PatternImports.cpp" />
     <ClCompile Include="RegTreeOptions.cpp" />
     <ClCompile Include="dbgprint.cpp" />
     <ClCompile Include="DestinationList.cpp" />

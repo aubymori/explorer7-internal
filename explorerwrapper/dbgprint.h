@@ -380,7 +380,6 @@ inline void DetourCall(void* Target, void* Detour)
 	memcpy(Target, jmpInstruction, sizeof(jmpInstruction));
 }
 
-
 //Ittr: Consolidated function for pattern byte replacements.
 static void ChangeImportedPattern(void* dllPattern, const unsigned char* newBytes, SIZE_T size) //thank you wiktor
 {

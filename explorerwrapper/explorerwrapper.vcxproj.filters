@@ -111,6 +111,18 @@
     <ClInclude Include="OptionConfig.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="AddressImports.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="TypeDefinitions.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="PatternImports.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="util.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -192,6 +204,9 @@
       <Filter>Source code files</Filter>
     </ClCompile>
     <ClCompile Include="OptionConfig.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
+    <ClCompile Include="PatternImports.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
   </ItemGroup>
