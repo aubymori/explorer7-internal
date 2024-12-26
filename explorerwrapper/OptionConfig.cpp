@@ -13,6 +13,7 @@ int s_AcrylicAlt;
 int s_ColorizationOptions;
 bool s_OverrideAlpha;
 DWORD s_AlphaValue;
+bool s_UseDCompFlyouts;
 
 // This is called at the beginning of the library's execution
 // The format for each setting is generally:
@@ -116,4 +117,11 @@ void InitializeConfiguration()
 	DWORD dwRPEnabled = 0;
 	g_registry.QueryValue(L"RPEnabled", (LPBYTE)&dwRPEnabled, sizeof(DWORD));
 	s_RPEnabled = dwRPEnabled;
+
+	// DComp flyouts
+	// - Defaults to the same value used by immersive stack
+	// - Only has an effect when UWP is enabled, otherwise this is always off
+	DWORD dwUseDCompFlyouts = s_EnableImmersiveShellStack;
+	g_registry.QueryValue(L"UseDCompFlyouts", (LPBYTE)&dwUseDCompFlyouts, sizeof(DWORD));
+	s_UseDCompFlyouts = dwUseDCompFlyouts;
 }

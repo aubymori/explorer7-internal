@@ -1,5 +1,6 @@
 #include "PatternImports.h"
 
+// Remove AMAP class from loaded msstyle so that Vista and 7 msstyles are compatible
 void RemoveLoadAnimationDataMap()
 {
 	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
@@ -15,6 +16,7 @@ void RemoveLoadAnimationDataMap()
 	}
 }
 
+// Remove Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
 void RemoveGetClassIdForShellTarget()
 {
 	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
@@ -30,6 +32,7 @@ void RemoveGetClassIdForShellTarget()
 	}
 }
 
+// Fix CLogoffPane so that options are correctly displayed
 void FixAuthUI()
 {
 	// Newer explorer versions use this
@@ -239,6 +242,68 @@ void FixWin11SearchIcon()
 	}
 }
 
+void RevertFlyouts()
+{
+	if (g_osVersion.BuildNumber() >= 10074) // not needed for 8.1
+	{
+		if (!s_UseDCompFlyouts || !s_EnableImmersiveShellStack)
+		{
+			////// VOLUME FLYOUT
+			char* LaunchSndVol = "0F 1F 44 00 00 83 FB 66 75 11";
+
+			HMODULE SVS = LoadLibrary(L"SndVolSSO.dll");
+			if (SVS) // only run if DLL is present
+			{
+				char* LSVPattern = (char*)FindPattern((uintptr_t)SVS, LaunchSndVol);
+
+				if (LSVPattern) // first run, VB to GE
+				{
+					unsigned char bytes[] = { 0x0F, 0x1F, 0x44, 0x00, 0x00, 0x83, 0xFB, 0x66, 0xEB, 0x11 };
+					ChangeImportedPattern(LSVPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					LaunchSndVol = "0F B7 44 24 50 66 83 F8 66 75";
+
+					LSVPattern = (char*)FindPattern((uintptr_t)SVS, LaunchSndVol);
+
+					if (LSVPattern) // second run, TH1 to TI
+					{
+						unsigned char bytes[] = { 0x0F, 0xB7, 0x44, 0x24, 0x50, 0x66, 0x83, 0xF8, 0x66, 0xEB };
+						ChangeImportedPattern(LSVPattern, bytes, sizeof(bytes));
+					}
+				}
+			}
+
+			////// NETWORK FLYOUT - TODO migrate this and part 2 to MinHookCreation.h
+			// Minhook stuff used here, as custom function was needed - see dllmain for now we'll re-consolidate this later
+
+			////// BATTERY FLYOUT
+			// Not done yet - ongoing implementation issues
+			// Implementation 1 - good universality, but misbehaves on trying to hide flyout
+			// Implementation 2 - bad universality, but behaves correctly
+			// Requires further thought but if all else fails I will implement Imp1
+		}
+	}
+}
+
+void EnablePinning()
+{
+	char* IsTrustedWindowsPinProcess = "48 89 5C 24 18 55 56 57 48 8B EC 48 83 EC 70 48 8B 05 6E 8E";
+
+	HMODULE TPS = LoadLibrary(L"twinui.pcshell.dll");
+	if (TPS)
+	{
+		char* ITWPPPattern = (char*)FindPattern((uintptr_t)TPS, IsTrustedWindowsPinProcess);
+
+		if (ITWPPPattern)
+		{
+			unsigned char bytes[] = { 0xB0, 0x01, 0xC3 };
+			ChangeImportedPattern(ITWPPPattern, bytes, sizeof(bytes));
+		}
+	}
+}
+
 void ChangePatternImports()
 {
 	// 1. Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
@@ -255,4 +320,9 @@ void ChangePatternImports()
 	DisableTaskView(); // Remove Windows 10+ virtual desktops functionality for UWP mode
 	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
 	FixWin11SearchIcon(); // Prevents search icon from being mangled by a buggy tablet mode implementation (cheers Microsoft)
+
+	// For 24H2 onwards so we can pin to taskbar as system shell
+	EnablePinning();
+
+	RevertFlyouts();
 }

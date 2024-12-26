@@ -19,6 +19,10 @@ void DisableImmersiveSearch();
 void DisableTaskView();
 void DisableWin11AltTab();
 void FixWin11SearchIcon();
+void RevertFlyouts();
+
+// Enable taskbar pins on 24H2 and later
+void EnablePinning();
 
 // Main procedure we call from elsewhere
 void ChangePatternImports();

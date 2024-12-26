@@ -15,6 +15,7 @@ extern int s_AcrylicAlt;
 extern int s_ColorizationOptions;
 extern bool s_OverrideAlpha;
 extern DWORD s_AlphaValue;
+extern bool s_UseDCompFlyouts;
 
 // Responsible for settings these values and calling them from registry
 extern void InitializeConfiguration();

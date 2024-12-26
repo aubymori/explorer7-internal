@@ -769,6 +769,64 @@ void ShowWin32Menus()
 	}
 }
 
+void CPniMainDlg_ShowFlyoutNEW() // don't bother with the parameters as we aren't going to use them
+{
+	// Open Network and Sharing Center instead inside the Windows Control Panel, as a non-immersive alternative
+	ShellExecuteW(nullptr, nullptr, L"control.exe", L"/name Microsoft.NetworkAndSharingCenter", nullptr, SW_SHOWNORMAL);
+
+	// End function as we aren't going to do anything else here
+	return;
+}
+
+void HandleNonImmersivePniDui()
+{
+	if (g_osVersion.BuildNumber() >= 10074) // not needed for 8.1
+	{
+		// Unable to do with patterns alone, as Microsoft removed HrOpenControlPanel
+		if (!s_UseDCompFlyouts || !s_EnableImmersiveShellStack)
+		{
+			HMODULE pnidui = LoadLibrary(L"pnidui.dll");
+
+			if (pnidui) // only run if DLL is present - handled like this because GE removes pnidui...
+			{
+				void* _ShowFlyout = (void*)FindPattern((uintptr_t)LoadLibrary(L"pnidui.dll"), "48 89 6C 24 18 56 57 41 57 48 83 EC 60");
+
+				if (_ShowFlyout) // first run, VB to NI
+				{
+					MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+				}
+				else
+				{
+					_ShowFlyout = (void*)FindPattern((uintptr_t)LoadLibrary(L"pnidui.dll"), "48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 20 40 8A");
+
+					if (_ShowFlyout) // second run, RS4 to TI
+					{
+						MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+					}
+					else
+					{
+						_ShowFlyout = (void*)FindPattern((uintptr_t)LoadLibrary(L"pnidui.dll"), "48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20 40 8A FA");
+
+						if (_ShowFlyout) // third run, TH2 to RS3
+						{
+							MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+						}
+						else
+						{
+							_ShowFlyout = (void*)FindPattern((uintptr_t)LoadLibrary(L"pnidui.dll"), "48 8B C4 56 57 41 56 48 81 EC 80 01 00 00");
+
+							if (_ShowFlyout) // fourth run, TH1
+							{
+								MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void HookShell32();
 void HookAPIs()
 {
@@ -821,6 +879,8 @@ void HookAPIs()
 		void* _thumbnailrender = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 8B C4 48 89 58 08 48 89 68 10 48 89 70 20 44 89 40 18 57 41 54 41 55 41 56 41 57 48 81 EC 90 00 00 00 48 8B F9");
 		MH_CreateHook(static_cast<LPVOID>(_thumbnailrender), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
 	}
+
+	HandleNonImmersivePniDui();
 
 	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
