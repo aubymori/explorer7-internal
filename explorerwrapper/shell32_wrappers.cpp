@@ -219,7 +219,7 @@ static HRESULT GetMergedFolders(const MERGEDFOLDERINFO* Folders, int length, ISh
 	*ppsfStartMenu = NULL;
 	hr = CoCreateInstance(CLSID_MergedFolder, 0LL, 1u, IID_IAugmentedFolder, (LPVOID*)&pasf);
 
-	if (s_EnableUWPAppsInStart)
+	if (s_ShowStoreAppsInStart)
 	{
 		IShellItem* shellItem;
 		IShellFolder* AppsFolder;

@@ -139,7 +139,6 @@ BOOL WINAPI IsCompositionActiveNEW()
 // Account for RPEnabled
 HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
 {
-	// hook for enabling w8 theme classes. this is the limit of this feature due to backlash
 	if (s_RPEnabled)
 	{
 		if (lstrcmp(pszSubAppName, L"VerticalShowDesktop") == 0)

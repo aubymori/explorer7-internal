@@ -55,6 +55,13 @@ static  setIconThumb_t SetIconThumb;
 typedef VOID(WINAPI* CPniMainDlg_ShowFlyout_t)(HWND* hwnd, char a2);
 static CPniMainDlg_ShowFlyout_t CPniMainDlg_ShowFlyout;
 
+//typedef VOID(WINAPI* CTaskbandPin_CreateInstance_t)(PVOID);
+//static CTaskbandPin_CreateInstance_t CTaskbandPin_CreateInstance;
+
+class CTaskbandPin_W32PTP;
+typedef HRESULT(*CTaskbandPin_CreateInstance_t)(CTaskbandPin_W32PTP**);
+static CTaskbandPin_CreateInstance_t CTaskbandPin_CreateInstance;
+
 wiktorArray<HTHEME>* themeHandles;
 
 // 7 {4376df10-a662-420b-b30d-958881461ef9}
@@ -134,8 +141,9 @@ typedef enum IMMERSIVE_COLOR_TYPE
 {
 	// Defining only used ones
 	IMCLR_SystemAccentLight2 = 0x2,
-	IMCLR_SystemAccent = 0x4,
-	IMCLR_SystemAccentDark2 = 0x6
+	IMCLR_SystemAccentDark2 = 0x6,
+	IMCLR_HardwareGutterRest = 0x50 // Replaces IMCLR_SystemAccent, as it is more accurate to DWM colorization
+
 } IMMERSIVE_COLOR_TYPE;
 
 typedef struct IMMERSIVE_COLOR_PREFERENCE
@@ -332,3 +340,4 @@ HTHEME(__stdcall* fOpenThemeDataForDpi)(HWND hwnd, LPCWSTR pszClassList, UINT dp
 HTHEME(__stdcall* fOpenThemeDataEx)(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags);
 
 LPTHREAD_START_ROUTINE CTray__SyncThreadProc_orig = nullptr;
+

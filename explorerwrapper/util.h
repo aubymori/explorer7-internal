@@ -94,14 +94,27 @@ DWORD GetColorizationColor()
 
 	// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
 	if (g_osVersion.BuildNumber() >= 10074 && s_ColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
+	{
 		a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
+	}
 
-	if (s_ColorizationOptions == 4) // mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
+	// Approximate default Windows 8.1 translucency if user has regular 10/11 colours used and has not manually set to 0xC4
+	if (s_UseWin8DefaultAlpha && a == 0xC4)
+	{
+		a = 0xAF;
+	}
+
+	// mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
+	if (s_ColorizationOptions == 4) 
+	{
 		a = 0xFF;
+	}
 
 	// Windows 10 and 11 users specifically without glass tools may struggle to adjust color opacity, this optional override fixes this
 	if (s_OverrideAlpha && (s_ColorizationOptions == 1 || s_ColorizationOptions == 2))
+	{
 		a = (s_AlphaValue) & 0xFF;
+	}
 
 	if (s_ColorizationOptions == 3)
 	{
@@ -116,15 +129,15 @@ DWORD GetColorizationColor()
 
 	switch (s_AcrylicAlt)
 	{
-	case 1:
-		imclr = IMCLR_SystemAccentLight2;
-		break;
-	case 2:
-		imclr = IMCLR_SystemAccent;
-		break;
-	default:
-		imclr = IMCLR_SystemAccentDark2;
-		break;
+		case 1:
+			imclr = IMCLR_SystemAccentDark2;
+			break;
+		case 2:
+			imclr = IMCLR_SystemAccentLight2;
+			break;
+		default:
+			imclr = IMCLR_HardwareGutterRest;
+			break;
 	}
 
 	DWORD color = (s_ColorizationOptions != 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : ((s_OverrideAlpha ? ((s_AlphaValue & 0xFF) << 24) : 0xCC000000) | (CImmersiveColor::GetColor(imclr) & 0xFFFFFF));
@@ -339,10 +352,10 @@ void CreateShellFolder()
 	}
 }
 
-// Compatibility warning for Windows 11 (Milestone 2)
+// Compatibility warning for Windows 11 24H2+
 void FirstRunCompatibilityWarning()
 {
-	if (g_osVersion.BuildNumber() >= 21996 || g_osVersion.BuildNumber() == 20348) // temporary one-off M2 warning for win11 users, permanent for iron users
+	if (g_osVersion.BuildNumber() >= 26100 || g_osVersion.BuildNumber() == 20348) // temporary one-off M2 warning for Win11 24H2 users, permanent for iron users
 	{
 		DWORD value = 0;
 		RegGetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunVersionCheck", &value);

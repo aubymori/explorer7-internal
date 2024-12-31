@@ -7,10 +7,12 @@
 bool s_ClassicTheme;
 bool s_DisableComposition;
 bool s_EnableImmersiveShellStack;
-bool s_EnableUWPAppsInStart;
+bool s_ShowStoreAppsInStart;
+bool s_ShowStoreAppsOnTaskbar;
 bool s_RPEnabled;
 int s_AcrylicAlt;
 int s_ColorizationOptions;
+bool s_UseWin8DefaultAlpha;
 bool s_OverrideAlpha;
 DWORD s_AlphaValue;
 bool s_UseDCompFlyouts;
@@ -35,9 +37,16 @@ void InitializeConfiguration()
 	// - Defaults to enabled (1)
 	// - Only applies on RS1 onwards, TH2 and earlier use the native program list
 	// - When disabled, the behaviour is similar to 8.1 and earlier
-	DWORD dwEnableUWPAppsInStart = 1;
-	g_registry.QueryValue(L"EnableUWPAppsInStart", (LPBYTE)&dwEnableUWPAppsInStart, sizeof(DWORD));
-	s_EnableUWPAppsInStart = dwEnableUWPAppsInStart;
+	DWORD dwStoreAppsInStart = 1;
+	g_registry.QueryValue(L"StoreAppsInStart", (LPBYTE)&dwStoreAppsInStart, sizeof(DWORD));
+	s_ShowStoreAppsInStart = dwStoreAppsInStart;
+
+	// Store apps on taskbar
+	// - Defaults to the same value used by immersive stack
+	// - Only has an effect when UWP is enabled, otherwise this is always off
+	DWORD dwStoreAppsOnTaskbar = s_EnableImmersiveShellStack;
+	g_registry.QueryValue(L"StoreAppsOnTaskbar", (LPBYTE)&dwStoreAppsOnTaskbar, sizeof(DWORD));
+	s_ShowStoreAppsOnTaskbar = dwStoreAppsOnTaskbar;
 
 	// Disable composition effects (e.g. Aero glass)
 	// - Defaults to disabled (0)
@@ -92,6 +101,11 @@ void InitializeConfiguration()
 		}
 	}
 
+	// Win8.x default alpha value
+	DWORD dwWin8DefaultAlpha = 1;
+	g_registry.QueryValue(L"Win8DefaultAlpha", (LPBYTE)&dwWin8DefaultAlpha, sizeof(DWORD));
+	s_UseWin8DefaultAlpha = dwWin8DefaultAlpha;
+
 	// Composited colorization alpha override
 	// - Defaults to disabled (0)
 	DWORD dwOverrideAlpha = 0;
@@ -104,7 +118,7 @@ void InitializeConfiguration()
 	DWORD dwAlphaValue = 0x6B;
 	g_registry.QueryValue(L"AlphaValue", (LPBYTE)&dwAlphaValue, sizeof(DWORD));
 	s_AlphaValue = dwAlphaValue;
-
+	
 	// Select appropriate acrylic style to use
 	// - Defaults to regular (0)
 	// - Only used when ColorizationOptions = 3

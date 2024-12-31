@@ -100,21 +100,79 @@ void DisableImmersiveStart()
 	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
 	{
 		char* ShowStartView; // XamlLauncher::ShowStartView
+		char* SSVPattern;
 		unsigned char bytes[] = { 0xC3 }; // retn
 
 		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell
-		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+		//HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
 
-		// so far there's only a few major revisions of this function as of 06-11-24
-		// this may require further testing/advancement on windows 11 in co-ordination with partners
-		if (g_osVersion.BuildNumber() >= 16299) // RS3 onwards
-			ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00 48 33 C4 48 89 84 24 ?? 01 00 00 48 83 B9 ?? ?? 00 00 00";
-		else if (g_osVersion.BuildNumber() >= 15063) // RS2
-			ShowStartView = "48 89 5C 24 20 55 56 57 48 83 EC 30 48 83 B9 F8 00 00 00 00 41 8B E8";
-		else if (g_osVersion.BuildNumber() >= 10074) // TH1 to RS1
-			ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00";
+		//// so far there's only a few major revisions of this function as of 06-11-24
+		//// this may require further testing/advancement on windows 11 in co-ordination with partners
+		//if (g_osVersion.BuildNumber() >= 16299) // RS3 onwards
+		//	ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00 48 33 C4 48 89 84 24 ?? 01 00 00 48 83 B9 ?? ?? 00 00 00";
+		//else if (g_osVersion.BuildNumber() >= 15063) // RS2
+		//	ShowStartView = "48 89 5C 24 20 55 56 57 48 83 EC 30 48 83 B9 F8 00 00 00 00 41 8B E8";
+		//else if (g_osVersion.BuildNumber() >= 10074) // TH1 to RS1
+		//	ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00";
 
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, ShowStartView), bytes, sizeof(bytes)); //byebye
+		//ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, ShowStartView), bytes, sizeof(bytes)); //byebye
+
+		// New rewritten code with better validation although longer length
+
+		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
+
+		if (twinui_pcshell) // only run if DLL is present
+		{
+			ShowStartView = "40 55 53 56 57 41 56 48 8D 6C 24 80 48 81 EC 80 01 00 00 48 8B 05 06 39 8E 00 48 33 C4";
+			SSVPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, ShowStartView);
+
+			if (SSVPattern) // first run, late NI
+			{
+				ChangeImportedPattern(SSVPattern, bytes, sizeof(bytes));
+			}
+			else
+			{
+				ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00 48 33 C4 48 89 84 24 ?? 01 00 00 48 83 B9 ?? ?? 00 00 00";
+				SSVPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, ShowStartView);
+
+				if (SSVPattern) // second run, RS3 to early NI
+				{
+					ChangeImportedPattern(SSVPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					ShowStartView = "48 89 5C 24 20 55 56 57 48 83 EC 30 48 83 B9 F8 00 00 00 00 41 8B E8";
+					SSVPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, ShowStartView);
+
+					if (SSVPattern) // third run, RS2
+					{
+						ChangeImportedPattern(SSVPattern, bytes, sizeof(bytes));
+					}
+					else
+					{
+						// RS1 where twinui.pcshell.dll exists, but isn't used for this so we have to go to twinui version
+						// this is an attempt to avoid additional build checks where they aren't needed
+						goto DisableImmersiveStart_TWINUI;
+					}
+				}
+			}
+		}
+		else // fourth run, TH1 to RS1, before twinui.pcshell was used for this...
+		{
+DisableImmersiveStart_TWINUI:
+			HMODULE twinui = LoadLibrary(L"twinui.dll");
+
+			if (twinui)
+			{
+				ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00";
+				SSVPattern = (char*)FindPattern((uintptr_t)twinui, ShowStartView);
+
+				if (SSVPattern)
+				{
+					ChangeImportedPattern(SSVPattern, bytes, sizeof(bytes));
+				}
+			}
+		}
 	}
 
 }
@@ -304,6 +362,57 @@ void EnablePinning()
 	}
 }
 
+void FixWin11ContextMenu()
+{
+	if (g_osVersion.BuildNumber() >= 21996)
+	{
+		// Version 1 - works but no "Open"
+		/*char* StartPinUnpinContextMenuQueryContextMenuImpl = "40 55 53 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 08 03 00 00";
+
+		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
+		if (appResolver)
+		{
+			char* SPUCMQCMIPattern = (char*)FindPattern((uintptr_t)appResolver, StartPinUnpinContextMenuQueryContextMenuImpl);
+
+			if (SPUCMQCMIPattern)
+			{
+				unsigned char bytes[] = { 0xC3 };
+				ChangeImportedPattern(SPUCMQCMIPattern, bytes, sizeof(bytes));
+			}
+		}*/
+
+		// Version 2 - non-functional
+		/*char* IsShellItemBlockedFromPinning = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 30 4C 8B F2 48 8B F1 33 FF 40 88 3A";
+
+		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
+		if (appResolver)
+		{
+			char* SPUCMISIBFPPattern = (char*)FindPattern((uintptr_t)appResolver, IsShellItemBlockedFromPinning);
+
+			if (SPUCMISIBFPPattern)
+			{
+				unsigned char bytes[] = { 0xB0, 0xFF, 0xC3 };
+				ChangeImportedPattern(SPUCMISIBFPPattern, bytes, sizeof(bytes));
+			}
+		}*/
+
+		// Version 3 - works and stops startmenu.dll being called
+		char* StartDocked_IsPinnedToStart = "48 89 5C 24 18 48 89 54 24 10 48 89 4C 24 08 55 56 57 41 56";
+
+		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
+		if (appResolver)
+		{
+			char* SDIPTSPattern = (char*)FindPattern((uintptr_t)appResolver, StartDocked_IsPinnedToStart);
+
+			if (SDIPTSPattern)
+			{
+				unsigned char bytes[] = { 0xC3 };
+				ChangeImportedPattern(SDIPTSPattern, bytes, sizeof(bytes));
+			}
+		}
+	}
+}
+
 void ChangePatternImports()
 {
 	// 1. Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
@@ -323,6 +432,8 @@ void ChangePatternImports()
 
 	// For 24H2 onwards so we can pin to taskbar as system shell
 	EnablePinning();
+
+	FixWin11ContextMenu();
 
 	RevertFlyouts();
 }

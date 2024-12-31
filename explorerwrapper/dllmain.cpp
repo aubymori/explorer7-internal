@@ -830,6 +830,17 @@ void HandleNonImmersivePniDui()
 void HookShell32();
 void HookAPIs()
 {
+	// 24H2+ - W32PTP
+	if (g_osVersion.BuildNumber() >= 26100)
+	{
+		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
+
+		if (twinui_pcshell)
+		{
+			CTaskbandPin_CreateInstance = (CTaskbandPin_CreateInstance_t)FindPattern((uintptr_t)twinui_pcshell, "40 53 48 83 EC 20 48 8B D9 48 8D 15 ?? ?? ?? ?? B9 80 00 00 00 E8 ?? ?? ?? ?? 48 85 C0");
+		}
+	}
+
 	// Change and fix core desktop components
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
@@ -882,18 +893,23 @@ void HookAPIs()
 
 	HandleNonImmersivePniDui();
 
-	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
-	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
+	if (s_ShowStoreAppsOnTaskbar && g_osVersion.BuildNumber() >= 10074)
 	{
-		// 1. This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
-		// 2. Prepare the taskbar and thumbnails to handle UWP icons. Further work needed for jumplists and to prevent wrongful classification as "Application Frame Host" in the first place.
 		void* _ctaskbandadd = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "FF F3 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F8 06 00 00");
 		void* _cthumbnailUpdate = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 30 48 8B 81 B0 00 00 00");
 		SetIconThumb = (setIconThumb_t)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 63 D8 4C 8B 81 B0 00 00 00");
 
 		MH_CreateHook(static_cast<LPVOID>(_ctaskbandadd), SetWindowIcon, reinterpret_cast<LPVOID*>(&SetIcon));
 		MH_CreateHook(static_cast<LPVOID>(_cthumbnailUpdate), UpdateItemIcon, reinterpret_cast<LPVOID*>(&UpdateItem));
+	}
+
+
+	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
+	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
+	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
+	{
+		// 1. This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
+		// 2. Prepare the taskbar and thumbnails to handle UWP icons. Further work needed for jumplists and to prevent wrongful classification as "Application Frame Host" in the first place.
 
 		// The rest of this code block is dedicated to ensuring UWP actually runs in the first place
 		CreateWindowInBandOrig = decltype(CreateWindowInBandOrig)(GetProcAddress(GetModuleHandle(L"user32.dll"), "CreateWindowInBand"));
@@ -1058,6 +1074,59 @@ void EndThemeHandles()
 	delete themeHandles;
 }
 
+// WINDOWS 11
+void InitPinnedListHack()
+{
+	// == CPINNEDLIST HACK ==
+
+	HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
+
+	// CTaskbandPin_CreateInstance
+	if (twinui_pcshell)
+	{
+		// Method 1: Direct function preamble (dangerous; breaks if they modify the fields of CTaskbandPin or its superclass(es))
+		// 40 53 48 83 EC 20 48 8B D9 48 8D 15 ?? ?? ?? ?? B9 80 00 00 00 E8 ?? ?? ?? ?? 48 85 C0
+		/*matchCTaskbandPinCreateInstance = (PBYTE)FindPattern(
+			pFile,
+			dwSize,
+			"\x40\x53\x48\x83\xEC\x20\x48\x8B\xD9\x48\x8D\x15\x00\x00\x00\x00\xB9\x80\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x85\xC0",
+			"xxxxxxxxxxxx????xxxxxx????xxx",
+			&numMatchesCTaskbandPinCreateInstance
+		);*/
+
+		// Method 2: winrt::Windows::Internal::Shell::implementation::PinManager::IsItemPinned
+		// 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0
+		//                                                                   ^^^^^^^^^^^
+		PBYTE matchCTaskbandPinCreateInstance = (PBYTE)FindPattern((uintptr_t)twinui_pcshell, "48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0");
+
+		if (matchCTaskbandPinCreateInstance)
+		{
+			matchCTaskbandPinCreateInstance += 21;
+			matchCTaskbandPinCreateInstance += 5 + *(int*)(matchCTaskbandPinCreateInstance + 1);
+
+		}
+
+		if (!matchCTaskbandPinCreateInstance)
+		{
+			// wil::out_param() destructor inlined
+			// 0F 1F 44 00 00 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0
+			//                                                    ^^^^^^^^^^^
+			matchCTaskbandPinCreateInstance = (PBYTE)FindPattern((uintptr_t)twinui_pcshell, "0F 1F 44 00 00 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0");
+
+			if (matchCTaskbandPinCreateInstance)
+			{
+				matchCTaskbandPinCreateInstance += 16;
+				matchCTaskbandPinCreateInstance += 5 + *(int*)(matchCTaskbandPinCreateInstance + 1);
+			}
+		}
+
+		if (matchCTaskbandPinCreateInstance)
+		{
+			CTaskbandPin_CreateInstance = (CTaskbandPin_CreateInstance_t)matchCTaskbandPinCreateInstance;
+		}
+	}
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
@@ -1077,9 +1146,14 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		if (GetFileAttributesW((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
 			CrashError(); // The user-facing crash message - we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
 
+		if (g_osVersion.BuildNumber() >= 26100)
+		{
+			InitPinnedListHack();
+		}
+
 		CreateShellFolder(); // Fix shell folder for 1607+...
 		EnsureWindowColorization(); // Correct colorization enablement setting for Win10/11
-		FirstRunCompatibilityWarning(); // Warn users on Windows 11 (for milestone 2) and Server 2022 of potential problems
+		FirstRunCompatibilityWarning(); // Warn users on Windows 11 24H2+ and Server 2022 of potential problems
 		FirstRunPrereleaseWarning(); // Warn users if this is a pre-release build that this is the case on first run ONLY
 		ThemeHandlesInit(); // Basically start the inactive theme management process
 
@@ -1222,12 +1296,36 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		IID id = IID_IPinnedList25;
 
 		if (build >= 14393 && build < 17763)
+		{
 			id = IID_IFlexibleTaskbarPinnedList;
+		}
 		else if (build >= 17763)
+		{
 			id = IID_IPinnedList3;
+		}
 
-		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-		*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+		if (rclsid == CLSID_TaskbarPin && CTaskbandPin_CreateInstance && build >= 26100) // Windows 11...
+		{
+			CTaskbandPin_W32PTP* pTaskbandPin;
+			result = CTaskbandPin_CreateInstance(&pTaskbandPin);
+			dbgprintf(L"CTaskbandPin_CreateInstance result: %p", result);
+			if (SUCCEEDED(result))
+			{
+				result = ((IUnknown*)pTaskbandPin)->QueryInterface(id, ppv);
+				dbgprintf(L"CTaskbandPin_CreateInstance result 2: %p", result);
+				((IUnknown*)pTaskbandPin)->Release();
+			}
+		}
+		else
+		{
+			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
+		}
+
+		if (SUCCEEDED(result))
+		{
+			*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
+		}
+
 	}
 
 	if (riid == IID_AutoDestList && result != S_OK)

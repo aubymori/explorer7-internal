@@ -9,10 +9,12 @@
 extern bool s_ClassicTheme;
 extern bool s_DisableComposition;
 extern bool s_EnableImmersiveShellStack;
-extern bool s_EnableUWPAppsInStart;
+extern bool s_ShowStoreAppsInStart;
+extern bool s_ShowStoreAppsOnTaskbar;
 extern bool s_RPEnabled;
 extern int s_AcrylicAlt;
 extern int s_ColorizationOptions;
+extern bool s_UseWin8DefaultAlpha;
 extern bool s_OverrideAlpha;
 extern DWORD s_AlphaValue;
 extern bool s_UseDCompFlyouts;

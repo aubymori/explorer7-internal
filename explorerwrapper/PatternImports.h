@@ -24,5 +24,7 @@ void RevertFlyouts();
 // Enable taskbar pins on 24H2 and later
 void EnablePinning();
 
+void FixWin11ContextMenu();
+
 // Main procedure we call from elsewhere
 void ChangePatternImports();
