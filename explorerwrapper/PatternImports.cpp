@@ -164,7 +164,7 @@ DisableImmersiveStart_TWINUI:
 
 			if (twinui)
 			{
-				ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00";
+				ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00 41 8B E8";
 				SSVPattern = (char*)FindPattern((uintptr_t)twinui, ShowStartView);
 
 				if (SSVPattern)
