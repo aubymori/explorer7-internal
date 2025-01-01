@@ -730,7 +730,7 @@ BOOL SystemParametersInfoWNEW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT f
 	return SystemParametersInfoW(uiAction, uiParam, pvParam, fWinIni);
 }
 
-//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. In future consider build check to limit to 10240+. 
+//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. 
 //Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
 void ShowWin32Menus()
 {
@@ -751,7 +751,7 @@ void ShowWin32Menus()
 			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
 			CAODTM_EF = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
 		}
-		else if (g_osVersion.BuildNumber() >= 10074) // TH1 to VB
+		else // TH1 to VB
 		{
 			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
 			CAODTM_EF = CAODTM_SH32;
@@ -761,11 +761,8 @@ void ShowWin32Menus()
 		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), CAODTM_EF), bytes, sizeof(bytes)); // ExplorerFrame.dll
 
 		// Ensure as much as we can that it's gone, if the above isn't enough (Win11 Cobalt, I'm looking at you...)
-		if (g_osVersion.BuildNumber() >= 10074)
-		{
-			// Only applied to shell32, as application to ExplorerFrame breaks the program list hover behaviour.
-			ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
-		}
+		// Only applied to shell32, as application to ExplorerFrame breaks the program list hover behaviour.
+		ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
 	}
 }
 
