@@ -17,6 +17,7 @@ void FixAuthUI();
 void DisableImmersiveStart();
 void DisableImmersiveSearch();
 void DisableTaskView();
+void RestoreWin32Menus();
 void DisableWin11AltTab();
 void FixWin11SearchIcon();
 void RevertFlyouts();

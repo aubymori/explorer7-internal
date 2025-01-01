@@ -718,54 +718,6 @@ HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be
 	return OnShellHookMessage(a1);
 }
 
-// Ittr: New method for removing immersive menus. Better inter-operability between Windows versions. Used alongside existing method.
-BOOL SystemParametersInfoWNEW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT fWinIni)
-{
-	if (uiAction == SPI_GETSCREENREADER)
-	{
-		*(BOOL*)pvParam = TRUE;
-		return TRUE;
-	}
-
-	return SystemParametersInfoW(uiAction, uiParam, pvParam, fWinIni);
-}
-
-//Ittr: Goodbye immersive context menus and good riddance. For Win10 TH1+. 
-//Also to be noted that Windows 11 makes further changes here that we'll need to account for in future if we do officially support it.
-void ShowWin32Menus()
-{
-	if (g_osVersion.BuildNumber() >= 10074) // if user is using TH1 or later
-	{
-		char* CAODTM_SH32; // ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu
-		char* CAODTM_EF; // same function, in ExplorerFrame.dll
-		char unsigned bytes[] = { 0xC3 }; // retn
-
-		if (g_osVersion.BuildNumber() >= 26100) // W11 Germanium onwards
-		{
-			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 33 DB 48 8B F2 33 FF 48 8B E9";
-			CAODTM_EF = CAODTM_SH32;
-		}
-		else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt to W11 Nickel
-		{
-			// This is somewhat flawed on Cobalt, but it will have to do
-			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
-			CAODTM_EF = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
-		}
-		else // TH1 to VB
-		{
-			CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
-			CAODTM_EF = CAODTM_SH32;
-		}
-
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), CAODTM_SH32), bytes, sizeof(bytes)); // shell32.dll
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), CAODTM_EF), bytes, sizeof(bytes)); // ExplorerFrame.dll
-
-		// Ensure as much as we can that it's gone, if the above isn't enough (Win11 Cobalt, I'm looking at you...)
-		// Only applied to shell32, as application to ExplorerFrame breaks the program list hover behaviour.
-		ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
-	}
-}
-
 void CPniMainDlg_ShowFlyoutNEW() // don't bother with the parameters as we aren't going to use them
 {
 	// Open Network and Sharing Center instead inside the Windows Control Panel, as a non-immersive alternative
@@ -950,13 +902,10 @@ void HookAPIs()
 	// Prevent theme overrides applying to file explorer *VERY IMPORTANT*
 	HookTrayThread();
 
-	
 	// 1. shell32.dll - hack created startmenupin instance
 	// 2. shell32.dll - patch delayload stuff
 	StartMenuPin_PatchShell32();
 	HookShell32();
-
-	ShowWin32Menus(); // Remove immersive menus so taskbar behaves properly
 
 	//fix classic start menu icon (pls fix)
 	/*HMODULE winbrand = LoadLibrary(L"winbrand.dll");

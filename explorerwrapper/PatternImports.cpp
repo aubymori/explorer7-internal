@@ -118,7 +118,6 @@ void DisableImmersiveStart()
 		//ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, ShowStartView), bytes, sizeof(bytes)); //byebye
 
 		// New rewritten code with better validation although longer length
-
 		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
 
 		if (twinui_pcshell) // only run if DLL is present
@@ -177,9 +176,9 @@ DisableImmersiveStart_TWINUI:
 
 }
 
-// Ittr: Get rid of the immersive search interface and prevent it appearing on TH1+ with ImmersiveShell enabled
-// Otherwise, when invoked, takes up half the screen.
-// Just use the Windows 7 start menu search - the functionality is much superior to this
+// Ittr: Remove the immersive search interface and prevent it appearing on TH1+ with ImmersiveShell enabled
+// Otherwise, when invoked, it can take up half of the screen
+// The Windows 7 start menu search functionality is much superior to this in any case
 void DisableImmersiveSearch()
 {
 	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
@@ -207,7 +206,7 @@ void DisableImmersiveSearch()
 		else if (g_osVersion.BuildNumber() >= 10240) // TH1 to TH2
 			CDEVSI = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 48 8D 68 A1 48 81 EC 90 00 00 00";
 
-		// if user is using 19H1 or higher, search was reimplemented, which means we kill it twice
+		// if the user is using 19H1 or higher, search was reimplemented, which means we kill it twice
 		if (g_osVersion.BuildNumber() >= 18362)
 		{
 			// because once wasn't enough.
@@ -236,67 +235,283 @@ void DisableImmersiveSearch()
 // For some reason, Germanium and later already disable this. We're not complaining.
 void DisableTaskView()
 {
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
+	if (s_EnableImmersiveShellStack) // this on its own should be enough as we enforce this value to 0 prior to TH1
 	{
-		char* TaskViewHostShow; // XamlAllUpViewHost::Show 
-		// (preceded by CAllUpViewHost::Show in TH1-RS1, replaced by TaskViewHost::Show in W11 Nickel)
-		unsigned char bytes[] = { 0xC3 }; // retn
+		// For historical context, the relevant function has changed name a few times...
+		// We opt to use the latest name throughout however the others are listed below:
+		// 22H2 and later: TaskViewHost::Show
+		// RS2 to 21H2: XamlAllUpViewHost::Show
+		// TH1 to RS1: CAllUpViewHost::Show
+		char* TaskViewHostShow;
+		char* TVHSPattern;
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 }; // mov al 0, retn - running retn on its own here has inconsistent results
 
-		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
-		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
 
-		// this function is particularly annoying - the signature is different in some way for many versions of Windows 10/11
-		// in some cases, it changes and reverts again in later versions
-		// :/
-		if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
+		if (twinui_pcshell)
+		{
 			TaskViewHostShow = "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00";
-		else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt
-			TaskViewHostShow = "48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00";
-		else if (g_osVersion.BuildNumber() >= 19041) // VB
-			TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC";
-		else if (g_osVersion.BuildNumber() >= 17763) // RS5 to 19H2
-			TaskViewHostShow = "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00";
-		else if (g_osVersion.BuildNumber() >= 15063) // RS2 to RS4
-			TaskViewHostShow = "4C 8B DC ?? 41 54 41 55 41 56 41 57 48 83 EC";
-		else if (g_osVersion.BuildNumber() >= 10586) // TH2 to RS1
-			TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00";
-		else if (g_osVersion.BuildNumber() >= 10074) // TH1
-			TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00";
+			TVHSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, TaskViewHostShow);
 
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, TaskViewHostShow), bytes, sizeof(bytes)); //byebye
+			if (TVHSPattern) // 22H2 and later
+			{
+				ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+			}
+			else
+			{
+				TaskViewHostShow = "48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20"; // not working in this run, needs further work
+				TVHSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, TaskViewHostShow);
+
+				if (TVHSPattern) // 21H2 (Windows 11)
+				{
+					ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC";
+					TVHSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, TaskViewHostShow);
+
+					if (TVHSPattern) // 2004
+					{
+						ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+					}
+					else
+					{
+						TaskViewHostShow = "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00";
+						TVHSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, TaskViewHostShow);
+
+						if (TVHSPattern) // RS5 to 19H2
+						{
+							ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+						}
+						else
+						{
+							TaskViewHostShow = "4C 8B DC ?? 41 54 41 55 41 56 41 57 48 83 EC";
+							TVHSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, TaskViewHostShow);
+
+							if (TVHSPattern) // RS2 to RS4
+							{
+								ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+							}
+							else
+							{
+								// RS1 where twinui.pcshell.dll exists, but isn't used for this so we have to go to twinui version
+								// this is an attempt to avoid additional build checks where they aren't needed
+								goto DisableTaskView_TWINUI;
+							}
+						}
+					}
+				}
+			}
+		}
+		else // TH1 to RS1, where twinui is used instead
+		{
+DisableTaskView_TWINUI:
+			HMODULE twinui = LoadLibrary(L"twinui.dll");
+
+			if (twinui)
+			{
+				TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00";
+				TVHSPattern = (char*)FindPattern((uintptr_t)twinui, TaskViewHostShow);
+
+				if (TVHSPattern) // TH2 to RS1
+				{
+					ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00";
+					TVHSPattern = (char*)FindPattern((uintptr_t)twinui, TaskViewHostShow);
+
+					if (TVHSPattern) // TH2 to RS1
+					{
+						ChangeImportedPattern(TVHSPattern, bytes, sizeof(bytes));
+					}
+				}
+			}
+		}
 	}
+
+	//if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
+		//{
+		//	char* TaskViewHostShow; // XamlAllUpViewHost::Show 
+		//	// (preceded by CAllUpViewHost::Show in TH1-RS1, replaced by TaskViewHost::Show in W11 Nickel)
+		//	unsigned char bytes[] = { 0xC3 }; // retn
+
+		//	// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
+		//	HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+
+		//	// this function is particularly annoying - the signature is different in some way for many versions of Windows 10/11
+		//	// in some cases, it changes and reverts again in later versions
+		//	// :/
+		//	if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
+		//		TaskViewHostShow = "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00";
+		//	else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt
+		//		TaskViewHostShow = "48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00";
+		//	else if (g_osVersion.BuildNumber() >= 19041) // VB
+		//		TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC";
+		//	else if (g_osVersion.BuildNumber() >= 17763) // RS5 to 19H2
+		//		TaskViewHostShow = "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00";
+		//	else if (g_osVersion.BuildNumber() >= 15063) // RS2 to RS4
+		//		TaskViewHostShow = "4C 8B DC ?? 41 54 41 55 41 56 41 57 48 83 EC";
+		//	else if (g_osVersion.BuildNumber() >= 10586) // TH2 to RS1
+		//		TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00";
+		//	else if (g_osVersion.BuildNumber() >= 10074) // TH1
+		//		TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00";
+
+		//	ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, TaskViewHostShow), bytes, sizeof(bytes)); //byebye
+		//}
 }
 
+// Ittr: Remove broken leftovers of immersive context menus, starting in Windows 10.
+// Also to be noted that Windows 11 makes further changes here that we have to account for.
+void RestoreWin32Menus()
+{
+	// Refactor: Do this in two separate parts - more readable but more lines of code (compiler should optimise...)
+	// Pattern variables initialised locally in both to prevent race-conditions
+	char unsigned bytes[] = { 0xB0, 0x00, 0xC3 }; // mov al 0, retn - running retn on its own here has inconsistent results
+	
+	// SHELL32
+	HMODULE shell32 = GetModuleHandle(L"shell32.dll");
+
+	if (shell32)
+	{
+		char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 33 DB 48 8B F2 33 FF 48 8B E9";
+		char* CAODTMPattern = (char*)FindPattern((uintptr_t)shell32, CanApplyOwnerDrawToMenu);
+
+		if (CAODTMPattern) // 24H2 and later
+		{
+			ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
+		}
+		else
+		{
+			char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
+			char* CAODTMPattern = (char*)FindPattern((uintptr_t)shell32, CanApplyOwnerDrawToMenu);
+
+			if (CAODTMPattern) // TH1 to 23H2
+			{
+				ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
+			}
+		}
+	}
+
+	// EXPLORERFRAME
+	HMODULE explorerFrame = LoadLibrary(L"ExplorerFrame.dll");
+
+	if (explorerFrame)
+	{
+		char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 33 DB 48 8B F2 33 FF 48 8B E9";
+		char* CAODTMPattern = (char*)FindPattern((uintptr_t)explorerFrame, CanApplyOwnerDrawToMenu);
+
+		if (CAODTMPattern) // 24H2 and later
+		{
+			ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
+		}
+		else
+		{
+			char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
+			char* CAODTMPattern = (char*)FindPattern((uintptr_t)explorerFrame, CanApplyOwnerDrawToMenu);
+
+			if (CAODTMPattern) // 24H2 and later
+			{
+				ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
+			}
+			else
+			{
+				char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
+				char* CAODTMPattern = (char*)FindPattern((uintptr_t)explorerFrame, CanApplyOwnerDrawToMenu);
+
+				if (CAODTMPattern) // 24H2 and later
+				{
+					ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
+				}
+			}
+		}
+	}
+
+	//if (g_osVersion.BuildNumber() >= 10074) // if user is using TH1 or later
+	//{
+	//	char* CAODTM_SH32; // ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu
+	//	char* CAODTM_EF; // same function, in ExplorerFrame.dll
+	//	char unsigned bytes[] = { 0xC3 }; // retn
+
+	//	if (g_osVersion.BuildNumber() >= 26100) // W11 Germanium onwards
+	//	{
+	//		CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 33 DB 48 8B F2 33 FF 48 8B E9";
+	//		CAODTM_EF = CAODTM_SH32;
+	//	}
+	//	else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt to W11 Nickel
+	//	{
+	//		// This is somewhat flawed on Cobalt, but it will have to do
+	//		CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
+	//		CAODTM_EF = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
+	//	}
+	//	else // TH1 to VB
+	//	{
+	//		CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
+	//		CAODTM_EF = CAODTM_SH32;
+	//	}
+
+	//	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), CAODTM_SH32), bytes, sizeof(bytes)); // shell32.dll
+	//	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), CAODTM_EF), bytes, sizeof(bytes)); // ExplorerFrame.dll
+	//}
+}
+
+// Disabled to prevent the shell from crashing due to incompatibilities with the XAML interface
 void DisableWin11AltTab()
 {
-	if (g_osVersion.BuildNumber() >= 21996) // build check because this is unnecessary for windows 10
+	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 21996) // only run if we are using Windows 11
 	{
-		//Ittr: Why? Because it causes it to crash and its stupid
-		char* immersiveBytes = "40 53 48 83 EC 20 83 79 ?? 02 74 17";
-
-		//Load and patch DLL
+		char* ShouldShowMTVAltTab = "40 53 48 83 EC 20 83 79 ?? 02 74 17";
+		char* SSMATPattern;
 		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"twinui.pcshell.dll"), immersiveBytes), bytes, sizeof(bytes)); //byebye
+
+		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
+
+		if (twinui_pcshell)
+		{
+			SSMATPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, ShouldShowMTVAltTab);
+			
+			if (SSMATPattern)
+			{
+				ChangeImportedPattern(SSMATPattern, bytes, sizeof(bytes)); //byebye
+			}
+		}
 	}
 }
 
 void FixWin11SearchIcon()
 {
 	// Ittr: An accidental change that actually works. Not complaining at all
-	// Tested on 22000 and 26100
-	// Not yet tested on Nickel (226xx)
+	// Tested on 22000, 22631 and 26100
 	if (g_osVersion.BuildNumber() >= 21996) // build check because this is unnecessary for windows 10
 	{
-		char* searchBytes;
-
-		if (g_osVersion.BuildNumber() >= 26100)
-			searchBytes = "40 55 48 8B EC 48 83 EC 40"; // SHIsFileExplorerInTabletMode()
-		else
-			searchBytes = "48 89 5C 24 20 55 48 8B EC"; // SHIsFileExplorerInTabletMode()
-
-
+		char* SHIsFileExplorerInTabletMode;
+		char* SIFEITMPattern;
 		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), searchBytes), bytes, sizeof(bytes));
+
+		HMODULE explorerFrame = LoadLibrary(L"ExplorerFrame.dll");
+
+		if (explorerFrame)
+		{
+			SHIsFileExplorerInTabletMode = "40 55 48 8B EC 48 83 EC 40";
+			SIFEITMPattern = (char*)FindPattern((uintptr_t)explorerFrame, SHIsFileExplorerInTabletMode);
+			
+			if (SIFEITMPattern) // 24H2 and later
+			{
+				ChangeImportedPattern(SIFEITMPattern, bytes, sizeof(bytes));
+			}
+			else
+			{
+				SHIsFileExplorerInTabletMode = "48 89 5C 24 20 55 48 8B EC";
+				SIFEITMPattern = (char*)FindPattern((uintptr_t)explorerFrame, SHIsFileExplorerInTabletMode);
+
+				if (SIFEITMPattern) // 21H2 to 23H2
+				{
+					ChangeImportedPattern(SIFEITMPattern, bytes, sizeof(bytes));
+				}
+			}
+		}
 	}
 }
 
@@ -427,13 +642,16 @@ void ChangePatternImports()
 	DisableImmersiveStart(); // Remove Windows 10+ immersive start menu for UWP mode (doesn't fix hotkeys yet)
 	DisableImmersiveSearch(); // Remove Windows 10+ immersive search menu for UWP mode
 	DisableTaskView(); // Remove Windows 10+ virtual desktops functionality for UWP mode
+	RestoreWin32Menus(); // Remove the immersive menu leftovers so that the taskbar behaves properly in accordance with Windows 7
 	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
 	FixWin11SearchIcon(); // Prevents search icon from being mangled by a buggy tablet mode implementation (cheers Microsoft)
 
 	// For 24H2 onwards so we can pin to taskbar as system shell
 	EnablePinning();
 
+	// Fix context menus for executable files starting in Windows 11 to prevent explorer from freezing
 	FixWin11ContextMenu();
 
+	// Revert flyouts to non-DComp versions on non-UWP or when the user has selected to do this
 	RevertFlyouts();
 }

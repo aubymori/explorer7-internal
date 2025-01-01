@@ -77,6 +77,18 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 	return res;
 }
 
+// Additional helper for removing immersive menus. Better inter-operability between Windows versions. Used alongside the pattern method.
+BOOL SystemParametersInfoWNEW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT fWinIni)
+{
+	if (uiAction == SPI_GETSCREENREADER)
+	{
+		*(BOOL*)pvParam = TRUE;
+		return TRUE;
+	}
+
+	return SystemParametersInfoW(uiAction, uiParam, pvParam, fWinIni);
+}
+
 // For SWCA, so we can import our colorization configuration
 BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised again 25/10/24
 {
@@ -227,10 +239,18 @@ void PatchShell32()
 // Import address changes for user32.dll modulename
 void PatchUser32()
 {
-	// Update overflow positioning to account for OS changes if the user is using TH1 or higher
 	if (g_osVersion.BuildNumber() >= 10074)
 	{
+		// Update overflow positioning to account for OS changes if the user is using TH1 or higher
 		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
+
+		// Ensure as much as we can that immersive menus are gone, if the pattern code isn't enough, e.g. Win11 Cobalt.
+		// Only applied to shell32, as application to ExplorerFrame breaks the program list hover behaviour.
+		HMODULE shell32 = GetModuleHandle(L"shell32.dll");
+		if (shell32)
+		{
+			ChangeImportedAddress(shell32, "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
+		}
 	}
 
 	// Load functions needed for task enumeration hook
