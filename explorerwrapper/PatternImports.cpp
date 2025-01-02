@@ -73,7 +73,7 @@ void FixAuthUI()
 		ChangeImportedPattern(inst3, patch1, size);
 	}
 
-	if (pattern1 && !pattern) //Ittr: Only apply to CLogoffPane::_OnCreate if we need to, otherwise this causes crashing on later 7 explorer.
+	if (pattern1 && !pattern) // Ittr: Only apply to CLogoffPane::_OnCreate if we need to, otherwise this causes crashing on later 7 explorer.
 	{
 		// mov rax, [rcx]
 		// call qword ptr [rax+18h]
@@ -92,12 +92,12 @@ void FixAuthUI()
 	}
 }
 
-// Ittr: Get rid of the immersive start menu and stop it appearing on TH1+ when UWP is on.
-// This is very important and also extremely fragile.
+// Ittr: Get rid of the immersive start menu and stop it appearing on TH1+ when immersive shell is on.
+// This is very important for good user experience.
 // I'll also be honest - I haven't tested 1703 because who actually uses 1703
 void DisableImmersiveStart()
 {
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
+	if (s_EnableImmersiveShellStack) // don't run this if the user isn't using immersive shell
 	{
 		char* ShowStartView; // XamlLauncher::ShowStartView
 		char* SSVPattern;
@@ -181,52 +181,178 @@ DisableImmersiveStart_TWINUI:
 // The Windows 7 start menu search functionality is much superior to this in any case
 void DisableImmersiveSearch()
 {
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
+	if (s_EnableImmersiveShellStack)
 	{
-		char* CDEVSI; // CortanaDesktopExperienceView::ShowInternal
-		// (preceded by CCortanaExperienceManager::ShowInternal in TH1-RS1)
-		unsigned char bytes[] = { 0xC3 }; // retn
+		char* CortanaDesktopExperienceView_ShowInternal;
+		char* CDEVSIPattern;
+		char* XamlLauncherState_ShowSearchFromOpenStart;
+		char* XLSSSFOSPattern;
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
 
-		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
-		HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
 
-		// seven different variants to account for as of 06-11-24
-		if (g_osVersion.BuildNumber() >= 19041) // VB onwards
-			CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
-		else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
-			CDEVSI = "40 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 81 EC 80 00 00 00";
-		else if (g_osVersion.BuildNumber() >= 17134) // RS4 to RS5
-			CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
-		else if (g_osVersion.BuildNumber() >= 16299) // RS3
-			CDEVSI = "40 55 53 56 57 41 56 48 8D 6C 24 C9 48 81 EC 90 00 00 00";
-		else if (g_osVersion.BuildNumber() >= 15063) // RS2
-			CDEVSI = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20 41 8B D9 41 8B E8 48 8B F2";
-		else if (g_osVersion.BuildNumber() >= 14393) // RS1
-			CDEVSI = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 70";
-		else if (g_osVersion.BuildNumber() >= 10240) // TH1 to TH2
-			CDEVSI = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 48 8D 68 A1 48 81 EC 90 00 00 00";
-
-		// if the user is using 19H1 or higher, search was reimplemented, which means we kill it twice
-		if (g_osVersion.BuildNumber() >= 18362)
+		// Disable CortanaDesktopExperienceView and ShowSearchFromOpenStart
+		if (twinui_pcshell)
 		{
-			// because once wasn't enough.
+			// Disable ShowCortanaFromOpenStart from 19H1 onwards (later renamed ShowSearchFromOpenStart)
+			XamlLauncherState_ShowSearchFromOpenStart = "48 89 54 24 10 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 83 EC";
+			XLSSSFOSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, XamlLauncherState_ShowSearchFromOpenStart);
 
-			char* SCFOS; // XamlLauncherState::ShowCortanaFromOpenStart
-			// exists in RS5, but not used until 19H1
-			// replaced by XamlLauncherState::ShowSearchFromOpenStart in W11 Nickel
+			if (XLSSSFOSPattern) // 22H2 and later
+			{
+				ChangeImportedPattern(XLSSSFOSPattern, bytes, sizeof(bytes));
+			}
+			else
+			{
+				XamlLauncherState_ShowSearchFromOpenStart = "48 89 54 24 10 55 53 56 57 41 56 41 57 48 8B EC 48 83 EC";
+				XLSSSFOSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, XamlLauncherState_ShowSearchFromOpenStart);
 
-			if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
-				SCFOS = "48 89 54 24 10 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 83 EC";
-			else if (g_osVersion.BuildNumber() >= 19041) // VB onwards
-				SCFOS = "48 89 54 24 10 55 53 56 57 41 56 41 57 48 8B EC 48 83 EC";
-			else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
-				SCFOS = "48 89 54 24 10 55 53 56 57 41 56 48 8B EC 48 83 EC 40 48 C7 45 E0 FE FF FF FF";
+				if (XLSSSFOSPattern) // VB to 21H2
+				{
+					ChangeImportedPattern(XLSSSFOSPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					XamlLauncherState_ShowSearchFromOpenStart = "48 89 54 24 10 55 53 56 57 41 56 48 8B EC 48 83 EC 40 48 C7 45 E0 FE FF FF FF";
+					XLSSSFOSPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, XamlLauncherState_ShowSearchFromOpenStart);
 
-			ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, SCFOS), bytes, sizeof(bytes)); //byebye again
+					if (XLSSSFOSPattern) // 19H1 to 19H2
+					{
+						ChangeImportedPattern(XLSSSFOSPattern, bytes, sizeof(bytes));
+					}
+				}
+			}
+
+			// Now proceed to disabling CortanaDesktopExperienceView (used in TH1 to RS5, still present but unused)
+			CortanaDesktopExperienceView_ShowInternal = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
+			CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, CortanaDesktopExperienceView_ShowInternal);
+
+			if (CDEVSIPattern) // VB and later
+			{
+				ChangeImportedPattern(CDEVSIPattern, bytes, sizeof(bytes));
+			}
+			else
+			{
+				CortanaDesktopExperienceView_ShowInternal = "40 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 81 EC 80 00 00 00";
+				CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, CortanaDesktopExperienceView_ShowInternal);
+
+				if (CDEVSIPattern) // 19H1 to 19H2
+				{
+					ChangeImportedPattern(CDEVSIPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					CortanaDesktopExperienceView_ShowInternal = "40 55 53 56 57 41 56 48 8D 6C 24 C9 48 81 EC 90 00 00 00";
+					CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, CortanaDesktopExperienceView_ShowInternal);
+
+					if (CDEVSIPattern) // RS4 to RS5
+					{
+						ChangeImportedPattern(CDEVSIPattern, bytes, sizeof(bytes));
+					}
+					else
+					{
+						CortanaDesktopExperienceView_ShowInternal = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20 41 8B D9 41 8B E8 48 8B F2";
+						CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, CortanaDesktopExperienceView_ShowInternal);
+
+						if (CDEVSIPattern) // RS3
+						{
+							ChangeImportedPattern(CDEVSIPattern, bytes, sizeof(bytes));
+						}
+						else
+						{
+							// RS1 where twinui.pcshell.dll exists, but isn't used for this so we have to go to twinui version
+							// this is an attempt to avoid additional build checks where they aren't needed
+							goto DisableImmersiveSearch_TWINUI;
+						}
+					}
+				}
+			}
 		}
+		else // TH1 to RS1
+		{
+DisableImmersiveSearch_TWINUI:
+			HMODULE twinui = LoadLibrary(L"twinui.dll");
 
-		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, CDEVSI), bytes, sizeof(bytes)); //byebye
+			if (twinui)
+			{
+				CortanaDesktopExperienceView_ShowInternal = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 70";
+				CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui, CortanaDesktopExperienceView_ShowInternal);
+
+				if (CDEVSIPattern) // RS1
+				{
+					ChangeImportedPattern(CDEVSIPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					CortanaDesktopExperienceView_ShowInternal = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? 48 81 EC 90 00 00 00 48 C7 45 DF FE FF FF FF 48 89 58 20";
+					CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui, CortanaDesktopExperienceView_ShowInternal);
+
+					if (CDEVSIPattern) // TH2
+					{
+						ChangeImportedPattern(CDEVSIPattern, bytes, sizeof(bytes));
+					}
+					else // no way of making a cross-compatible pattern despite a one-byte difference, thanks Microsoft
+					{
+						CortanaDesktopExperienceView_ShowInternal = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? 48 81 EC 90 00 00 00 48 C7 45 E7 FE FF FF FF";
+						CDEVSIPattern = (char*)FindPattern((uintptr_t)twinui, CortanaDesktopExperienceView_ShowInternal);
+
+						if (CDEVSIPattern) // TH1
+						{
+							unsigned char ThresholdBytes[]  = { 0xB0, 0x00, 0xC3, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+							ChangeImportedPattern(CDEVSIPattern, ThresholdBytes, sizeof(ThresholdBytes));
+						}
+					}
+				}
+			}
+		}
 	}
+
+	//if (s_EnableImmersiveShellStack) // because we don't want to run this thing if user isn't using UWP
+	//{
+	//	char* CDEVSI; // CortanaDesktopExperienceView::ShowInternal
+	//	// (preceded by CCortanaExperienceManager::ShowInternal in TH1-RS1)
+	//	unsigned char bytes[] = { 0xC3 }; // retn
+
+	//	// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
+	//	HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
+
+	//	// seven different variants to account for as of 06-11-24
+	//	if (g_osVersion.BuildNumber() >= 19041) // VB onwards
+	//		CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
+	//	else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
+	//		CDEVSI = "40 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 81 EC 80 00 00 00";
+	//	else if (g_osVersion.BuildNumber() >= 17134) // RS4 to RS5
+	//		CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
+	//	else if (g_osVersion.BuildNumber() >= 16299) // RS3
+	//		CDEVSI = "40 55 53 56 57 41 56 48 8D 6C 24 C9 48 81 EC 90 00 00 00";
+	//	else if (g_osVersion.BuildNumber() >= 15063) // RS2
+	//		CDEVSI = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20 41 8B D9 41 8B E8 48 8B F2";
+	//	else if (g_osVersion.BuildNumber() >= 14393) // RS1
+	//		CDEVSI = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 70";
+	//	else if (g_osVersion.BuildNumber() >= 10240) // TH1 to TH2
+	//		CDEVSI = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 48 8D 68 A1 48 81 EC 90 00 00 00";
+
+	//	// if the user is using 19H1 or higher, search was reimplemented, which means we kill it twice
+	//	if (g_osVersion.BuildNumber() >= 18362)
+	//	{
+	//		// because once wasn't enough.
+
+	//		char* SCFOS; // XamlLauncherState::ShowCortanaFromOpenStart
+	//		// exists in RS5, but not used until 19H1
+	//		// replaced by XamlLauncherState::ShowSearchFromOpenStart in W11 Nickel
+
+	//		if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
+	//			SCFOS = "48 89 54 24 10 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 83 EC";
+	//		else if (g_osVersion.BuildNumber() >= 19041) // VB onwards
+	//			SCFOS = "48 89 54 24 10 55 53 56 57 41 56 41 57 48 8B EC 48 83 EC";
+	//		else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
+	//			SCFOS = "48 89 54 24 10 55 53 56 57 41 56 48 8B EC 48 83 EC 40 48 C7 45 E0 FE FF FF FF";
+
+	//		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, SCFOS), bytes, sizeof(bytes)); //byebye again
+	//	}
+
+	//	ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, CDEVSI), bytes, sizeof(bytes)); //byebye
+	//}
 }
 
 // Ittr: Get rid of the half-broken TaskView interface and prevent it appearing on TH1+ when UWP is on.

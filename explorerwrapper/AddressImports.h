@@ -134,7 +134,7 @@ UINT WINAPI SetErrorModeNEW(UINT uMode)
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+	if (s_EnableImmersiveShellStack)
 		CreateTwinUI_UWP();
 
 	return SetErrorMode(uMode);

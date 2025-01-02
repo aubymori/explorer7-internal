@@ -34,7 +34,7 @@
 
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: for TH1+
+	if (s_EnableImmersiveShellStack)
 		SetProgmanAsShell(); // misha: TODO hack
 
 	if (uMsg == 0x56D) return 0;
@@ -461,7 +461,7 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // UWP enabled
+	if (s_EnableImmersiveShellStack) // UWP enabled
 	{
 		DWORD p0 = (DWORD)_ReturnAddress();
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed
@@ -855,7 +855,7 @@ void HookAPIs()
 
 	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
+	if (s_EnableImmersiveShellStack) // Ittr: Run these hooks only if the user A) is on Windows 10 and B) has UWP enabled
 	{
 		// 1. This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
 		// 2. Prepare the taskbar and thumbnails to handle UWP icons. Further work needed for jumplists and to prevent wrongful classification as "Application Frame Host" in the first place.
@@ -949,7 +949,7 @@ void HookImmersive()
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074)
+	if (s_EnableImmersiveShellStack)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
@@ -1172,7 +1172,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 
-		if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+		if (s_EnableImmersiveShellStack) // Ittr: Only create TWinUI UWP mode here if we are going to use it
 			CreateTwinUI_UWP();
 
 	}

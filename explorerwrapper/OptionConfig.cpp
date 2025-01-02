@@ -30,7 +30,13 @@ void InitializeConfiguration()
 	// - Defaults to disabled (0)
 	// - Pending stability improvements before default enablement
 	DWORD dwEnableUWP = 0;
-	g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
+	if (g_osVersion.BuildNumber() >= 10074)
+	{
+		// Immersive shell can only be enabled on TH1 onwards
+		// Consolidate the check to here so we don't have to do double comparisons elsewhere in the software
+		// In other words, this is more efficient
+		g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
+	}
 	s_EnableImmersiveShellStack = dwEnableUWP;
 	
 	// Enable modern apps in start menu programs list
