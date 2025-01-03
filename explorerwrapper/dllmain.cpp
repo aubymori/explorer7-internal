@@ -101,14 +101,14 @@ LRESULT CALLBACK NewThumbnailProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 	return CallWindowProc(g_prevThumbnailProc, hwnd, uMsg, wParam, lParam);
 }
 
-void ShimDesktop8()
+void ShimDesktop()
 {
 	static int InitOnce = FALSE;
 	if (InitOnce) return;
 	hwnd_desktop = FindWindow(L"Progman", L"Program Manager");
 	HWND hwndTray = GetTaskbarWnd();
-	HWND hwndThumbnail = GetThumbnailWnd();
-	if (!hwnd_desktop || !hwndTray || !hwndThumbnail) return;
+	HWND hwndThumbnail = GetThumbnailWnd(); // thumbnail hwnd not being present should not stop the shim
+	if (!hwnd_desktop || !hwndTray) return;
 	InitOnce = TRUE;
 	//hook tray
 	g_prevTrayProc = (WNDPROC)GetWindowLongPtr(hwndTray, GWLP_WNDPROC);
@@ -128,7 +128,7 @@ void ShimDesktop8()
 PVOID WINAPI SHCreateDesktopNEW(PVOID p1)
 {
 	PVOID ret = SHCreateDesktopOrig(p1);
-	ShimDesktop8();
+	ShimDesktop();
 	return ret;
 }
 

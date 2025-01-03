@@ -641,51 +641,6 @@ void FixWin11SearchIcon()
 	}
 }
 
-void RevertFlyouts()
-{
-	if (g_osVersion.BuildNumber() >= 10074) // not needed for 8.1
-	{
-		if (!s_UseDCompFlyouts || !s_EnableImmersiveShellStack)
-		{
-			////// VOLUME FLYOUT
-			char* LaunchSndVol = "0F 1F 44 00 00 83 FB 66 75 11";
-
-			HMODULE SVS = LoadLibrary(L"SndVolSSO.dll");
-			if (SVS) // only run if DLL is present
-			{
-				char* LSVPattern = (char*)FindPattern((uintptr_t)SVS, LaunchSndVol);
-
-				if (LSVPattern) // first run, VB to GE
-				{
-					unsigned char bytes[] = { 0x0F, 0x1F, 0x44, 0x00, 0x00, 0x83, 0xFB, 0x66, 0xEB, 0x11 };
-					ChangeImportedPattern(LSVPattern, bytes, sizeof(bytes));
-				}
-				else
-				{
-					LaunchSndVol = "0F B7 44 24 50 66 83 F8 66 75";
-
-					LSVPattern = (char*)FindPattern((uintptr_t)SVS, LaunchSndVol);
-
-					if (LSVPattern) // second run, TH1 to TI
-					{
-						unsigned char bytes[] = { 0x0F, 0xB7, 0x44, 0x24, 0x50, 0x66, 0x83, 0xF8, 0x66, 0xEB };
-						ChangeImportedPattern(LSVPattern, bytes, sizeof(bytes));
-					}
-				}
-			}
-
-			////// NETWORK FLYOUT - TODO migrate this and part 2 to MinHookCreation.h
-			// Minhook stuff used here, as custom function was needed - see dllmain for now we'll re-consolidate this later
-
-			////// BATTERY FLYOUT
-			// Not done yet - ongoing implementation issues
-			// Implementation 1 - good universality, but misbehaves on trying to hide flyout
-			// Implementation 2 - bad universality, but behaves correctly
-			// Requires further thought but if all else fails I will implement Imp1
-		}
-	}
-}
-
 void EnablePinning()
 {
 	char* IsTrustedWindowsPinProcess = "48 89 5C 24 18 55 56 57 48 8B EC 48 83 EC 70 48 8B 05 6E 8E";
@@ -738,6 +693,7 @@ void FixWin11ContextMenu()
 		}*/
 
 		// Version 3 - works and stops startmenu.dll being called
+		// This restores Windows 10 behaviour
 		char* StartDocked_IsPinnedToStart = "48 89 5C 24 18 48 89 54 24 10 48 89 4C 24 08 55 56 57 41 56";
 
 		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
@@ -750,6 +706,51 @@ void FixWin11ContextMenu()
 				unsigned char bytes[] = { 0xC3 };
 				ChangeImportedPattern(SDIPTSPattern, bytes, sizeof(bytes));
 			}
+		}
+	}
+}
+
+void RevertFlyouts()
+{
+	if (g_osVersion.BuildNumber() >= 10074) // not needed for 8.1
+	{
+		if (!s_UseDCompFlyouts || !s_EnableImmersiveShellStack)
+		{
+			////// VOLUME FLYOUT
+			char* LaunchSndVol = "0F 1F 44 00 00 83 FB 66 75 11";
+
+			HMODULE SVS = LoadLibrary(L"SndVolSSO.dll");
+			if (SVS) // only run if DLL is present
+			{
+				char* LSVPattern = (char*)FindPattern((uintptr_t)SVS, LaunchSndVol);
+
+				if (LSVPattern) // first run, VB to GE
+				{
+					unsigned char bytes[] = { 0x0F, 0x1F, 0x44, 0x00, 0x00, 0x83, 0xFB, 0x66, 0xEB, 0x11 };
+					ChangeImportedPattern(LSVPattern, bytes, sizeof(bytes));
+				}
+				else
+				{
+					LaunchSndVol = "0F B7 44 24 50 66 83 F8 66 75";
+
+					LSVPattern = (char*)FindPattern((uintptr_t)SVS, LaunchSndVol);
+
+					if (LSVPattern) // second run, TH1 to TI
+					{
+						unsigned char bytes[] = { 0x0F, 0xB7, 0x44, 0x24, 0x50, 0x66, 0x83, 0xF8, 0x66, 0xEB };
+						ChangeImportedPattern(LSVPattern, bytes, sizeof(bytes));
+					}
+				}
+			}
+
+			////// NETWORK FLYOUT - TODO migrate this and part 2 to MinHookCreation.h
+			// Minhook stuff used here, as custom function was needed - see dllmain for now we'll re-consolidate this later
+
+			////// BATTERY FLYOUT
+			// Not done yet - ongoing implementation issues
+			// Implementation 1 - good universality, but misbehaves on trying to hide flyout
+			// Implementation 2 - bad universality, but behaves correctly
+			// Requires further thought but if all else fails I will implement Imp1
 		}
 	}
 }

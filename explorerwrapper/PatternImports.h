@@ -20,12 +20,15 @@ void DisableTaskView();
 void RestoreWin32Menus();
 void DisableWin11AltTab();
 void FixWin11SearchIcon();
-void RevertFlyouts();
 
 // Enable taskbar pins on 24H2 and later
 void EnablePinning();
 
+// Fix executable context menus on all Windows 11 versions
 void FixWin11ContextMenu();
+
+// Disable DComp immersive flyouts as applicable
+void RevertFlyouts();
 
 // Main procedure we call from elsewhere
 void ChangePatternImports();
