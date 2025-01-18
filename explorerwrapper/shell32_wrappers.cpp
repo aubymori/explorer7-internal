@@ -113,7 +113,7 @@ void HookShell32()
 	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), "ILIsEqual"), ILIsEqualNEW);
 
 	uintptr_t Win32PinCheck = FindPattern((uintptr_t)LoadLibrary(L"shell32.dll"), "41 8B E9 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
-	if (Win32PinCheck && g_osVersion.BuildNumber() >= 19045)
+	if (Win32PinCheck && g_osVersion.BuildNumber() >= 19045 && g_osVersion.BuildNumber() < 26100)
 	{
 		dbgprintf(L"Win32PinCheck %i", Win32PinCheck);
 		Win32PinCheck += 19;

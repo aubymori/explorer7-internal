@@ -3,20 +3,49 @@
 // Remove AMAP class from loaded msstyle so that Vista and 7 msstyles are compatible
 void RemoveLoadAnimationDataMap()
 {
-	void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
-	if (LoadAnimationDataMap)
-	{
-		LoadAnimationDataMap = (void*)GetFunctionStart((uintptr_t)LoadAnimationDataMap, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
+	// 48 8B 53 20 48 8B ?? E8 ?? ?? ?? ?? 8B ?? 48 8B ?? E8 ?? ?? ?? ?? 8B ?? EB 05 B8 57 00 07 80
+	// thank you amrsatrio for the pattern + offsetting method
+	char* LoadAnimationDataMap = "48 8B 53 20 48 8B ?? E8 ?? ?? ?? ?? 8B ?? 48 8B";
 
-		//byebye
-		DWORD old;
-		VirtualProtect(LoadAnimationDataMap, 1, PAGE_EXECUTE_READWRITE, &old);
-		*reinterpret_cast<char*>(LoadAnimationDataMap) = 0xC3;
-		VirtualProtect(LoadAnimationDataMap, 1, old, 0);
+	HMODULE uxTheme = GetModuleHandle(L"uxtheme.dll");
+	if (uxTheme)
+	{
+		char* LADMPattern = (char*)FindPattern((uintptr_t)uxTheme, LoadAnimationDataMap);
+
+		if (LADMPattern)
+		{
+			LADMPattern += 7;
+			LADMPattern += 5 + *(int*)(LADMPattern + 1);
+
+			unsigned char bytes[] = { 0x31, 0xC0, 0xC3 };
+			ChangeImportedPattern(LADMPattern, bytes, sizeof(bytes));
+
+		/* -- version 1
+			unsigned char bytes[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+			ChangeImportedPattern(LADMPattern, bytes, sizeof(bytes));*/
+		}
+		else // revert to deprecated methodology. preferably avoid this because it causes cpu spiking, however preserved as fallback (for now)
+		{
+			void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
+			if (LoadAnimationDataMap)
+			{
+				LoadAnimationDataMap = (void*)GetFunctionStart((uintptr_t)LoadAnimationDataMap, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
+
+				//byebye
+				DWORD old;
+				VirtualProtect(LoadAnimationDataMap, 1, PAGE_EXECUTE_READWRITE, &old);
+				*reinterpret_cast<char*>(LoadAnimationDataMap) = 0xC3;
+				VirtualProtect(LoadAnimationDataMap, 1, old, 0);
+
+				RemoveGetClassIdForShellTarget(); // call this here as we don't from changepatternimports anymore
+			}
+		}
 	}
+
+	
 }
 
-// Remove Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
+// (DEPRECATED) Remove Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
 void RemoveGetClassIdForShellTarget()
 {
 	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
@@ -538,7 +567,7 @@ void RestoreWin32Menus()
 			char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
 			char* CAODTMPattern = (char*)FindPattern((uintptr_t)explorerFrame, CanApplyOwnerDrawToMenu);
 
-			if (CAODTMPattern) // 24H2 and later
+			if (CAODTMPattern) // 21H2 to 23H2 (i think... i forgot to comment this properly at the time)
 			{
 				ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
 			}
@@ -547,7 +576,7 @@ void RestoreWin32Menus()
 				char* CanApplyOwnerDrawToMenu = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
 				char* CAODTMPattern = (char*)FindPattern((uintptr_t)explorerFrame, CanApplyOwnerDrawToMenu);
 
-				if (CAODTMPattern) // 24H2 and later
+				if (CAODTMPattern) // TH1 to VB
 				{
 					ChangeImportedPattern(CAODTMPattern, bytes, sizeof(bytes));
 				}
@@ -760,7 +789,7 @@ void ChangePatternImports()
 	// 1. Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
 	// 2. Remove Windows 8+ immersive shell msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
 	RemoveLoadAnimationDataMap();
-	RemoveGetClassIdForShellTarget();
+	//RemoveGetClassIdForShellTarget(); ----- DEPRECATED, called if needed from above
 
 	// Responsible for fixing CLogoffOptions
 	FixAuthUI();

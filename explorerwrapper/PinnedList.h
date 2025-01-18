@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "OptionConfig.h"
 
 #pragma region GUID definitions
 DEFINE_GUID(CLSID_TaskbandPin, 0x90AA3A4E, 0x1CBA, 0x4233, 0xB8, 0xBB, 0x53, 0x57, 0x73, 0xD4, 0x84, 0x49);

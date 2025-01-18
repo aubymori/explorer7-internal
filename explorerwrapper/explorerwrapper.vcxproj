@@ -198,6 +198,7 @@
     <ClInclude Include="AugmentedShellFolder.h" />
     <ClInclude Include="AuthUI.h" />
     <ClInclude Include="AutoPlay.h" />
+    <ClInclude Include="MinhookImports.h" />
     <ClInclude Include="PatternImports.h" />
     <ClInclude Include="RegTreeOptions.h" />
     <ClInclude Include="dbgprint.h" />

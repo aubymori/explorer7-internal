@@ -68,6 +68,7 @@ ULONG __stdcall CPinnedListWrapper::Release(void)
 		free((void*)this);
 	return cref;
 }
+
 //.text:00007FF6BEB24439 explorer.exe:$94439 #93A39
 HRESULT __stdcall CPinnedListWrapper::EnumObjects(IEnumFullIDList** p1)
 {
@@ -109,6 +110,27 @@ HRESULT __stdcall CPinnedListWrapper::GetChangeCount(ULONG* p1)
 
 HRESULT __stdcall CPinnedListWrapper::GetPinnableInfo(IDataObject* p1, int p2, IShellItem2** p3, IShellItem** p4, PWSTR* p5, INT* p6)
 {
+	if (!s_UseTaskbarPinning)
+	{
+		// in this situation, we don't take the information
+		// this is to prevent potential issues arising with people trying to pin despite being in this mode
+		return E_NOINTERFACE;
+	}
+
+	//if (s_ShowStoreAppsOnTaskbar) ----- THIS DOES NOT WORK YET
+	//{
+	//	dbgprintf(L"CPinnedListWrapper::GetPinnableInfo: %p %p %p %p %p %p", p1, p2, p3, p4, p5, p6);
+
+	//	//dbgprintf(L"ISHELLITEM p4 DISPLAYNAME: %p", folderpath);
+
+	//	if (lstrcmp((LPCWSTR)p5, L"Application Frame Host") == 0)
+	//	{
+	//		// set p1 to NULL which is a hack but prevents wrongful "Application Frame Host" entries appearing. 8.0 behaviour for now.
+	//		// TODO: rework this in future
+	//		p1 = NULL;
+	//	}
+	//}
+
 	if (m_pinnedList25)
 		return m_pinnedList25->GetPinnableInfo(p1, p2, p3, p4, p5, p6);
 	if (m_flexList)
@@ -164,6 +186,11 @@ HRESULT __stdcall CPinnedListWrapper::GetPinnedItem(PCIDLIST_ABSOLUTE p1, PIDLIS
 
 HRESULT __stdcall CPinnedListWrapper::GetAppIDForPinnedItem(PCIDLIST_ABSOLUTE p1, PWSTR* p2)
 {
+	if (!s_UseTaskbarPinning)
+	{
+		return E_NOINTERFACE;
+	}
+
 	if (m_pinnedList25)
 		return m_pinnedList25->GetAppIDForPinnedItem(p1, p2);
 	if (m_flexList)

@@ -6,9 +6,10 @@
 // - To create a new definition, you must define it here and in OptionConfig.h
 bool s_ClassicTheme;
 bool s_DisableComposition;
-bool s_EnableImmersiveShellStack;
-bool s_ShowStoreAppsInStart;
+int s_EnableImmersiveShellStack;
+bool s_UseTaskbarPinning;
 bool s_ShowStoreAppsOnTaskbar;
+bool s_ShowStoreAppsInStart;
 bool s_RPEnabled;
 int s_AcrylicAlt;
 int s_ColorizationOptions;
@@ -38,6 +39,21 @@ void InitializeConfiguration()
 		g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
 	}
 	s_EnableImmersiveShellStack = dwEnableUWP;
+
+	// Taskbar pinning
+	// - Defaults to enabled (1)
+	// - When disabled, the behaviour is similar to Vista and earlier
+	// - Moreover, when disabled, certain jumplist actions are not shown to prevent other issues
+	DWORD dwTaskbarPinning = 1;
+	g_registry.QueryValue(L"UseTaskbarPinning", (LPBYTE)&dwTaskbarPinning, sizeof(DWORD));
+	s_UseTaskbarPinning = dwTaskbarPinning;
+
+	// Store apps on taskbar
+	// - Defaults to the same value used by immersive stack
+	// - Only has an effect when UWP is enabled, otherwise this is always off
+	DWORD dwStoreAppsOnTaskbar = s_EnableImmersiveShellStack;
+	g_registry.QueryValue(L"StoreAppsOnTaskbar", (LPBYTE)&dwStoreAppsOnTaskbar, sizeof(DWORD));
+	s_ShowStoreAppsOnTaskbar = dwStoreAppsOnTaskbar;
 	
 	// Enable modern apps in start menu programs list
 	// - Defaults to enabled (1)
@@ -46,13 +62,6 @@ void InitializeConfiguration()
 	DWORD dwStoreAppsInStart = 1;
 	g_registry.QueryValue(L"StoreAppsInStart", (LPBYTE)&dwStoreAppsInStart, sizeof(DWORD));
 	s_ShowStoreAppsInStart = dwStoreAppsInStart;
-
-	// Store apps on taskbar
-	// - Defaults to the same value used by immersive stack
-	// - Only has an effect when UWP is enabled, otherwise this is always off
-	DWORD dwStoreAppsOnTaskbar = s_EnableImmersiveShellStack;
-	g_registry.QueryValue(L"StoreAppsOnTaskbar", (LPBYTE)&dwStoreAppsOnTaskbar, sizeof(DWORD));
-	s_ShowStoreAppsOnTaskbar = dwStoreAppsOnTaskbar;
 
 	// Disable composition effects (e.g. Aero glass)
 	// - Defaults to disabled (0)

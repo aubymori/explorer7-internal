@@ -339,5 +339,7 @@ HTHEME(__stdcall* fOpenThemeData)(HWND hwnd, LPCWSTR pszClassList);
 HTHEME(__stdcall* fOpenThemeDataForDpi)(HWND hwnd, LPCWSTR pszClassList, UINT dpi);
 HTHEME(__stdcall* fOpenThemeDataEx)(HWND hwnd, LPCWSTR pszClassList, DWORD dwFlags);
 
-LPTHREAD_START_ROUTINE CTray__SyncThreadProc_orig = nullptr;
+typedef int(*IsThemeClassDefined_t)(HTHEME hTheme, LPCWSTR pszAppName, LPCWSTR pszClassId, int fAllowInheritance);
+IsThemeClassDefined_t IsThemeClassDefined;
 
+LPTHREAD_START_ROUTINE CTray__SyncThreadProc_orig = nullptr;

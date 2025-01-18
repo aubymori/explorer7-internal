@@ -8,9 +8,10 @@
 // - These are external to ensure we can call them elsewhere
 extern bool s_ClassicTheme;
 extern bool s_DisableComposition;
-extern bool s_EnableImmersiveShellStack;
-extern bool s_ShowStoreAppsInStart;
+extern int s_EnableImmersiveShellStack;
+extern bool s_UseTaskbarPinning;
 extern bool s_ShowStoreAppsOnTaskbar;
+extern bool s_ShowStoreAppsInStart;
 extern bool s_RPEnabled;
 extern int s_AcrylicAlt;
 extern int s_ColorizationOptions;

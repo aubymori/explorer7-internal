@@ -123,6 +123,9 @@
     <ClInclude Include="util.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="MinhookImports.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

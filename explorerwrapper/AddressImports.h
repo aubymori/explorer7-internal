@@ -151,18 +151,36 @@ BOOL WINAPI IsCompositionActiveNEW()
 // Account for RPEnabled
 HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
 {
-	if (s_RPEnabled)
+	//if (s_RPEnabled)
 	{
-		if (lstrcmp(pszSubAppName, L"VerticalShowDesktop") == 0)
+		// Partial use of theme loader code here
+		// This is likely to receive further re-factoring 
+		// Unsure of any stability impact - if there is, it should be simple enough to resolve
+		/*HTHEME theme = 0;
+		DWORD flags = 2;
+		if ((unsigned int)GetScreenDpi() != 96)
+			flags |= 1u;
+
+		if (g_loadedTheme)
+			theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, L"Button", flags);
+		else
+			theme = fOpenThemeData(hwnd, L"Button");
+			*/
+		if (IsThemeClassDefined(g_currentTheme, L"ShowDesktop8", L"Button", 0))
 		{
-			return SetWindowTheme(hwnd, L"VerticalShowDesktop8", pszSubIdList);
-		}
-		
-		if (lstrcmp(pszSubAppName, L"ShowDesktop") == 0)
-		{
-			return SetWindowTheme(hwnd, L"ShowDesktop8", pszSubIdList);
+			if (lstrcmp(pszSubAppName, L"VerticalShowDesktop") == 0)
+			{
+				return SetWindowTheme(hwnd, L"VerticalShowDesktop8", pszSubIdList);
+			}
+
+			if (lstrcmp(pszSubAppName, L"ShowDesktop") == 0)
+			{
+				return SetWindowTheme(hwnd, L"ShowDesktop8", pszSubIdList);
+			}
 		}
 
+		// We don't check here because, unlike ShowDesktop::Button, there is no inherited fallback class
+		// In other words, it already falls back to the 7-era class if required
 		if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0) && IsCompositionActiveNEW()) // updated thumbnail classes misbehave without DWM
 		{
 			return SetWindowTheme(hwnd, L"W8", pszSubIdList);
@@ -277,6 +295,8 @@ void PatchKernel32()
 // Import address changes for uxtheme.dll modulename
 void PatchUxTheme()
 {
+	IsThemeClassDefined = (IsThemeClassDefined_t)GetProcAddress(GetModuleHandle(L"uxtheme.dll"), (LPSTR)0x32);
+
 	// Disable DWM composition as quickly as we can (if registry key set)
 	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
 

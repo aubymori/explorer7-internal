@@ -233,18 +233,18 @@ bool IsProcessAnExplorerHook()
 	return true;
 }
 
-void StartMenuPin_PatchShell32() //x32 only!!!
+void StartMenuPin_PatchShell32() 
 {	
 	h_shell32 = GetModuleHandle(L"shell32.dll");
 	ChangeImportedAddress(h_shell32,"api-ms-win-core-libraryloader-l1-2-0.dll",GetProcAddress(GetModuleHandle(L"kernelbase.dll"),"LoadStringW"),Shell32_LoadString);
 	ChangeImportedAddress(GetModuleHandle(0), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "IsProcessAnExplorer"), IsProcessAnExplorerHook);
 
-	DWORD_PTR addr = FindPattern((uintptr_t)h_shell32,"48 85 C0 0F 85 ?? ?? ?? ?? 45 8B C5 4C 8D 15 ?? ?? ?? ??");
+	DWORD_PTR addr = FindPattern((uintptr_t)h_shell32, "48 85 C0 0F 85 ?? ?? ?? ?? 45 8B C5 4C 8D 15 ?? ?? ?? ??");
 	if (addr)
 		addr += 15;
 	else
 	{
-		addr = FindPattern((uintptr_t)h_shell32,"41 8B FD 48 8D 1D ?? ?? ?? ?? 4C 8D 3D");
+		addr = FindPattern((uintptr_t)h_shell32, "41 8B FD 48 8D 1D ?? ?? ?? ?? 4C 8D 3D");
 		if (addr)
 			addr += 12;
 		else
