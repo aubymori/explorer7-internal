@@ -12,7 +12,6 @@ extern int s_EnableImmersiveShellStack;
 extern bool s_UseTaskbarPinning;
 extern bool s_ShowStoreAppsOnTaskbar;
 extern bool s_ShowStoreAppsInStart;
-extern bool s_RPEnabled;
 extern int s_AcrylicAlt;
 extern int s_ColorizationOptions;
 extern bool s_UseWin8DefaultAlpha;

@@ -10,7 +10,6 @@ int s_EnableImmersiveShellStack;
 bool s_UseTaskbarPinning;
 bool s_ShowStoreAppsOnTaskbar;
 bool s_ShowStoreAppsInStart;
-bool s_RPEnabled;
 int s_AcrylicAlt;
 int s_ColorizationOptions;
 bool s_UseWin8DefaultAlpha;
@@ -140,12 +139,6 @@ void InitializeConfiguration()
 	DWORD dwAcrylicAlt = 0;
 	g_registry.QueryValue(L"AcrylicColorization", (LPBYTE)&dwAcrylicAlt, sizeof(DWORD));
 	s_AcrylicAlt = dwAcrylicAlt;
-
-	// Win8 theme classes
-	// - Defaults to disabled (0)
-	DWORD dwRPEnabled = 0;
-	g_registry.QueryValue(L"RPEnabled", (LPBYTE)&dwRPEnabled, sizeof(DWORD));
-	s_RPEnabled = dwRPEnabled;
 
 	// DComp flyouts
 	// - Defaults to the same value used by immersive stack

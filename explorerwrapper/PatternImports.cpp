@@ -19,10 +19,6 @@ void RemoveLoadAnimationDataMap()
 
 			unsigned char bytes[] = { 0x31, 0xC0, 0xC3 };
 			ChangeImportedPattern(LADMPattern, bytes, sizeof(bytes));
-
-		/* -- version 1
-			unsigned char bytes[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-			ChangeImportedPattern(LADMPattern, bytes, sizeof(bytes));*/
 		}
 		else // revert to deprecated methodology. preferably avoid this because it causes cpu spiking, however preserved as fallback (for now)
 		{
@@ -41,11 +37,11 @@ void RemoveLoadAnimationDataMap()
 			}
 		}
 	}
-
-	
 }
 
-// (DEPRECATED) Remove Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
+// DEPRECATED
+// Remove Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
+// This will be removed in the near-future as it is no longer needed with the newer system
 void RemoveGetClassIdForShellTarget()
 {
 	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
@@ -132,21 +128,8 @@ void DisableImmersiveStart()
 		char* SSVPattern;
 		unsigned char bytes[] = { 0xC3 }; // retn
 
-		// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell
-		//HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
-
-		//// so far there's only a few major revisions of this function as of 06-11-24
-		//// this may require further testing/advancement on windows 11 in co-ordination with partners
-		//if (g_osVersion.BuildNumber() >= 16299) // RS3 onwards
-		//	ShowStartView = "48 89 5C 24 20 55 56 57 48 81 EC ?? 01 00 00 48 8B 05 ?? ?? ?? 00 48 33 C4 48 89 84 24 ?? 01 00 00 48 83 B9 ?? ?? 00 00 00";
-		//else if (g_osVersion.BuildNumber() >= 15063) // RS2
-		//	ShowStartView = "48 89 5C 24 20 55 56 57 48 83 EC 30 48 83 B9 F8 00 00 00 00 41 8B E8";
-		//else if (g_osVersion.BuildNumber() >= 10074) // TH1 to RS1
-		//	ShowStartView = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 83 B9 ?? 00 00 00 00";
-
-		//ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, ShowStartView), bytes, sizeof(bytes)); //byebye
-
-		// New rewritten code with better validation although longer length
+		// Load twinui.pcshell.dll for versions where it is used...
+		// Otherwise we load twinui.dll (see further below)
 		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
 
 		if (twinui_pcshell) // only run if DLL is present
@@ -335,53 +318,6 @@ DisableImmersiveSearch_TWINUI:
 			}
 		}
 	}
-
-	//if (s_EnableImmersiveShellStack) // because we don't want to run this thing if user isn't using UWP
-	//{
-	//	char* CDEVSI; // CortanaDesktopExperienceView::ShowInternal
-	//	// (preceded by CCortanaExperienceManager::ShowInternal in TH1-RS1)
-	//	unsigned char bytes[] = { 0xC3 }; // retn
-
-	//	// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
-	//	HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
-
-	//	// seven different variants to account for as of 06-11-24
-	//	if (g_osVersion.BuildNumber() >= 19041) // VB onwards
-	//		CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
-	//	else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
-	//		CDEVSI = "40 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 81 EC 80 00 00 00";
-	//	else if (g_osVersion.BuildNumber() >= 17134) // RS4 to RS5
-	//		CDEVSI = "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 20 57 48 83 EC 20 41 8B ?? 41 8B ?? 48 8B FA";
-	//	else if (g_osVersion.BuildNumber() >= 16299) // RS3
-	//		CDEVSI = "40 55 53 56 57 41 56 48 8D 6C 24 C9 48 81 EC 90 00 00 00";
-	//	else if (g_osVersion.BuildNumber() >= 15063) // RS2
-	//		CDEVSI = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 48 83 EC 20 41 8B D9 41 8B E8 48 8B F2";
-	//	else if (g_osVersion.BuildNumber() >= 14393) // RS1
-	//		CDEVSI = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 70";
-	//	else if (g_osVersion.BuildNumber() >= 10240) // TH1 to TH2
-	//		CDEVSI = "48 8B C4 55 56 57 41 54 41 55 41 56 41 57 48 8D 68 A1 48 81 EC 90 00 00 00";
-
-	//	// if the user is using 19H1 or higher, search was reimplemented, which means we kill it twice
-	//	if (g_osVersion.BuildNumber() >= 18362)
-	//	{
-	//		// because once wasn't enough.
-
-	//		char* SCFOS; // XamlLauncherState::ShowCortanaFromOpenStart
-	//		// exists in RS5, but not used until 19H1
-	//		// replaced by XamlLauncherState::ShowSearchFromOpenStart in W11 Nickel
-
-	//		if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
-	//			SCFOS = "48 89 54 24 10 55 53 56 57 41 54 41 56 41 57 48 8B EC 48 83 EC";
-	//		else if (g_osVersion.BuildNumber() >= 19041) // VB onwards
-	//			SCFOS = "48 89 54 24 10 55 53 56 57 41 56 41 57 48 8B EC 48 83 EC";
-	//		else if (g_osVersion.BuildNumber() >= 18362) // 19H1 to 19H2
-	//			SCFOS = "48 89 54 24 10 55 53 56 57 41 56 48 8B EC 48 83 EC 40 48 C7 45 E0 FE FF FF FF";
-
-	//		ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, SCFOS), bytes, sizeof(bytes)); //byebye again
-	//	}
-
-	//	ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, CDEVSI), bytes, sizeof(bytes)); //byebye
-	//}
 }
 
 // Ittr: Get rid of the half-broken TaskView interface and prevent it appearing on TH1+ when UWP is on.
@@ -486,36 +422,6 @@ DisableTaskView_TWINUI:
 			}
 		}
 	}
-
-	//if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 10074) // because we don't want to run this thing if user isn't using UWP
-		//{
-		//	char* TaskViewHostShow; // XamlAllUpViewHost::Show 
-		//	// (preceded by CAllUpViewHost::Show in TH1-RS1, replaced by TaskViewHost::Show in W11 Nickel)
-		//	unsigned char bytes[] = { 0xC3 }; // retn
-
-		//	// load correct library - TH1 to RS1 use twinui, RS2 onwards use twinui.pcshell (dll introduced in RS1 but not used widely)
-		//	HMODULE twinui = (g_osVersion.BuildNumber() >= 15063) ? LoadLibrary(L"twinui.pcshell.dll") : LoadLibrary(L"twinui.dll");
-
-		//	// this function is particularly annoying - the signature is different in some way for many versions of Windows 10/11
-		//	// in some cases, it changes and reverts again in later versions
-		//	// :/
-		//	if (g_osVersion.BuildNumber() >= 22621) // W11 Nickel onwards
-		//		TaskViewHostShow = "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 03 00 00";
-		//	else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt
-		//		TaskViewHostShow = "48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 81 EC 20 03 00 00";
-		//	else if (g_osVersion.BuildNumber() >= 19041) // VB
-		//		TaskViewHostShow = "48 89 5C 24 20 56 57 41 54 41 55 41 57 48 81 EC";
-		//	else if (g_osVersion.BuildNumber() >= 17763) // RS5 to 19H2
-		//		TaskViewHostShow = "4C 8B DC 57 41 54 41 55 41 56 41 57 48 81 EC 40 03 00 00";
-		//	else if (g_osVersion.BuildNumber() >= 15063) // RS2 to RS4
-		//		TaskViewHostShow = "4C 8B DC ?? 41 54 41 55 41 56 41 57 48 83 EC";
-		//	else if (g_osVersion.BuildNumber() >= 10586) // TH2 to RS1
-		//		TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 50 02 00 00";
-		//	else if (g_osVersion.BuildNumber() >= 10074) // TH1
-		//		TaskViewHostShow = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC E0 01 00 00";
-
-		//	ChangeImportedPattern((char*)FindPattern((uintptr_t)twinui, TaskViewHostShow), bytes, sizeof(bytes)); //byebye
-		//}
 }
 
 // Ittr: Remove broken leftovers of immersive context menus, starting in Windows 10.
@@ -583,33 +489,6 @@ void RestoreWin32Menus()
 			}
 		}
 	}
-
-	//if (g_osVersion.BuildNumber() >= 10074) // if user is using TH1 or later
-	//{
-	//	char* CAODTM_SH32; // ImmersiveContextMenuHelper::CanApplyOwnerDrawToMenu
-	//	char* CAODTM_EF; // same function, in ExplorerFrame.dll
-	//	char unsigned bytes[] = { 0xC3 }; // retn
-
-	//	if (g_osVersion.BuildNumber() >= 26100) // W11 Germanium onwards
-	//	{
-	//		CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 33 DB 48 8B F2 33 FF 48 8B E9";
-	//		CAODTM_EF = CAODTM_SH32;
-	//	}
-	//	else if (g_osVersion.BuildNumber() >= 21996) // W11 Cobalt to W11 Nickel
-	//	{
-	//		// This is somewhat flawed on Cobalt, but it will have to do
-	//		CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2";
-	//		CAODTM_EF = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B E9 33 FF 33 D2 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? C7 44 24 20 50 00 00 00";
-	//	}
-	//	else // TH1 to VB
-	//	{
-	//		CAODTM_SH32 = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 70 48 8B F2 48 8B";
-	//		CAODTM_EF = CAODTM_SH32;
-	//	}
-
-	//	ChangeImportedPattern((char*)FindPattern((uintptr_t)GetModuleHandle(L"shell32.dll"), CAODTM_SH32), bytes, sizeof(bytes)); // shell32.dll
-	//	ChangeImportedPattern((char*)FindPattern((uintptr_t)LoadLibrary(L"ExplorerFrame.dll"), CAODTM_EF), bytes, sizeof(bytes)); // ExplorerFrame.dll
-	//}
 }
 
 // Disabled to prevent the shell from crashing due to incompatibilities with the XAML interface
@@ -670,6 +549,7 @@ void FixWin11SearchIcon()
 	}
 }
 
+// Currently ineffective, TBD review if needed
 void EnablePinning()
 {
 	char* IsTrustedWindowsPinProcess = "48 89 5C 24 18 55 56 57 48 8B EC 48 83 EC 70 48 8B 05 6E 8E";
@@ -691,38 +571,8 @@ void FixWin11ContextMenu()
 {
 	if (g_osVersion.BuildNumber() >= 21996)
 	{
-		// Version 1 - works but no "Open"
-		/*char* StartPinUnpinContextMenuQueryContextMenuImpl = "40 55 53 56 57 41 54 41 55 41 56 41 57 ?? ?? ?? ?? ?? ?? ?? ?? 48 81 EC 08 03 00 00";
-
-		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
-		if (appResolver)
-		{
-			char* SPUCMQCMIPattern = (char*)FindPattern((uintptr_t)appResolver, StartPinUnpinContextMenuQueryContextMenuImpl);
-
-			if (SPUCMQCMIPattern)
-			{
-				unsigned char bytes[] = { 0xC3 };
-				ChangeImportedPattern(SPUCMQCMIPattern, bytes, sizeof(bytes));
-			}
-		}*/
-
-		// Version 2 - non-functional
-		/*char* IsShellItemBlockedFromPinning = "40 55 53 56 57 41 56 48 8B EC 48 83 EC 30 4C 8B F2 48 8B F1 33 FF 40 88 3A";
-
-		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
-		if (appResolver)
-		{
-			char* SPUCMISIBFPPattern = (char*)FindPattern((uintptr_t)appResolver, IsShellItemBlockedFromPinning);
-
-			if (SPUCMISIBFPPattern)
-			{
-				unsigned char bytes[] = { 0xB0, 0xFF, 0xC3 };
-				ChangeImportedPattern(SPUCMISIBFPPattern, bytes, sizeof(bytes));
-			}
-		}*/
-
-		// Version 3 - works and stops startmenu.dll being called
-		// This restores Windows 10 behaviour
+		// Ittr: Works and stops startmenu.dll being called
+		// This prevents the crashing issue, restoring Windows 10 behaviour
 		char* StartDocked_IsPinnedToStart = "48 89 5C 24 18 48 89 54 24 10 48 89 4C 24 08 55 56 57 41 56";
 
 		HMODULE appResolver = LoadLibrary(L"appresolver.dll");
@@ -786,10 +636,8 @@ void RevertFlyouts()
 
 void ChangePatternImports()
 {
-	// 1. Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
-	// 2. Remove Windows 8+ immersive shell msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
+	// Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
 	RemoveLoadAnimationDataMap();
-	//RemoveGetClassIdForShellTarget(); ----- DEPRECATED, called if needed from above
 
 	// Responsible for fixing CLogoffOptions
 	FixAuthUI();

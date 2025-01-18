@@ -88,7 +88,7 @@ LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
 }
 
-// Ittr: Awful hack but it seems to fix it
+// Ittr: Subclass the thumbnail so we can update its colorization as needed
 LRESULT CALLBACK NewThumbnailProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	if (uMsg == WM_SETTINGCHANGE || uMsg == WM_ERASEBKGND || uMsg == WM_WININICHANGE) // Ittr: Fix thumbnail colorization for non-legacy
@@ -169,8 +169,6 @@ void HookTrayThread(void)
 		);
 	}
 }
-
-
 
 void GetOrbDPIAndPos(LPWSTR fName)
 {
