@@ -343,3 +343,7 @@ typedef int(*IsThemeClassDefined_t)(HTHEME hTheme, LPCWSTR pszAppName, LPCWSTR p
 IsThemeClassDefined_t IsThemeClassDefined;
 
 LPTHREAD_START_ROUTINE CTray__SyncThreadProc_orig = nullptr;
+
+// prevent windows 11 hotkey registration
+typedef BOOL(WINAPI* ShellRegisterHotKey_t)(HWND, int, UINT, UINT, HWND);
+static ShellRegisterHotKey_t ShellRegisterHotKey;

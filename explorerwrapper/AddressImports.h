@@ -134,7 +134,7 @@ UINT WINAPI SetErrorModeNEW(UINT uMode)
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
-	if (s_EnableImmersiveShellStack)
+	if (s_EnableImmersiveShellStack == 1)
 		CreateTwinUI_UWP();
 
 	return SetErrorMode(uMode);
@@ -231,6 +231,24 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 	return ret;
 }
 
+// Prevent additional hotkey double-registration on Windows 11
+static BOOL WINAPI ShellRegisterHotKeyNEW(HWND hwnd, int a2, UINT key1, UINT key2, HWND target)
+{
+	// Windows key
+	if (key1 == MOD_WIN && key2 == 0)
+	{
+		return FALSE;
+	}
+
+	// Ctrl+Esc combination
+	if (key1 == MOD_CONTROL && key2 == VK_ESCAPE)
+	{
+		return FALSE;
+	}
+
+	return ShellRegisterHotKey(hwnd, a2, key1, key2, target);
+}
+
 // Import address changes for shell32.dll modulename
 void PatchShell32()
 {
@@ -307,6 +325,15 @@ void PatchDwmApi()
 	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmGetColorizationParametersOrig, DwmGetColorizationParametersNEW);
 }
 
+void PatchTwinUI()
+{
+	// Declare the type so we can use it in our rewritten function...
+	ShellRegisterHotKey = (ShellRegisterHotKey_t)GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)2671);
+
+	// Prevent additional hotkey double-registration on Windows 11
+	ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", ShellRegisterHotKey, ShellRegisterHotKeyNEW);
+}
+
 // Consolidate all of the above so they can be changed at runtime as needed
 void ChangeAddressImports()
 {
@@ -315,4 +342,5 @@ void ChangeAddressImports()
 	PatchKernel32();
 	PatchUxTheme();
 	PatchDwmApi();
+	PatchTwinUI();
 }

@@ -122,7 +122,7 @@ void FixAuthUI()
 // I'll also be honest - I haven't tested 1703 because who actually uses 1703
 void DisableImmersiveStart()
 {
-	if (s_EnableImmersiveShellStack) // don't run this if the user isn't using immersive shell
+	if (s_EnableImmersiveShellStack == 1) // don't run this if the user isn't using immersive shell
 	{
 		char* ShowStartView; // XamlLauncher::ShowStartView
 		char* SSVPattern;
@@ -193,7 +193,7 @@ DisableImmersiveStart_TWINUI:
 // The Windows 7 start menu search functionality is much superior to this in any case
 void DisableImmersiveSearch()
 {
-	if (s_EnableImmersiveShellStack)
+	if (s_EnableImmersiveShellStack == 1)
 	{
 		char* CortanaDesktopExperienceView_ShowInternal;
 		char* CDEVSIPattern;
@@ -326,7 +326,7 @@ DisableImmersiveSearch_TWINUI:
 // For some reason, Germanium and later already disable this. We're not complaining.
 void DisableTaskView()
 {
-	if (s_EnableImmersiveShellStack) // this on its own should be enough as we enforce this value to 0 prior to TH1
+	if (s_EnableImmersiveShellStack == 1) // this on its own should be enough as we enforce this value to 0 prior to TH1
 	{
 		// For historical context, the relevant function has changed name a few times...
 		// We opt to use the latest name throughout however the others are listed below:
@@ -494,7 +494,7 @@ void RestoreWin32Menus()
 // Disabled to prevent the shell from crashing due to incompatibilities with the XAML interface
 void DisableWin11AltTab()
 {
-	if (s_EnableImmersiveShellStack && g_osVersion.BuildNumber() >= 21996) // only run if we are using Windows 11
+	if (s_EnableImmersiveShellStack == 1 && g_osVersion.BuildNumber() >= 21996) // only run if we are using Windows 11
 	{
 		char* ShouldShowMTVAltTab = "40 53 48 83 EC 20 83 79 ?? 02 74 17";
 		char* SSMATPattern;
@@ -510,6 +510,27 @@ void DisableWin11AltTab()
 			{
 				ChangeImportedPattern(SSMATPattern, bytes, sizeof(bytes)); //byebye
 			}
+		}
+	}
+}
+
+void DisableWin11HardwareConfirmators()
+{
+	// Ittr: In simple terms, we disable them because they're unstable and crash-prone
+	// Checked against 22631 and 26100
+	char* CAudioFlyoutController_Show = "48 83 C1 80 45 33 C9 E9"; // CAudioFlyoutController::Show
+
+	HMODULE twinui = LoadLibrary(L"twinui.dll");
+
+	if (twinui)
+	{
+		char* CAFCSPattern = (char*)FindPattern((uintptr_t)twinui, CAudioFlyoutController_Show);
+
+		unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+
+		if (CAFCSPattern)
+		{
+			ChangeImportedPattern(CAFCSPattern, bytes, sizeof(bytes));
 		}
 	}
 }
@@ -647,11 +668,12 @@ void ChangePatternImports()
 	DisableImmersiveSearch(); // Remove Windows 10+ immersive search menu for UWP mode
 	DisableTaskView(); // Remove Windows 10+ virtual desktops functionality for UWP mode
 	RestoreWin32Menus(); // Remove the immersive menu leftovers so that the taskbar behaves properly in accordance with Windows 7
-	DisableWin11AltTab(); // Disable XAML UI because it crashes (Win+Tab will still need to separately be accounted for on Cobalt and possibly Nickel. M3?)
+	DisableWin11AltTab(); // Disable XAML UI because it crashes
+	DisableWin11HardwareConfirmators(); // Disable XAML UI because it crashes
 	FixWin11SearchIcon(); // Prevents search icon from being mangled by a buggy tablet mode implementation (cheers Microsoft)
 
 	// For 24H2 onwards so we can pin to taskbar as system shell
-	EnablePinning();
+	//EnablePinning();
 
 	// Fix context menus for executable files starting in Windows 11 to prevent explorer from freezing
 	FixWin11ContextMenu();

@@ -469,7 +469,7 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	if (s_EnableImmersiveShellStack) // immersive enabled
+	if (s_EnableImmersiveShellStack == 1) // immersive enabled
 	{
 		DWORD p0 = (DWORD)_ReturnAddress();
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed?

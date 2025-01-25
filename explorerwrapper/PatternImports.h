@@ -6,6 +6,7 @@
 
 // Ittr: Pattern imports are defined and rewritten here rather than dllmain. Feel free to further improve this.
 
+// TODO: Update this definition
 // Find-by-string - allow 7 msstyles to load by removing animation map data
 void RemoveLoadAnimationDataMap();
 void RemoveGetClassIdForShellTarget();
@@ -19,6 +20,7 @@ void DisableImmersiveSearch();
 void DisableTaskView();
 void RestoreWin32Menus();
 void DisableWin11AltTab();
+void DisableWin11HardwareConfirmators();
 void FixWin11SearchIcon();
 
 // Enable taskbar pins on 24H2 and later

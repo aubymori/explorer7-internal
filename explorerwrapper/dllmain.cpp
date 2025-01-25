@@ -35,8 +35,8 @@
 
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (s_EnableImmersiveShellStack)
-		SetProgmanAsShell(); // misha: TODO hack
+	//if (s_EnableImmersiveShellStack == 1)
+		//SetProgmanAsShell(); // misha: TODO hack
 
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
@@ -434,7 +434,7 @@ void HookImmersive()
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
-	if (s_EnableImmersiveShellStack)
+	if (s_EnableImmersiveShellStack == 1)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
@@ -657,7 +657,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 
-		if (s_EnableImmersiveShellStack) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+		if (s_EnableImmersiveShellStack == 1) // Ittr: Only create TWinUI UWP mode here if we are going to use it
 			CreateTwinUI_UWP();
 
 	}

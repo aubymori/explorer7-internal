@@ -7,7 +7,7 @@ typedef HRESULT(CALLBACK* SetShellWindow)(HWND hwnd);
 
 GetTaskmanWindow GetTaskmanWindowFunc = NULL;
 SetTaskmanWindow SetTaskmanWindowFunc = NULL;
-SetShellWindow SetShellWindowFunc = NULL;
+//SetShellWindow SetShellWindowFunc = NULL;
 
 UINT shellhook = 0;
 IImmersiveShellHookService* ShellHookService;
@@ -63,7 +63,7 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
 	}
 	else
 	{
-		if (msg == shellhook || msg != WM_HOTKEY)
+		if (msg == shellhook && msg != WM_HOTKEY)
 		{
 			if (ShellHookService)
 			{
@@ -126,20 +126,20 @@ void CreateTaskManWindow()
 	}
 	auto Taskman = CreateWindowExW(0, L"TaskmanWndClass", NULL, 0x82000000, 0, 0, 0, 0, 0, 0, 0, 0);
 }
-
-void SetProgmanAsShell()
-{
-	BOOL res = false;
-	if (SetShellWindowFunc && !successfullySetShellWindow)
-	{
-		HWND progMan = FindWindow(TEXT("Progman"), TEXT("Program Manager"));
-
-		if (SetShellWindowFunc(progMan))
-		{
-			successfullySetShellWindow = true;
-		}
-	}
-}
+//
+//void SetProgmanAsShell()
+//{
+//	BOOL res = false;
+//	if (SetShellWindowFunc && !successfullySetShellWindow)
+//	{
+//		HWND progMan = FindWindow(TEXT("Progman"), TEXT("Program Manager"));
+//
+//		if (SetShellWindowFunc(progMan))
+//		{
+//			successfullySetShellWindow = true;
+//		}
+//	}
+//}
 
 void CreateTwinUI()
 {
@@ -171,7 +171,7 @@ void CreateTwinUI_UWP()
 	auto user32 = LoadLibrary(TEXT("user32.dll"));
 	GetTaskmanWindowFunc = (GetTaskmanWindow)GetProcAddress(user32, "GetTaskmanWindow");
 	SetTaskmanWindowFunc = (SetTaskmanWindow)GetProcAddress(user32, "SetTaskmanWindow");
-	SetShellWindowFunc = (SetShellWindow)GetProcAddress(user32, "SetShellWindow");
+	//SetShellWindowFunc = (SetShellWindow)GetProcAddress(user32, "SetShellWindow");
 
 	CreateTaskManWindow();
 
@@ -185,6 +185,7 @@ void CreateTwinUI_UWP()
 		dbgprintf(L"TwinUI instance created %p %p", ret, controller);
 		if (SUCCEEDED(ret))
 		{
+			//controller->SetCreationBehavior((IImmersiveBehavior*)136);
 			HRESULT hr = controller->Start();
 
 			dbgprintf(L"Immersive Shell Controller Result: %x", hr);
