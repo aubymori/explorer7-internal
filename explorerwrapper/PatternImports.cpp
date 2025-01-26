@@ -20,40 +20,6 @@ void RemoveLoadAnimationDataMap()
 			unsigned char bytes[] = { 0x31, 0xC0, 0xC3 };
 			ChangeImportedPattern(LADMPattern, bytes, sizeof(bytes));
 		}
-		else // revert to deprecated methodology. preferably avoid this because it causes cpu spiking, however preserved as fallback (for now)
-		{
-			void* LoadAnimationDataMap = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"AMAP");
-			if (LoadAnimationDataMap)
-			{
-				LoadAnimationDataMap = (void*)GetFunctionStart((uintptr_t)LoadAnimationDataMap, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
-
-				//byebye
-				DWORD old;
-				VirtualProtect(LoadAnimationDataMap, 1, PAGE_EXECUTE_READWRITE, &old);
-				*reinterpret_cast<char*>(LoadAnimationDataMap) = 0xC3;
-				VirtualProtect(LoadAnimationDataMap, 1, old, 0);
-
-				RemoveGetClassIdForShellTarget(); // call this here as we don't from changepatternimports anymore
-			}
-		}
-	}
-}
-
-// DEPRECATED
-// Remove Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
-// This will be removed in the near-future as it is no longer needed with the newer system
-void RemoveGetClassIdForShellTarget()
-{
-	void* GetClassIdForShellTarget = FindByString((uintptr_t)GetModuleHandle(L"uxtheme.dll"), L"Immersive");
-	if (GetClassIdForShellTarget)
-	{
-		GetClassIdForShellTarget = (void*)GetFunctionStart((uintptr_t)GetClassIdForShellTarget, (uintptr_t)GetModuleHandle(L"uxtheme.dll"));
-
-		//byebye
-		DWORD old;
-		VirtualProtect(GetClassIdForShellTarget, 1, PAGE_EXECUTE_READWRITE, &old);
-		*reinterpret_cast<char*>(GetClassIdForShellTarget) = 0xC3;
-		VirtualProtect(GetClassIdForShellTarget, 1, old, 0);
 	}
 }
 

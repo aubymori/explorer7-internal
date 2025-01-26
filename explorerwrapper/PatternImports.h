@@ -6,10 +6,8 @@
 
 // Ittr: Pattern imports are defined and rewritten here rather than dllmain. Feel free to further improve this.
 
-// TODO: Update this definition
-// Find-by-string - allow 7 msstyles to load by removing animation map data
+// Allow 7 msstyles to load by removing animation map data from uxtheme.dll imports
 void RemoveLoadAnimationDataMap();
-void RemoveGetClassIdForShellTarget();
 
 // Fix authui.dll import for CLogOffOptions by replacing bytes
 void FixAuthUI();
