@@ -23,6 +23,24 @@ void RemoveLoadAnimationDataMap()
 	}
 }
 
+// For Windows 8.1 - remove additional Immersive class from loaded msstyle so that Vista and 7 msstyles are compatible
+void RemoveGetClassIdForShellTarget()
+{
+	char* GetClassIdForShellTarget = "4C 8B DC 4D 89 43 18 49 89 4B 08 53 48 83 EC 30";
+
+	HMODULE uxTheme = GetModuleHandle(L"uxtheme.dll");
+	if (uxTheme)
+	{
+		char* GCIFSTPattern = (char*)FindPattern((uintptr_t)uxTheme, GetClassIdForShellTarget);
+
+		if (GCIFSTPattern)
+		{
+			unsigned char bytes[] = { 0x31, 0xC0, 0xC3 };
+			ChangeImportedPattern(GCIFSTPattern, bytes, sizeof(bytes));
+		}
+	}
+}
+
 // Fix CLogoffPane so that options are correctly displayed
 void FixAuthUI()
 {
@@ -625,6 +643,7 @@ void ChangePatternImports()
 {
 	// Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
 	RemoveLoadAnimationDataMap();
+	RemoveGetClassIdForShellTarget();
 
 	// Responsible for fixing CLogoffOptions
 	FixAuthUI();

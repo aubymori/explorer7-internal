@@ -8,6 +8,7 @@
 
 // Allow 7 msstyles to load by removing animation map data from uxtheme.dll imports
 void RemoveLoadAnimationDataMap();
+void RemoveGetClassIdForShellTarget(); // for windows 8.1
 
 // Fix authui.dll import for CLogOffOptions by replacing bytes
 void FixAuthUI();
