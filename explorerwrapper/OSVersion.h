@@ -12,6 +12,7 @@ public:
 	ULONG BuildNumber();
 	ULONG MajorVersion();
 	ULONG MinorVersion();
+	ULONG BuildRevision();
 };
 
 extern COSVersion g_osVersion;
