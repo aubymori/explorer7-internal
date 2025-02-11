@@ -1,18 +1,31 @@
 #include "ImmersiveShell.h"
 #include "dbgprint.h"
+#include "OptionConfig.h"
 
 typedef HWND(WINAPI* GetTaskmanWindow)();
 typedef BOOL(WINAPI* SetTaskmanWindow)(HWND handle);
-typedef HRESULT(CALLBACK* SetShellWindow)(HWND hwnd);
+
+typedef BOOL(*RegisterShellHook_t)(HWND, DWORD); // 181
 
 GetTaskmanWindow GetTaskmanWindowFunc = NULL;
 SetTaskmanWindow SetTaskmanWindowFunc = NULL;
-//SetShellWindow SetShellWindowFunc = NULL;
 
 UINT shellhook = 0;
-IImmersiveShellHookService* ShellHookService;
+IImmersiveShellHookService* m_shellHookService;
 
-static bool successfullySetShellWindow = false;
+IImmersiveShellController* m_immersiveShellController;
+
+IClassicWindowManager* m_classicWindowManager;
+IImmersiveApplicationNotificationService* m_immersiveApplicationNotificationService;
+IImmersiveAppCrusher* m_immersiveAppCrusher;
+IImmersiveApplicationManager* m_immersiveApplicationManager;
+IImmersiveApplicationArrayService* m_immersiveApplicationArrayService;
+IApplicationDataPersistence* m_applicationDataPersistence;
+IApplicationViewCollection* m_applicationViewCollection;
+IPinManagerInterop* m_pinManager;
+
+DWORD m_immersiveApplicationNotificationToken;
+DWORD m_immersiveAppCrusherNotificationToken;
 
 DWORD WINAPI TwinThread( LPVOID lpParameter )
 {
@@ -33,73 +46,86 @@ DWORD WINAPI TwinThread( LPVOID lpParameter )
 	return 0;
 }
 
-
-LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM w, LPARAM l)
+BOOL RegisterShellHook(HWND hwnd, DWORD dwType)
 {
-	if (msg == WM_CREATE)
+	static RegisterShellHook_t fn = nullptr;
+	if (!fn)
 	{
-		shellhook = RegisterWindowMessageW(L"SHELLHOOK");
-		if (!shellhook)
-		{
-			dbgprintf(L"failed to register shellhook\n");
-		}
-		if (!SetTaskmanWindowFunc(hwnd))
-		{
-			dbgprintf(L"failed to register taskman window\n");
-		}
-		if (!RegisterShellHookWindow(hwnd))
-		{
-			dbgprintf(L"register shellhook window failed\n");
-		}
+		HMODULE hShell32 = GetModuleHandleW(L"shell32.dll");
+		if (hShell32)
+			fn = (RegisterShellHook_t)GetProcAddress(hShell32, MAKEINTRESOURCEA(181));
+	}
+	return fn(hwnd, dwType);
+}
 
-	}
-	else if (msg == WM_DESTROY)
-	{
-		if (GetTaskmanWindowFunc() == hwnd)
+LRESULT TaskmanWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+		switch (uMsg)
 		{
-			SetTaskmanWindowFunc(NULL);
-		}
-		DeregisterShellHookWindow(hwnd);
-	}
-	else
-	{
-		if (msg == shellhook && msg != WM_HOTKEY)
-		{
-			if (ShellHookService)
+			case WM_CREATE:
 			{
-				BOOL handle = TRUE;
-				if ((UINT)w == 12)
+				shellhook = RegisterWindowMessageW(L"SHELLHOOK");
+				if (!shellhook)
 				{
-					ShellHookService->SetTargetWindowForSerialization((HWND)l);
+					dbgprintf(L"failed to register shellhook\n");
 				}
-				else if ((UINT)w == 0x32)
+				if (!SetTaskmanWindowFunc(hwnd))
 				{
-					handle = FALSE;
+					dbgprintf(L"failed to register taskman window\n");
 				}
-				if (handle)
+				if (!RegisterShellHook(hwnd, 3))
 				{
-					ShellHookService->PostShellHookMessage(w, l);
+					dbgprintf(L"RegisterShellHook failed\n");
 				}
 				return 0;
 			}
-
-			GUID guidImmersiveShell;
-			CLSIDFromString(L"{c2f03a33-21f5-47fa-b4bb-156362a2f239}", &guidImmersiveShell);
-
-			GUID SID_ImmersiveShellHookService;
-			CLSIDFromString(L"{4624bd39-5fc3-44a8-a809-163a836e9031}", &SID_ImmersiveShellHookService);
-
-			GUID SID_Unknown;
-			CLSIDFromString(L"{914d9b3a-5e53-4e14-bbba-46062acb35a4}", &SID_Unknown);
-
-			IServiceProvider* ImmersiveShell;
-			if (CoCreateInstance(guidImmersiveShell, 0, 0x404u, IID_IServiceProvider, (LPVOID*)&ImmersiveShell) >= 0)
+			case WM_DESTROY:
 			{
-				ImmersiveShell->QueryService(SID_ImmersiveShellHookService, SID_Unknown, (void**)&ShellHookService);
+				if (GetTaskmanWindowFunc() == hwnd)
+				{
+					SetTaskmanWindowFunc(NULL);
+				}
+				RegisterShellHook(hwnd, 0);
+				return 0;
+			}
+			case WM_USER + 0x3C:
+			{
+				if (IsWindow((HWND)(UINT_PTR)(int)lParam) && m_shellHookService)
+				{
+					m_shellHookService->PostShellHookMessage(wParam ? 53 : 54, lParam);
+				}
+				return 0;
 			}
 		}
-	}
-	return DefWindowProc(hwnd, msg, w, l);
+
+		if (shellhook && uMsg == shellhook)
+		{
+			//LRESULT lRes = _HandleShellHook((int)wParam, lParam);
+
+			LRESULT lRes = 0;
+
+			/*if (m_applicationUsageTracker)
+			{
+				m_applicationUsageTracker->OnShellHookMessage(wParam, lParam);
+			}*/
+
+			if (m_shellHookService)
+			{
+				if (wParam == 38)
+				{
+					// if (GetPropW((HWND)lParam, L"WindowShouldReportLayoutCompletedTelemetryProp")) ...
+				}
+
+				if (wParam != 0x32)
+				{
+					m_shellHookService->PostShellHookMessage(wParam, lParam);
+				}
+				return lRes;
+			}
+
+		}
+
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 void CreateTaskManWindow()
@@ -126,20 +152,6 @@ void CreateTaskManWindow()
 	}
 	auto Taskman = CreateWindowExW(0, L"TaskmanWndClass", NULL, 0x82000000, 0, 0, 0, 0, 0, 0, 0, 0);
 }
-//
-//void SetProgmanAsShell()
-//{
-//	BOOL res = false;
-//	if (SetShellWindowFunc && !successfullySetShellWindow)
-//	{
-//		HWND progMan = FindWindow(TEXT("Progman"), TEXT("Program Manager"));
-//
-//		if (SetShellWindowFunc(progMan))
-//		{
-//			successfullySetShellWindow = true;
-//		}
-//	}
-//}
 
 void CreateTwinUI()
 {
@@ -166,14 +178,32 @@ void CreateTwinUI()
 	}
 }
 
+HWND v_hwndTray;
+
+
+static HWND GetTrayWnd()
+{
+	if (!v_hwndTray)
+		v_hwndTray = FindWindow(L"Shell_TrayWnd", NULL);
+	return v_hwndTray;
+}
+
 void CreateTwinUI_UWP()
 {
-	auto user32 = LoadLibrary(TEXT("user32.dll"));
-	GetTaskmanWindowFunc = (GetTaskmanWindow)GetProcAddress(user32, "GetTaskmanWindow");
-	SetTaskmanWindowFunc = (SetTaskmanWindow)GetProcAddress(user32, "SetTaskmanWindow");
-	//SetShellWindowFunc = (SetShellWindow)GetProcAddress(user32, "SetShellWindow");
+	if (s_ImmersiveShell == 1)
+	{
+		auto user32 = LoadLibrary(TEXT("user32.dll"));
+		GetTaskmanWindowFunc = (GetTaskmanWindow)GetProcAddress(user32, "GetTaskmanWindow");
+		SetTaskmanWindowFunc = (SetTaskmanWindow)GetProcAddress(user32, "SetTaskmanWindow");
 
-	CreateTaskManWindow();
+		CreateTaskManWindow();
+	}
+
+	//IImmersiveShellBuilder* immersiveShellBuilder;
+	//if (SUCCEEDED(CoCreateInstance(CLSID_ImmersiveShellBuilder, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&immersiveShellBuilder))))
+	//{
+	//	SUCCEEDED(immersiveShellBuilder->CreateImmersiveShellController(&m_immersiveShellController)); // Outputted to telemetry
+	//}
 
 	IImmersiveShellCreator* ImmersiveShellCreator;
 	if (SUCCEEDED(CoCreateInstance(CLSID_ImmersiveShellBuilder, NULL, CLSCTX_INPROC_SERVER, IID_ImmersiveShellBuilder, (LPVOID*)&ImmersiveShellCreator)))
@@ -187,8 +217,73 @@ void CreateTwinUI_UWP()
 		{
 			//controller->SetCreationBehavior((IImmersiveBehavior*)136);
 			HRESULT hr = controller->Start();
+			if (SUCCEEDED(hr))
+			{
+				GUID guidImmersiveShell;
+				CLSIDFromString(L"{c2f03a33-21f5-47fa-b4bb-156362a2f239}", &guidImmersiveShell);
+
+				GUID SID_ImmersiveShellHookService;
+				CLSIDFromString(L"{4624bd39-5fc3-44a8-a809-163a836e9031}", &SID_ImmersiveShellHookService);
+
+				GUID SID_Unknown;
+				CLSIDFromString(L"{914d9b3a-5e53-4e14-bbba-46062acb35a4}", &SID_Unknown);
+
+				IServiceProvider* serviceProvider;
+				if (CoCreateInstance(guidImmersiveShell, nullptr, CLSCTX_NO_CODE_DOWNLOAD | CLSCTX_LOCAL_SERVER,
+					IID_IServiceProvider, (LPVOID*)&serviceProvider) >= 0)
+				{
+					serviceProvider->QueryService(SID_ImmersiveShellHookService, SID_Unknown, (void**)&m_shellHookService);
+					if (m_shellHookService && s_ImmersiveShell == 1)
+						m_shellHookService->SetTargetWindowForSerialization(FindWindow(L"Shell_TrayWnd", NULL));
+
+					serviceProvider->QueryService(IID_IClassicWindowManager, SID_Unknown, (void**)&m_classicWindowManager);
+					serviceProvider->QueryService(IID_IImmersiveApplicationNotificationService, SID_Unknown, (void**)&m_immersiveApplicationNotificationService);
+					serviceProvider->QueryService(SID_AppCrusher, SID_Unknown, (void**)&m_immersiveAppCrusher);
+					serviceProvider->QueryService(IID_IImmersiveApplicationManager, SID_Unknown, (void**)&m_immersiveApplicationManager);
+					serviceProvider->QueryService(SID_ImmersiveApplicationArrayService, SID_Unknown, (void**)&m_immersiveApplicationArrayService);
+					serviceProvider->QueryService(__uuidof(IApplicationDataPersistence), SID_Unknown, (void**)&m_applicationDataPersistence);
+
+					serviceProvider->QueryService(__uuidof(IApplicationViewCollection), SID_Unknown, (void**)&m_applicationViewCollection);
+
+					if (g_osVersion.BuildNumber() >= 19045 || g_osVersion.BuildNumber() >= 22631)
+					{
+						serviceProvider->QueryService(SID_PinManager, SID_Unknown, (void**)&m_pinManager);
+					}
+
+					serviceProvider->Release();
+				}
+				else
+				{
+
+					HRESULT hr = 0;
+					if (!serviceProvider)
+					{
+						hr = CoCreateInstance(
+							guidImmersiveShell,
+							nullptr,
+							CLSCTX_NO_CODE_DOWNLOAD | CLSCTX_LOCAL_SERVER,
+							__uuidof(IServiceProvider),
+							(void**)serviceProvider
+						);
+					}
+				}
+			}
+			else
+			{
+				// reset immersive shell controller. todo: better resetting
+
+				controller->Stop();
+				controller->Release();
+
+			}
 
 			dbgprintf(L"Immersive Shell Controller Result: %x", hr);
+
+			if (m_immersiveApplicationNotificationService)
+				m_immersiveApplicationNotificationService->Register(NULL, &m_immersiveApplicationNotificationToken);
+
+			if (m_immersiveAppCrusher)
+				m_immersiveAppCrusher->Register(NULL, &m_immersiveAppCrusherNotificationToken);
 		}
 	}
 }

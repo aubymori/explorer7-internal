@@ -200,7 +200,7 @@ void FixNonImmersivePniDui()
 	if (g_osVersion.BuildNumber() >= 10074) // not needed for 8.1
 	{
 		// Unable to do with patterns alone, as Microsoft removed HrOpenControlPanel
-		if (!s_UseDCompFlyouts || !s_EnableImmersiveShellStack)
+		if (!s_UseDCompFlyouts || !s_ImmersiveShell)
 		{
 			HMODULE pnidui = LoadLibrary(L"pnidui.dll");
 
@@ -293,7 +293,7 @@ void CreateImmersiveShell()
 	////////////////////////////////
 	// 1. Todo in future *after* feature-set is complete: see how many of these hooks can be ChangeImportedAddress instead of MH_CreateHook (perf optimisation)
 	// 2. Code stack used exclusively for UWP mode, hence the conditional statement.
-	if (s_EnableImmersiveShellStack == 1) // Run these hooks only if the user has UWP enabled
+	if (s_ImmersiveShell < 2) // Run these hooks only if the user has UWP enabled
 	{
 		// 1. This will *need* serious optimization in the near future as it singlehandedly delays program enumeration and startup by several seconds
 		// 2. Prepare the taskbar and thumbnails to handle UWP icons. Further work needed for jumplists and to prevent wrongful classification as "Application Frame Host" in the first place.

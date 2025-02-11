@@ -106,7 +106,7 @@ void FixAuthUI()
 // I'll also be honest - I haven't tested 1703 because who actually uses 1703
 void DisableImmersiveStart()
 {
-	if (s_EnableImmersiveShellStack == 1) // don't run this if the user isn't using immersive shell
+	if (s_ImmersiveShell == 1) // don't run this if the user isn't using immersive shell
 	{
 		char* ShowStartView; // XamlLauncher::ShowStartView
 		char* SSVPattern;
@@ -177,7 +177,7 @@ DisableImmersiveStart_TWINUI:
 // The Windows 7 start menu search functionality is much superior to this in any case
 void DisableImmersiveSearch()
 {
-	if (s_EnableImmersiveShellStack == 1)
+	if (s_ImmersiveShell == 1)
 	{
 		char* CortanaDesktopExperienceView_ShowInternal;
 		char* CDEVSIPattern;
@@ -310,7 +310,7 @@ DisableImmersiveSearch_TWINUI:
 // For some reason, Germanium and later already disable this. We're not complaining.
 void DisableTaskView()
 {
-	if (s_EnableImmersiveShellStack == 1) // this on its own should be enough as we enforce this value to 0 prior to TH1
+	if (s_ImmersiveShell == 1) // this on its own should be enough as we enforce this value to 0 prior to TH1
 	{
 		// For historical context, the relevant function has changed name a few times...
 		// We opt to use the latest name throughout however the others are listed below:
@@ -478,7 +478,7 @@ void RestoreWin32Menus()
 // Disabled to prevent the shell from crashing due to incompatibilities with the XAML interface
 void DisableWin11AltTab()
 {
-	if (s_EnableImmersiveShellStack == 1 && g_osVersion.BuildNumber() >= 21996) // only run if we are using Windows 11
+	if (s_ImmersiveShell == 1 && g_osVersion.BuildNumber() >= 21996) // only run if we are using Windows 11
 	{
 		char* ShouldShowMTVAltTab = "40 53 48 83 EC 20 83 79 ?? 02 74 17";
 		char* SSMATPattern;
@@ -598,7 +598,7 @@ void RevertFlyouts()
 {
 	if (g_osVersion.BuildNumber() >= 10074) // not needed for 8.1
 	{
-		if (!s_UseDCompFlyouts || !s_EnableImmersiveShellStack)
+		if (!s_UseDCompFlyouts || !s_ImmersiveShell)
 		{
 			////// VOLUME FLYOUT
 			char* LaunchSndVol = "0F 1F 44 00 00 83 FB 66 75 11";
@@ -639,8 +639,26 @@ void RevertFlyouts()
 	}
 }
 
+void TEST()
+{
+	char* OnMessage = "48 89 5C 24 08 48 89 74 24 10 57 41 54 41 55 41 56 41 57 48 83 EC 60 48 8B F2 4C 8B E9 48 8B 02";
+
+	HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
+	if (twinui_pcshell)
+	{
+		char* OMPattern = (char*)FindPattern((uintptr_t)twinui_pcshell, OnMessage);
+
+		if (OMPattern) // first run, late NI
+		{
+			unsigned char bytes[] = { 0xB0, 0x00, 0xC3 };
+			ChangeImportedPattern(OMPattern, bytes, sizeof(bytes));
+		}
+	}
+}
+
 void ChangePatternImports()
 {
+	//TEST();
 	// Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
 	RemoveLoadAnimationDataMap();
 	RemoveGetClassIdForShellTarget();

@@ -469,10 +469,18 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 	LPVOID lpParam,
 	DWORD dwBand)
 {
-	if (s_EnableImmersiveShellStack == 1) // immersive enabled
+	if (s_ImmersiveShell < 2) // immersive enabled
 	{
 		DWORD p0 = (DWORD)_ReturnAddress();
 		dwExStyle = dwExStyle | WS_EX_TOOLWINDOW; // TODO is this needed?
+
+		WCHAR charmWnd[23] = L"Shell_CharmWindow";
+		if (strcmp((char*)lpClassName, (char*)charmWnd) == 0)
+		{
+			dwExStyle |= WS_EX_TOPMOST;
+		}
+
+
 		HWND ret = CreateWindowExW(dwExStyle, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hwndParent, hMenu, hInstance, lpParam);
 
 		// We do this to eliminate the ghost window
@@ -543,4 +551,190 @@ BOOL WINAPI RegisterWindowHotkeyNew(HWND hwnd, int id, UINT mod, UINT vk)
 	}
 
 	return TRUE;
+}
+
+BOOL DoesOSBuildSupportSpotlight()
+{
+	return (g_osVersion.BuildNumber() == 22000 && g_osVersion.BuildRevision() >= 706) || (g_osVersion.BuildNumber() >= 22598) || (g_osVersion.BuildNumber() >= 19045);
+}
+
+BOOL IsSpotlightEnabled()
+{
+	HKEY hKey = NULL;
+	BOOL bRet = RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\CLSID\\{2CC5CA98-6485-489A-920E-B3E88A6CCCE3}", 0, KEY_READ, &hKey) == ERROR_SUCCESS;
+	if (bRet) RegCloseKey(hKey);
+	return bRet;
+}
+
+#define SCRATCH_QCM_FIRST 1
+#define SCRATCH_QCM_LAST  0x7FFF
+
+#define SPOP_OPENMENU            1
+#define SPOP_INSERTMENU_ALL      0b1111110000
+#define SPOP_INSERTMENU_OPEN     0b0000010000
+#define SPOP_INSERTMENU_NEXTPIC  0b0000100000
+#define SPOP_INSERTMENU_LIKE     0b0001000000
+#define SPOP_INSERTMENU_DISLIKE  0b0010000000
+#define SPOP_INSERTMENU_INFOTIP1 0b0100000000
+#define SPOP_INSERTMENU_INFOTIP2 0b1000000000
+#define SPOP_CLICKMENU_FIRST     40000
+#define SPOP_CLICKMENU_OPEN      40000
+#define SPOP_CLICKMENU_NEXTPIC   40001
+#define SPOP_CLICKMENU_LIKE      40002
+#define SPOP_CLICKMENU_DISLIKE   40003
+#define SPOP_CLICKMENU_LAST      40003
+
+#define SEE_MASK_UNICODE 0x00004000
+
+TCHAR* mini_wcschr(const TCHAR* str, TCHAR ch)
+{
+	const TCHAR* ptr = str;
+	while (*ptr != '\0' && *ptr != ch) ptr++;
+	if (*ptr == ch) return (TCHAR*)ptr;
+	return NULL;
+}
+
+const int spop_insertmenu_ops[] = { SPOP_INSERTMENU_OPEN, SPOP_INSERTMENU_NEXTPIC, 0, SPOP_INSERTMENU_LIKE, SPOP_INSERTMENU_DISLIKE };
+void SpotlightHelper(DWORD dwOp, HWND hWnd, HMENU hMenu, LPPOINT pPt)
+{
+	HRESULT hr = S_OK;
+	LPITEMIDLIST pidl = NULL;
+	SFGAOF sfgao = 0;
+	if (SUCCEEDED(hr = SHParseDisplayName(L"::{2CC5CA98-6485-489A-920E-B3E88A6CCCE3}", NULL, &pidl, 0, &sfgao)))
+	{
+		IShellFolder* psf = NULL;
+		LPCITEMIDLIST pidlChild;
+		if (SUCCEEDED(hr = SHBindToParent(pidl, IID_IShellFolder, (void**)&psf, &pidlChild)))
+		{
+			IContextMenu* pcm = NULL;
+			if (SUCCEEDED(hr = psf->GetUIObjectOf(hWnd, 1, &pidlChild, IID_IContextMenu, NULL, (void**)&pcm)))
+			{
+				HMENU hMenu2 = CreatePopupMenu();
+				if (hMenu2)
+				{
+					if (SUCCEEDED(hr = pcm->QueryContextMenu(hMenu2, 0, SCRATCH_QCM_FIRST, SCRATCH_QCM_LAST, CMF_NORMAL)))
+					{
+						if (dwOp == SPOP_OPENMENU)
+						{
+							int iCmd = TrackPopupMenuEx(hMenu2, TPM_RETURNCMD, pPt->x, pPt->y, hWnd, NULL);
+							if (iCmd > 0)
+							{
+								CMINVOKECOMMANDINFOEX info = { 0 };
+								info.cbSize = sizeof(info);
+								info.fMask = CMIC_MASK_UNICODE | CMIC_MASK_PTINVOKE;
+								info.hwnd = hWnd;
+								info.lpVerb = MAKEINTRESOURCEA(iCmd - SCRATCH_QCM_FIRST);
+								info.lpVerbW = MAKEINTRESOURCEW(iCmd - SCRATCH_QCM_FIRST);
+								info.nShow = SW_SHOWNORMAL;
+								info.ptInvoke = *pPt;
+								pcm->InvokeCommand((CMINVOKECOMMANDINFO*)&info);
+							}
+						}
+						else if (!(dwOp & ~SPOP_INSERTMENU_ALL))
+						{
+							MENUITEMINFOW mii;
+							int i = ARRAYSIZE(spop_insertmenu_ops) - 1;
+							while (1)
+							{
+								if (i == -1 ? ((dwOp & SPOP_INSERTMENU_INFOTIP1) || (dwOp & SPOP_INSERTMENU_INFOTIP2)) : (dwOp & spop_insertmenu_ops[i]))
+								{
+									mii.cbSize = sizeof(MENUITEMINFOW);
+									mii.fMask = MIIM_FTYPE | MIIM_STRING;
+									mii.cch = 0;
+									mii.dwTypeData = NULL;
+									if (i <= 0 ?
+										(i == 0 ?
+											!RegQueryValueW(HKEY_CURRENT_USER, L"Software\\Classes\\CLSID\\{2cc5ca98-6485-489a-920e-b3e88a6ccce3}", NULL, (PLONG)&mii.cch) :
+											!RegGetValueW(HKEY_CURRENT_USER, L"Software\\Classes\\CLSID\\{2cc5ca98-6485-489a-920e-b3e88a6ccce3}", L"InfoTip", RRF_RT_REG_SZ, NULL, NULL, (LPDWORD)&mii.cch)
+											) :
+										GetMenuItemInfoW(hMenu2, i, TRUE, &mii))
+									{
+										WCHAR* buf = (WCHAR*)malloc(++mii.cch * sizeof(WCHAR));
+										if (buf)
+										{
+											mii.dwTypeData = buf;
+											if (i <= 0 ?
+												(i == 0 ?
+													!RegQueryValueW(HKEY_CURRENT_USER, L"Software\\Classes\\CLSID\\{2cc5ca98-6485-489a-920e-b3e88a6ccce3}", mii.dwTypeData, (PLONG)&mii.cch) :
+													!RegGetValueW(HKEY_CURRENT_USER, L"Software\\Classes\\CLSID\\{2cc5ca98-6485-489a-920e-b3e88a6ccce3}", L"InfoTip", RRF_RT_REG_SZ, NULL, mii.dwTypeData, (LPDWORD)&mii.cch)
+													) :
+												GetMenuItemInfoW(hMenu2, i, TRUE, &mii))
+											{
+												if (i == -1)
+												{
+													WCHAR* pCInit = mii.dwTypeData;
+													WCHAR* pC = mini_wcschr(mii.dwTypeData, L'\r');
+													if (pC)
+													{
+														pC[0] = 0;
+
+														pC++;
+														WCHAR* pC2 = mini_wcschr(pC, L'\r');
+														if (pC2)
+														{
+															pC2[0] = 0;
+														}
+														mii.dwTypeData = pC;
+
+														mii.fMask = MIIM_ID | MIIM_STRING | MIIM_DATA | MIIM_STATE;
+														mii.wID = 3999 + i - 1;
+														mii.dwItemData = SPOP_CLICKMENU_FIRST + i - 1;
+														mii.fType = MFT_STRING;
+														mii.fState = MFS_DISABLED;
+														if (dwOp & SPOP_INSERTMENU_INFOTIP2)
+														{
+															InsertMenuItemW(hMenu, 3, TRUE, &mii);
+														}
+
+														mii.dwTypeData = pCInit;
+													}
+												}
+												mii.fMask = MIIM_ID | MIIM_STRING | MIIM_DATA | (i == -1 ? MIIM_STATE : 0);
+												mii.wID = 3999 + i;
+												mii.dwItemData = SPOP_CLICKMENU_FIRST + i;
+												mii.fType = MFT_STRING;
+												if (i == -1) mii.fState = MFS_DISABLED;
+												if (i != -1 || (i == -1 && (dwOp & SPOP_INSERTMENU_INFOTIP1)))
+												{
+													InsertMenuItemW(hMenu, 3, TRUE, &mii);
+												}
+											}
+											free(buf);
+										}
+									}
+								}
+								i--;
+								if (i < -1) break;
+							}
+							mii.fMask = MIIM_FTYPE | MIIM_DATA;
+							mii.dwItemData = 0;
+							mii.fType = MFT_SEPARATOR;
+							InsertMenuItemW(hMenu, 3, TRUE, &mii);
+						}
+						else if (dwOp >= SPOP_CLICKMENU_FIRST && dwOp <= SPOP_CLICKMENU_LAST)
+						{
+							MENUITEMINFOW mii;
+							mii.cbSize = sizeof(MENUITEMINFOW);
+							mii.fMask = MIIM_ID;
+							if (GetMenuItemInfoW(hMenu2, dwOp - SPOP_CLICKMENU_FIRST, TRUE, &mii))
+							{
+								CMINVOKECOMMANDINFOEX info = { 0 };
+								info.cbSize = sizeof(info);
+								info.fMask = CMIC_MASK_UNICODE;
+								info.hwnd = hWnd;
+								info.lpVerb = MAKEINTRESOURCEA(mii.wID - SCRATCH_QCM_FIRST);
+								info.lpVerbW = MAKEINTRESOURCEW(mii.wID - SCRATCH_QCM_FIRST);
+								info.nShow = SW_SHOWNORMAL;
+								pcm->InvokeCommand((CMINVOKECOMMANDINFO*)&info);
+							}
+						}
+					}
+					DestroyMenu(hMenu2);
+				}
+				pcm->Release();
+			}
+			psf->Release();
+		}
+		CoTaskMemFree(pidl);
+	}
 }

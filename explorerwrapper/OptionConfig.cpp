@@ -6,7 +6,7 @@
 // - To create a new definition, you must define it here and in OptionConfig.h
 bool s_ClassicTheme;
 bool s_DisableComposition;
-int s_EnableImmersiveShellStack;
+int s_ImmersiveShell;
 bool s_UseTaskbarPinning;
 bool s_ShowStoreAppsOnTaskbar;
 bool s_ShowStoreAppsInStart;
@@ -37,7 +37,7 @@ void InitializeConfiguration()
 		// In other words, this is more efficient
 		g_registry.QueryValue(L"EnableImmersive", (LPBYTE)&dwEnableUWP, sizeof(DWORD));
 	}
-	s_EnableImmersiveShellStack = dwEnableUWP;
+	s_ImmersiveShell = dwEnableUWP;
 
 	// Taskbar pinning
 	// - Defaults to enabled (1)
@@ -50,7 +50,7 @@ void InitializeConfiguration()
 	// Store apps on taskbar
 	// - Defaults to the same value used by immersive stack
 	// - Only has an effect when UWP is enabled, otherwise this is always off
-	DWORD dwStoreAppsOnTaskbar = s_EnableImmersiveShellStack;
+	DWORD dwStoreAppsOnTaskbar = s_ImmersiveShell;
 	g_registry.QueryValue(L"StoreAppsOnTaskbar", (LPBYTE)&dwStoreAppsOnTaskbar, sizeof(DWORD));
 	s_ShowStoreAppsOnTaskbar = dwStoreAppsOnTaskbar;
 	
@@ -143,7 +143,7 @@ void InitializeConfiguration()
 	// DComp flyouts
 	// - Defaults to the same value used by immersive stack
 	// - Only has an effect when UWP is enabled, otherwise this is always off
-	DWORD dwUseDCompFlyouts = s_EnableImmersiveShellStack;
+	DWORD dwUseDCompFlyouts = s_ImmersiveShell;
 	g_registry.QueryValue(L"UseDCompFlyouts", (LPBYTE)&dwUseDCompFlyouts, sizeof(DWORD));
 	s_UseDCompFlyouts = dwUseDCompFlyouts;
 }

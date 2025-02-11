@@ -33,11 +33,10 @@
 #include "MinhookImports.h"
 #include "TypeDefinitions.h"
 
+DWORD dwSpotlightUpdateSchedule = 0;
+
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	//if (s_EnableImmersiveShellStack == 1)
-		//SetProgmanAsShell(); // misha: TODO hack
-
 	if (uMsg == 0x56D) return 0;
 	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
 	{
@@ -124,6 +123,11 @@ void ShimDesktop()
 	PostMessage(hwnd_desktop, 0x45C, 2, 3); //wallpaper & icons
 	PostMessage(hwnd_desktop, 0x45B, 0, 0); //final init
 	PostMessage(hwnd_desktop, 0x40B, 0, 0); //pins
+
+	if (hwnd_desktop)
+	{
+		if (IsSpotlightEnabled() && dwSpotlightUpdateSchedule) SetTimer(hwnd_desktop, 100, dwSpotlightUpdateSchedule * 1000, NULL);
+	}
 }
 
 PVOID WINAPI SHCreateDesktopNEW(PVOID p1)
@@ -339,16 +343,19 @@ UINT WINAPI RegisterWindowMessageWNEW(LPCWSTR lpString)
 // experimental hotkey fix 3 - buggy results but *does* appear to work
 HRESULT(__fastcall* CTaskBand_HandleShellHook)(PVOID ctaskband, int id, HWND a3);
 
-HRESULT(__fastcall* OnShellHookMessage)(void* a1);
-HRESULT OnShellHookMessage_Hook(void* a1) //gets called when start menu is to be opened - a bit temperamental
+HRESULT(__fastcall* OnShellHookMessage)(void* a1, unsigned __int64 id, HWND a3);
+HRESULT OnShellHookMessage_Hook(void* a1, unsigned __int64 id, HWND a3) //gets called when start menu is to be opened - a bit temperamental
 {
 	// key to note: at the moment, we can either do this for bugged start menu behaviour, or we can return S_OK and have no menu on the hotkey at all.
 	// neither is ideal, but we can probably ship m2 like this and fix properly later
 
-	if (CTaskBandPtr)
-		return CTaskBand_HandleShellHook(CTaskBandPtr,7,0);
+	if (CTaskBandPtr && id == 7)
+	{
+		PostMessageW(GetTaskbarWnd(), 0x504, 0, 0);
+		return S_OK;
+	}
 
-	return OnShellHookMessage(a1);
+	return OnShellHookMessage(a1, id, a3);
 }
 
 void HookShell32();
@@ -384,8 +391,8 @@ void HookAPIs() // largely a legacy function now
 	//fRegisterWindowMessageW = (decltype(fRegisterWindowMessageW))GetProcAddress(LoadLibraryW(L"user32.dll"),"RegisterWindowMessageW");
 
 	// disabled - <1607 doesnt like atm + unfinished. sorry! uncomment if you're testing
-	//CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
-	//OnShellHookMessage = (decltype(OnShellHookMessage))FindPattern((uintptr_t)LoadLibraryW(L"twinui.pcshell.dll"), "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83");
+	CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
+	OnShellHookMessage = (decltype(OnShellHookMessage))FindPattern((uintptr_t)LoadLibraryW(L"twinui.pcshell.dll"), "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83");
 
 	// disabled - <1607 doesnt like atm + unfinished. sorry! uncomment if you're testing
 	//MH_CreateHook(static_cast<LPVOID>(OnShellHookMessage), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&OnShellHookMessage));
@@ -434,16 +441,16 @@ void HookImmersive()
 	HMODULE hUser32 = GetModuleHandle(L"user32.dll");
 	CreateWindowInBandOrig = (CreateWindowInBandAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
-	if (s_EnableImmersiveShellStack == 1)
+	if (s_ImmersiveShell < 2)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
 
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
-	ChangeImportedAddress(immersiveui, "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
-	ChangeImportedAddress(immersiveui, "user32.dll", GetWindowBandOrig, GetWindowBandNew);
+	//ChangeImportedAddress(immersiveui, "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
+	//ChangeImportedAddress(immersiveui, "user32.dll", GetWindowBandOrig, GetWindowBandNew);
 	ChangeImportedAddress(immersiveui, "user32.dll", GetUserObjectInformation, GetUserObjectInformationNew);
 	ChangeImportedAddress(immersiveui, "user32.dll", SetTimer, SetTimer_WUI);
 
-	if (!s_EnableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
+	if (s_ImmersiveShell == 2 || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
 	{
 		//bugbug!!!
 		ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
@@ -657,7 +664,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		dbgprintf(L"create Metro before tray\n");
 		HookImmersive();
 
-		if (s_EnableImmersiveShellStack == 1) // Ittr: Only create TWinUI UWP mode here if we are going to use it
+		if (s_ImmersiveShell < 2) // Ittr: Only create TWinUI UWP mode here if we are going to use it
 			CreateTwinUI_UWP();
 
 	}
@@ -828,7 +835,7 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	if (rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
-		if (g_osVersion.BuildNumber() < 10074 || s_EnableImmersiveShellStack == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - restoring this on 10 is now seemingly unnecessary
+		if (g_osVersion.BuildNumber() < 10074 || s_ImmersiveShell == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - restoring this on 10 is now seemingly unnecessary
 		{
 			//register immersive shell fake too
 			RegisterFakeImmersive();
@@ -849,7 +856,7 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject(DWORD dwRegister)
 {
 	if (dwRegister == dwRegisterNotify)
 	{
-		if (g_osVersion.BuildNumber() < 10074 || s_EnableImmersiveShellStack == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		if (g_osVersion.BuildNumber() < 10074 || s_ImmersiveShell == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
 		{
 			UnregisterFakeImmersive();
 			UnregisterProjection();
