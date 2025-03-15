@@ -155,7 +155,7 @@ DWORD GetColorizationColor()
 	}
 
 	// Approximate default Windows 8.1 translucency if user has regular 10/11 colours used and has not manually set to 0xC4
-	if (s_UseWin8DefaultAlpha && a == 0xC4)
+	if (a == 0xC4)
 	{
 		a = 0x74;
 	}
@@ -442,11 +442,11 @@ void FirstRunCompatibilityWarning()
 // One-off warning for pre-release version
 void FirstRunPrereleaseWarning()
 {
+#ifdef PRERELEASE_COPY // do nothing if this isn't defined
 	DWORD value = 0;
 	RegGetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunPrereleaseCheck", &value);
 	if (value != 1)
 	{
-#ifdef PRERELEASE_COPY
 		MessageBoxW(NULL, L"Evaluation copy.\nFor testing purposes only.", L"explorer7", MB_ICONEXCLAMATION);
 		DWORD newValue = 1;
 		RegSetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunPrereleaseCheck", &newValue);
