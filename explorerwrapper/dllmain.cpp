@@ -1,5 +1,5 @@
 #define INITGUID
-//#define PRERELEASE_COPY
+#define PRERELEASE_COPY
 #include "util.h"
 #include "common.h"
 #include "forwards.h"
