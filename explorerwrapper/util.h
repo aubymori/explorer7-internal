@@ -450,8 +450,8 @@ void FirstRunPrereleaseWarning()
 		MessageBoxW(NULL, L"Evaluation copy.\nFor testing purposes only.", L"explorer7", MB_ICONEXCLAMATION);
 		DWORD newValue = 1;
 		RegSetDWORD(HKEY_CURRENT_USER, sz_SettingsKey, L"FirstRunPrereleaseCheck", &newValue);
-#endif
 	}
+#endif
 }
 
 // Ittr: The following 3 functions are here rather than any specific imports header because they are used by 2 different patch types
