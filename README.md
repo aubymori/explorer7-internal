@@ -15,7 +15,7 @@ explorer7 is a **wrapper library** that allows Windows 7's explorer.exe to run p
 
 </details>
 
-## Known issues (Milestone 2, last updated 2025-03-15)
+## Known issues (Milestone 2, last updated 2025-03-31)
 These issues, unless specified to have been resolved in a later Windows version, are persistent across subsequent versions of Windows from their introduction.
 
 **MAKE SURE YOU READ THESE FIRST SO YOU ARE AWARE OF WHAT YOU ARE GETTING INTO!**
@@ -260,3 +260,7 @@ If you're having linker errors because of the prebuilt minhook, do the following
 
 Contributors: DON'T COMMIT YOUR MODIFIED `libMinHook.x64.lib` UNLESS SPECIFIED!
 
+## Licensing
+The code for the project is licensed under GPLv3, to allow both for further research and for power-users to be able to make their own modifications. However, in the public interest, for the safety of users and developers alike, inclusion of compiled explorer7 DLL files in any form (whether compiled from source, forks of the source code, or from the release repository) in modified Windows ISOs, or "transformation packs", is strictly prohibited. 
+
+We reserve every right to act against unauthorised usage of the software, as outlined above.
