@@ -43,13 +43,6 @@ HTHEME __stdcall OpenThemeDataForDpi_Hook(HWND hwnd, LPCWSTR pszClassList, UINT 
 	if (g_loadedTheme && (lstrcmp(pszClassList, L"ItemsViewAccessible::Header") != 0))
 	{
 		theme = OpenThemeDataFromFile(g_loadedTheme, hwnd, pszClassList, flags);
-
-		// DEAD CODE - Delete before public deploy 
-		//if (g_osVersion.BuildNumber() >= 22631 && !IsThemeClassDefined(theme, L"ItemsViewAccessible", L"Header", 0))
-		//{
-		//	theme = nullptr; // ensure no data is leftover
-		//	theme = fOpenThemeDataForDpi(hwnd, pszClassList, dpi);
-		//}
 	}
 	else
 	{
@@ -200,20 +193,20 @@ bool fShowLauncher = false; // Ittr: First run erroneously shows the start menu,
 
 HRESULT OnShellHookMessage_Hook(void* a1) // This gets called when start menu is to be opened - has been a bit temperamental
 {
-	if (g_osVersion.BuildNumber() == 19041 || g_osVersion.BuildNumber() >= 22621) 
-	{
-		// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
-		if (CTaskBandPtr && fShowLauncher) // If the TaskBand exists, and the flag is set
-		{
-			return CTaskBand_HandleShellHook(CTaskBandPtr, 7, 0); // Use Windows 7's handling of ShellHook stuff
-		}
-		else // But if one of these conditions isn't met...
-		{
-			fShowLauncher = true; // Enable the flag for showing the start menu now that this first attempt has run through
-			return E_FAIL; // Then, ensure this run is marked as a failure
-		}
-	}
-	else // We do things a bit differently here
+	//if (g_osVersion.BuildNumber() == 19041 || g_osVersion.BuildNumber() >= 22631) 
+	//{
+	//	// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
+	//	if (CTaskBandPtr && fShowLauncher) // If the TaskBand exists, and the flag is set
+	//	{
+	//		return CTaskBand_HandleShellHook(CTaskBandPtr, 7, 0); // Use Windows 7's handling of ShellHook stuff
+	//	}
+	//	else // But if one of these conditions isn't met...
+	//	{
+	//		fShowLauncher = true; // Enable the flag for showing the start menu now that this first attempt has run through
+	//		return E_FAIL; // Then, ensure this run is marked as a failure
+	//	}
+	//}
+	//else // We do things a bit differently here
 	{
 		// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
 		if (fShowLauncher) // If the flag is set...
@@ -244,7 +237,6 @@ void SetUpThemeManager()
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeData), OpenThemeData_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeData));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataForDpi), OpenThemeDataForDpi_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataForDpi));
 	MH_CreateHook(static_cast<LPVOID>(fOpenThemeDataEx), OpenThemeDataEx_Hook, reinterpret_cast<LPVOID*>(&fOpenThemeDataEx));
-
 }
 
 void FixNonImmersivePniDui()
@@ -389,7 +381,7 @@ void _OnHShellTaskMan()
 	CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
 
 	// Then, work out what we need for different OS versions (TH1 through SE)
-	char* XamlLauncher_OnShellHookMessage;// = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83";
+	char* XamlLauncher_OnShellHookMessage;
 	char* XLOSHMPattern;
 
 	// Check whether the modern DLL exists in Windows

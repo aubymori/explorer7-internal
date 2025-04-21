@@ -680,24 +680,6 @@ void RevertFlyouts()
 	}
 }
 
-// DEAD CODE - Delete when ShellHook is completed
-//void FixHShell()
-//{
-//	char* HShellInitialEvent = "48 89 5C 24 08 57 48 83 EC 20 48 8B F9 E8 ?? ?? ?? ?? 84 C0 74 0D E8";
-//
-//	HMODULE TPS = LoadLibrary(L"twinui.pcshell.dll");
-//	if (TPS)
-//	{
-//		char* HSIEPattern = (char*)FindPattern((uintptr_t)TPS, HShellInitialEvent);
-//
-//		if (HSIEPattern)
-//		{
-//			unsigned char bytes[] = { 0xC3 };
-//			ChangeImportedPattern(HSIEPattern, bytes, sizeof(bytes));
-//		}
-//	}
-//}
-
 void ChangePatternImports()
 {
 	// Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system

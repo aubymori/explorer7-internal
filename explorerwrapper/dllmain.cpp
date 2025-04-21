@@ -425,8 +425,6 @@ void HookImmersive()
 	ChangeImportedAddress(immersiveui, "user32.dll", GetUserObjectInformation, GetUserObjectInformationNew);
 	ChangeImportedAddress(immersiveui, "user32.dll", SetTimer, SetTimer_WUI);
 
-	//ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "ntdll.dll", RtlIsMultiSessionSku, )
-
 	if (!s_EnableImmersiveShellStack || g_osVersion.BuildNumber() < 10074) // Ittr: If user *either* has UWP disabled, or they are NOT on Windows 10, run legacy window band code
 	{
 		//bugbug!!!
