@@ -186,7 +186,6 @@ VOID UpdateItemIcon(PVOID This, int a2)
 }
 
 // Ittr: Under immersive mode, the differences in ShellHook operation have to be accounted for
-HRESULT(__fastcall* CTaskBand_HandleShellHook)(PVOID ctaskband, int id, HWND a3);
 HRESULT(__fastcall* OnShellHookMessage)(void* a1);
 
 bool fShowLauncher = false; // Ittr: First run erroneously shows the start menu, unless we handle it differently
@@ -196,7 +195,7 @@ HRESULT OnShellHookMessage_Hook(void* a1) // This gets called when start menu is
 	// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
 	if (fShowLauncher) // If the flag is set...
 	{
-		PostMessageW(hwnd_taskbar, 0x504u, 0LL, 0LL); // Fire the message directly that opens Windows 7's start menu - ShellHook unreliable pre-VB
+		PostMessageW(hwnd_taskbar, 0x504, 0, 0); // Fire the message directly that opens Windows 7's start menu - ShellHook unreliable pre-VB
 		return S_OK; // Ensure the run is recognised as a success 
 	}
 	else // However, without the flag, this is presumed to be the first run
@@ -363,10 +362,7 @@ void _OnHShellTaskMan()
 	{
 		// Here we account for the immersive shell's destructive impacts upon certain internal mechanisms of explorer
 
-		// Retrieve the ShellHook handling used for Windows 7 first
-		CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
-
-		// Then, work out what we need for different OS versions (TH1 through SE)
+		// Work out what we need for different OS versions (TH1 through GE)
 		char* XamlLauncher_OnShellHookMessage;
 		char* XLOSHMPattern;
 

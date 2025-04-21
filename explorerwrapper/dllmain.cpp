@@ -1,5 +1,4 @@
 #define INITGUID
-#define PRERELEASE_COPY
 
 #pragma warning(disable:4302)
 #pragma warning(disable:4309)
