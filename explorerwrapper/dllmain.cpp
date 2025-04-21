@@ -289,22 +289,24 @@ void ModifyDesktopHwnd()
 	}
 }
 
-enum BlockHotKeyRegistrationFlags : __int32
-{
-	BHKRF_None = 0x0,
-	BHKRF_Always = 0x1,
-	BHKRF_PpiEdition = 0x2,
-	BHKRF_AssignedAccessMultiAppMode = 0x4,
-	BHKRF_ShellLauncher = 0x8,
-};
+// DEAD CODE - Delete when ShellHook is completed
+//enum BlockHotKeyRegistrationFlags : __int32
+//{
+//	BHKRF_None = 0x0,
+//	BHKRF_Always = 0x1,
+//	BHKRF_PpiEdition = 0x2,
+//	BHKRF_AssignedAccessMultiAppMode = 0x4,
+//	BHKRF_ShellLauncher = 0x8,
+//};
 
-const struct IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION
-{
-	BlockHotKeyRegistrationFlags blockFlags;
-	int id;
-	unsigned int fsModifiers;
-	unsigned int vk;
-};
+// DEAD CODE - Delete when ShellHook is completed
+//const struct IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION
+//{
+//	BlockHotKeyRegistrationFlags blockFlags;
+//	int id;
+//	unsigned int fsModifiers;
+//	unsigned int vk;
+//};
 
 // DEAD CODE - Delete when ShellHook is completed
 //HRESULT(__fastcall* CImmersiveWindowMessageService__RequestHotkeys)(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5);

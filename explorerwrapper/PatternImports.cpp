@@ -3,7 +3,6 @@
 // Remove AMAP class from loaded msstyle so that Vista and 7 msstyles are compatible
 void RemoveLoadAnimationDataMap()
 {
-	// 48 8B 53 20 48 8B ?? E8 ?? ?? ?? ?? 8B ?? 48 8B ?? E8 ?? ?? ?? ?? 8B ?? EB 05 B8 57 00 07 80
 	// thank you amrsatrio for the pattern + offsetting method
 	char* LoadAnimationDataMap = "48 8B 53 20 48 8B ?? E8 ?? ?? ?? ?? 8B ?? 48 8B";
 
@@ -556,7 +555,6 @@ void FixWin11SearchIcon()
 void DisableWinXMenu()
 {
 	// Ittr: This only applies to Windows 10. The menu is no longer part of the immersive shell starting with Windows 11 21H2.
-
 	char* ShowLauncherTipContextMenu; // CImmersiveHotkeyNotification::_ShowLauncherTipContextMenu
 	char* SLTCMPattern;
 	unsigned char bytes[] = { 0xB0, 0x01, 0xC3 };
