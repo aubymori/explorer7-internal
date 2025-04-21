@@ -289,59 +289,6 @@ void ModifyDesktopHwnd()
 	}
 }
 
-// DEAD CODE - Delete when ShellHook is completed
-//enum BlockHotKeyRegistrationFlags : __int32
-//{
-//	BHKRF_None = 0x0,
-//	BHKRF_Always = 0x1,
-//	BHKRF_PpiEdition = 0x2,
-//	BHKRF_AssignedAccessMultiAppMode = 0x4,
-//	BHKRF_ShellLauncher = 0x8,
-//};
-
-// DEAD CODE - Delete when ShellHook is completed
-//const struct IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION
-//{
-//	BlockHotKeyRegistrationFlags blockFlags;
-//	int id;
-//	unsigned int fsModifiers;
-//	unsigned int vk;
-//};
-
-// DEAD CODE - Delete when ShellHook is completed
-//HRESULT(__fastcall* CImmersiveWindowMessageService__RequestHotkeys)(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5);
-//HRESULT CImmersiveWindowMessageService__RequestHotkeys_Hook(void* a1, unsigned int a2, IMMERSIVE_WINDOW_MESSAGE_SERVICE_HOTKEY_REGISTRATION* a3, void* a4, unsigned int* a5)
-//{
-//	dbgprintf(L"CImmersiveWindowMessageService__RequestHotkeys");
-//	if (a3->vk == VK_LWIN || a3->vk == VK_RWIN || (a3->vk == VK_ESCAPE && a3->fsModifiers & VK_CONTROL)) // fix win key
-//	{
-//		dbgprintf(L"FIXING WINDOWS KEY");
-//		return S_OK;
-//	}
-//
-//	return CImmersiveWindowMessageService__RequestHotkeys(a1,a2,a3,a4,a5);
-//}
-
-// DEAD CODE - Delete when ShellHook is completed
-//UINT shellHook = 0;
-//
-//UINT(WINAPI* fRegisterWindowMessageW)(LPCWSTR lpString);
-//UINT WINAPI RegisterWindowMessageWNEW(LPCWSTR lpString)
-//{
-//	dbgprintf(L"RegisterWindowMessageWNEW %s",lpString);
-//	if (wcscmp(L"SHELLHOOK", lpString) == 0)
-//	{
-//		dbgprintf(L"RegisterWindowMessageWNEW REDIRD");
-//
-//		if (shellHook != 0)
-//			return shellHook;
-//
-//		shellHook = fRegisterWindowMessageW(L"SHELLHOOK");
-//		return shellHook;
-//	}
-//	return fRegisterWindowMessageW(lpString);
-//}
-
 void HookShell32();
 void HookAPIs() // largely a legacy function now
 {
@@ -368,11 +315,6 @@ void HookAPIs() // largely a legacy function now
 
 	// We run the Minhook patches here
 	ChangeMinhookImports();
-
-	//// DEAD CODE - Delete when ShellHook is completed
-	//CImmersiveWindowMessageService__RequestHotkeys = (decltype(CImmersiveWindowMessageService__RequestHotkeys))FindPattern((uintptr_t)LoadLibrary(L"twinui.dll"), "4C 8B DC 4D 89 43 ?? 57 41 54 41 55 41 56 41 57 48 83 EC");
-	//MH_CreateHook(static_cast<LPVOID>(CImmersiveWindowMessageService__RequestHotkeys), CImmersiveWindowMessageService__RequestHotkeys_Hook, reinterpret_cast<LPVOID*>(&CImmersiveWindowMessageService__RequestHotkeys));
-	//fRegisterWindowMessageW = (decltype(fRegisterWindowMessageW))GetProcAddress(LoadLibraryW(L"user32.dll"),"RegisterWindowMessageW");
 
 	// Prevent theme overrides applying to file explorer *VERY IMPORTANT*
 	HookTrayThread();
@@ -507,7 +449,6 @@ void InitPinnedListHack()
 		{
 			matchCTaskbandPinCreateInstance += 21;
 			matchCTaskbandPinCreateInstance += 5 + *(int*)(matchCTaskbandPinCreateInstance + 1);
-
 		}
 
 		if (!matchCTaskbandPinCreateInstance)

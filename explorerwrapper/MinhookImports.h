@@ -193,32 +193,16 @@ bool fShowLauncher = false; // Ittr: First run erroneously shows the start menu,
 
 HRESULT OnShellHookMessage_Hook(void* a1) // This gets called when start menu is to be opened - has been a bit temperamental
 {
-	//if (g_osVersion.BuildNumber() == 19041 || g_osVersion.BuildNumber() >= 22631) 
-	//{
-	//	// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
-	//	if (CTaskBandPtr && fShowLauncher) // If the TaskBand exists, and the flag is set
-	//	{
-	//		return CTaskBand_HandleShellHook(CTaskBandPtr, 7, 0); // Use Windows 7's handling of ShellHook stuff
-	//	}
-	//	else // But if one of these conditions isn't met...
-	//	{
-	//		fShowLauncher = true; // Enable the flag for showing the start menu now that this first attempt has run through
-	//		return E_FAIL; // Then, ensure this run is marked as a failure
-	//	}
-	//}
-	//else // We do things a bit differently here
+	// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
+	if (fShowLauncher) // If the flag is set...
 	{
-		// Use of fShowLauncher flag is essential to have something resembling stability for overall functionality
-		if (fShowLauncher) // If the flag is set...
-		{
-			PostMessageW(hwnd_taskbar, 0x504u, 0LL, 0LL); // Fire the message directly that opens Windows 7's start menu - ShellHook unreliable pre-VB
-			return S_OK; // Ensure the run is recognised as a success 
-		}
-		else // However, without the flag, this is presumed to be the first run
-		{
-			fShowLauncher = true; // Enable the flag for showing the start menu now that this first attempt has run through
-			return E_FAIL;  // Then, ensure this run is marked as a failure
-		}
+		PostMessageW(hwnd_taskbar, 0x504u, 0LL, 0LL); // Fire the message directly that opens Windows 7's start menu - ShellHook unreliable pre-VB
+		return S_OK; // Ensure the run is recognised as a success 
+	}
+	else // However, without the flag, this is presumed to be the first run
+	{
+		fShowLauncher = true; // Enable the flag for showing the start menu now that this first attempt has run through
+		return E_FAIL;  // Then, ensure this run is marked as a failure
 	}
 
 	return OnShellHookMessage(a1); // This codepath should ideally never run
@@ -375,83 +359,86 @@ void CreateImmersiveShell()
 
 void _OnHShellTaskMan()
 {
-	// Here we account for the immersive shell's destructive impacts upon certain internal mechanisms of explorer
-
-	// Retrieve the ShellHook handling used for Windows 7 first
-	CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
-
-	// Then, work out what we need for different OS versions (TH1 through SE)
-	char* XamlLauncher_OnShellHookMessage;
-	char* XLOSHMPattern;
-
-	// Check whether the modern DLL exists in Windows
-	HMODULE twinUI_PCShell = LoadLibrary(L"twinui.pcshell.dll");
-	if (twinUI_PCShell) // If it does...
+	if (s_EnableImmersiveShellStack == 1)
 	{
-		XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 83 C1 D8 33 D2 E8 ?? ?? ?? ?? 8B D8";
-		XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
+		// Here we account for the immersive shell's destructive impacts upon certain internal mechanisms of explorer
 
-		if (XLOSHMPattern) // NI, GE
+		// Retrieve the ShellHook handling used for Windows 7 first
+		CTaskBand_HandleShellHook = (decltype(CTaskBand_HandleShellHook))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 08 55 56 57 41 54 41 55 48 83 EC ?? 83 FA 07");
+
+		// Then, work out what we need for different OS versions (TH1 through SE)
+		char* XamlLauncher_OnShellHookMessage;
+		char* XLOSHMPattern;
+
+		// Check whether the modern DLL exists in Windows
+		HMODULE twinUI_PCShell = LoadLibrary(L"twinui.pcshell.dll");
+		if (twinUI_PCShell) // If it does...
 		{
-			MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
-		} 
-		else
-		{
-			XamlLauncher_OnShellHookMessage = "48 89 5C 24 08 57 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 76 48 8B 01";
+			XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 83 C1 D8 33 D2 E8 ?? ?? ?? ?? 8B D8";
 			XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
 
-			if (XLOSHMPattern) // CO
+			if (XLOSHMPattern) // NI, GE
 			{
 				MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 			}
 			else
 			{
-				XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83";
+				XamlLauncher_OnShellHookMessage = "48 89 5C 24 08 57 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 76 48 8B 01";
 				XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
 
-				if (XLOSHMPattern) // VB
+				if (XLOSHMPattern) // CO
 				{
 					MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 				}
 				else
 				{
-					XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 4E 48 8B 01";
+					XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 ?? 48 8B 01 48 8B 40 ?? FF 15 ?? ?? ?? ?? 84 C0 0F 85 ?? ?? ?? ?? 38 83";
 					XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
 
-					if (XLOSHMPattern) // RS5, 19H1
+					if (XLOSHMPattern) // VB
 					{
 						MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 					}
 					else
 					{
-						XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 59 48 8B 01"; // 0x59 cannot be wildcarded
+						XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 4E 48 8B 01";
 						XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
 
-						if (XLOSHMPattern) // RS4
+						if (XLOSHMPattern) // RS5, 19H1
 						{
 							MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 						}
 						else
 						{
-							XamlLauncher_OnShellHookMessage = "48 89 5C 24 10 57 48 83 EC 30 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 75 0A";
+							XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 74 59 48 8B 01"; // 0x59 cannot be wildcarded
 							XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
 
-							if (XLOSHMPattern) // RS3
+							if (XLOSHMPattern) // RS4
 							{
 								MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 							}
 							else
 							{
-								XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 75 07 B8 90 04 07 80 EB 6F 48 8B 01";
+								XamlLauncher_OnShellHookMessage = "48 89 5C 24 10 57 48 83 EC 30 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 75 0A";
 								XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
 
-								if (XLOSHMPattern) // RS2
+								if (XLOSHMPattern) // RS3
 								{
 									MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 								}
 								else
 								{
-									goto _OnHShellTaskMan_TWINUI; // New DLL exists on RS1 but unused for these purposes. Fall back to twinui.dll
+									XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 75 07 B8 90 04 07 80 EB 6F 48 8B 01";
+									XLOSHMPattern = (char*)FindPattern((uintptr_t)twinUI_PCShell, XamlLauncher_OnShellHookMessage);
+
+									if (XLOSHMPattern) // RS2
+									{
+										MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
+									}
+									else
+									{
+										goto _OnHShellTaskMan_TWINUI; // New DLL exists on RS1 but unused for these purposes. Fall back to twinui.dll
+									}
 								}
 							}
 						}
@@ -459,45 +446,45 @@ void _OnHShellTaskMan()
 				}
 			}
 		}
-	}
-	else // RS1 and earlier
-	{
-_OnHShellTaskMan_TWINUI:
-		HMODULE twinui = LoadLibrary(L"twinui.dll");
-
-		if (twinui) // This should always exist, but we check in case it doesn't
+		else // RS1 and earlier
 		{
-			XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 ?? ?? ?? ?? ?? ?? 48 8B 01";
-			XLOSHMPattern = (char*)FindPattern((uintptr_t)twinui, XamlLauncher_OnShellHookMessage);
+_OnHShellTaskMan_TWINUI:
+			HMODULE twinui = LoadLibrary(L"twinui.dll");
 
-			if (XLOSHMPattern) // RS1
+			if (twinui) // This should always exist, but we check in case it doesn't
 			{
-				MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
-			}
-			else
-			{
-				XamlLauncher_OnShellHookMessage = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B B9 ?? ?? ?? ?? 48 8B D9 48 85 FF ?? ?? ?? ?? ?? ?? 48 8B 07";
+				XamlLauncher_OnShellHookMessage = "40 53 48 83 EC 20 48 8B D9 48 8B 89 ?? ?? ?? ?? 48 85 C9 ?? ?? ?? ?? ?? ?? 48 8B 01";
 				XLOSHMPattern = (char*)FindPattern((uintptr_t)twinui, XamlLauncher_OnShellHookMessage);
 
-				if (XLOSHMPattern) // TH2
+				if (XLOSHMPattern) // RS1
 				{
 					MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
 				}
 				else
 				{
-					XamlLauncher_OnShellHookMessage = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B B9 ?? ?? ?? ?? 48 8B D9 48 85 FF 74 62";
-					char* CImmersiveLauncher_OnShellHookMessage = "48 89 5C 24 10 55 56 57 48 8B EC 48 83 EC 20 FF"; // Server uses this
-
+					XamlLauncher_OnShellHookMessage = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B B9 ?? ?? ?? ?? 48 8B D9 48 85 FF ?? ?? ?? ?? ?? ?? 48 8B 07";
 					XLOSHMPattern = (char*)FindPattern((uintptr_t)twinui, XamlLauncher_OnShellHookMessage);
-					char* CILOSHMPattern = (char*)FindPattern((uintptr_t)twinui, CImmersiveLauncher_OnShellHookMessage);
 
-					if (XLOSHMPattern) // TH1
+					if (XLOSHMPattern) // TH2
 					{
 						MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
+					}
+					else
+					{
+						XamlLauncher_OnShellHookMessage = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B B9 ?? ?? ?? ?? 48 8B D9 48 85 FF 74 62";
+						char* CImmersiveLauncher_OnShellHookMessage = "48 89 5C 24 10 55 56 57 48 8B EC 48 83 EC 20 FF"; // Server uses this
 
-						if (CILOSHMPattern) // Second stage for Server SKUs that use legacy CImmersiveLauncher
+						XLOSHMPattern = (char*)FindPattern((uintptr_t)twinui, XamlLauncher_OnShellHookMessage);
+						char* CILOSHMPattern = (char*)FindPattern((uintptr_t)twinui, CImmersiveLauncher_OnShellHookMessage);
+
+						if (XLOSHMPattern) // TH1
 						{
-							MH_CreateHook(static_cast<LPVOID>(CILOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&CILOSHMPattern));
+							MH_CreateHook(static_cast<LPVOID>(XLOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&XLOSHMPattern));
+
+							if (CILOSHMPattern) // Second stage for Server SKUs that use legacy CImmersiveLauncher
+							{
+								MH_CreateHook(static_cast<LPVOID>(CILOSHMPattern), OnShellHookMessage_Hook, reinterpret_cast<LPVOID*>(&CILOSHMPattern));
+							}
 						}
 					}
 				}
