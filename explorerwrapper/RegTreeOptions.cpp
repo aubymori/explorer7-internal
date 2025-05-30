@@ -1,3 +1,4 @@
+#include "common.h"
 #include "RegTreeOptions.h"
 
 CRegTreeOptionsWrapper::CRegTreeOptionsWrapper(IRegTreeOptions8* pUnk)

@@ -1,3 +1,4 @@
+#include "common.h"
 #include "OSVersion.h"
 
 typedef NTSTATUS (NTAPI *RtlGetVersion_t)(PRTL_OSVERSIONINFOEXW);

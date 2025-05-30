@@ -1,3 +1,4 @@
+#include "common.h"
 #include "ImmersiveFactory.h"
 #include "dbgprint.h"
 

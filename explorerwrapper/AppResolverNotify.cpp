@@ -1,3 +1,4 @@
+#include "common.h"
 #include "AppResolverNotify.h"
 #include "dbgprint.h"
 

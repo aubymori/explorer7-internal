@@ -1,3 +1,4 @@
+#include "common.h"
 #include "AuthUI.h"
 #include "dbgprint.h"
 

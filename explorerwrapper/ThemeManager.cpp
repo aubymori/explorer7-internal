@@ -1,3 +1,4 @@
+#include "common.h"
 #include "ThemeManager.h"
 #include "dbgprint.h"
 #include "pathcch.h"

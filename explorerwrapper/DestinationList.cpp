@@ -1,3 +1,4 @@
+#include "common.h"
 #include "DestinationList.h"
 
 CAutoDestWrapper::CAutoDestWrapper(IAutoDestinationList10* destlist)

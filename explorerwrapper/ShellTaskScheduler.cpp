@@ -1,3 +1,4 @@
+#include "common.h"
 #include "ShellTaskScheduler.h"
 #include "dbgprint.h"
 

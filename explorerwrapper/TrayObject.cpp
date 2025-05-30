@@ -1,3 +1,4 @@
+#include "common.h"
 #include "TrayObject.h"
 #include "dbgprint.h"
 

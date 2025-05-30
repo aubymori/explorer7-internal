@@ -1,3 +1,4 @@
+#include "common.h"
 #include "OptionConfig.h"
 
 // Ittr: Migrated all configuration here to make things clearer in dllmain

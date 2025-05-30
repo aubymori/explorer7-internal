@@ -1,3 +1,4 @@
+#include "common.h"
 #include "PatternImports.h"
 
 // Remove AMAP class from loaded msstyle so that Vista and 7 msstyles are compatible

@@ -1,5 +1,5 @@
+#include "common.h"
 #include "TrayNotify.h"
-#include <Shlwapi.h>
 #include "dbgprint.h"
 #include "OSVersion.h"
 

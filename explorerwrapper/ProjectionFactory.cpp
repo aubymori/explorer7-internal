@@ -1,3 +1,4 @@
+#include "common.h"
 #include "ProjectionFactory.h"
 #include "dbgprint.h"
 #pragma function(memset)

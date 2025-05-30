@@ -1,3 +1,4 @@
+#include "common.h"
 #include "StartMenuResolver.h"
 #include "StartMenuPin.h"
 #include "dbgprint.h"

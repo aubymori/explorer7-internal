@@ -1,3 +1,4 @@
+#include "common.h"
 #include "PinnedList.h"
 #include "dbgprint.h"
 #include "OSVersion.h"

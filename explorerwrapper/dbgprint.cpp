@@ -1,3 +1,4 @@
+#include "common.h"
 #include "dbgprint.h"
 
 void dbgvprintf(LPCWSTR format, void* _argp)

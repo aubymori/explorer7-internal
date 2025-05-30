@@ -212,6 +212,9 @@
     <ClCompile Include="PatternImports.cpp">
       <Filter>Source code files</Filter>
     </ClCompile>
+    <ClCompile Include="common.cpp">
+      <Filter>Source code files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wrapper.rc">

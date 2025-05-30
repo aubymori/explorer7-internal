@@ -1,3 +1,4 @@
+#include "common.h"
 #include "ShellURL.h"
 
 CShellURLWrapper::CShellURLWrapper(IShellURL10* actual)

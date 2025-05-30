@@ -1,3 +1,4 @@
+#include "common.h"
 #include "StartMenuItemFilter.h"
 #include "augmentedshellfolder.h"
 #include "Shlobj_core.h"

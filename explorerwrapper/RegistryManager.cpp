@@ -1,3 +1,4 @@
+#include "common.h"
 #include "RegistryManager.h"
 #include "dbgprint.h"
 

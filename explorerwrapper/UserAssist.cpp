@@ -1,3 +1,4 @@
+#include "common.h"
 #include "UserAssist.h"
 
 IUserAssist* g_UserAssist;

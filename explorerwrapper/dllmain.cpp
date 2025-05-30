@@ -6,8 +6,8 @@
 #pragma warning(disable:4312)
 #pragma warning(disable:4700) // this one in particular because it fires erroneously
 
-#include "util.h"
 #include "common.h"
+#include "util.h"
 #include "forwards.h"
 #include "StartMenuResolver.h"
 #include "TrayObject.h"
