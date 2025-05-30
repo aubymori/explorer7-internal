@@ -399,3 +399,4 @@ FodyWeavers.xsd
 
 # Minhook minibuild
 minhook/
+/.idea

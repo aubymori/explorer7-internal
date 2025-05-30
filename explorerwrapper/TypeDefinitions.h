@@ -250,7 +250,17 @@ typedef struct {
 	DWORD ColorizationOpaqueBlend;
 } DWMCOLORIZATIONPARAMS, * PDWMCOLORIZATIONPARAMS;
 
-__int64(__fastcall* DwmpActivateLivePreview)(int a1, __int64 a2, __int64 a3, int a4, void* a5);
+enum LIVEPREVIEW_TRIGGER
+{
+	LPT_SHOWDESKTOP = 1,
+	LPT_KEYBOARDSHORTCUT = 2,
+	LPT_SUPERBAR = 3,
+	LPT_ALTTAB = 4,
+	LPT_SUPERBAR_TOUCH = 5,
+	LPT_SHOWDESKTOP_TOUCH = 6,
+};
+
+HRESULT(__fastcall* DwmpActivateLivePreview)(BOOL fActivate, HWND hwndExclude, HWND hwndInsertBefore, LIVEPREVIEW_TRIGGER lpt, RECT* prcFinalLocation);
 
 typedef BOOL(WINAPI* IsShellWindow_t)(HWND);
 IsShellWindow_t IsShellFrameWindow = nullptr;

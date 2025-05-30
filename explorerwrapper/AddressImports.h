@@ -203,19 +203,19 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 }
 
 // Adjust preview activation to prevent possible crashing
-__int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void* a5)
+HRESULT DwmpActivateLivePreviewNEW(BOOL fActivate, HWND hwndExclude, HWND hwndInsertBefore, LIVEPREVIEW_TRIGGER lpt, RECT* prcFinalLocation)
 {
-	if (a5 == (void*)8)
+	if (prcFinalLocation == (void*)8)
 	{
-		a5 = 0;
+		prcFinalLocation = nullptr;
 	}
 
-	if (a5 && IsBadReadPtr(a5, 0x8))
+	if (prcFinalLocation && IsBadReadPtr(prcFinalLocation, 0x8))
 	{
-		a5 = 0;
+		prcFinalLocation = nullptr;
 	}
 
-	return DwmpActivateLivePreview(a1, a2, a3, a4, a5);
+	return DwmpActivateLivePreview(fActivate, hwndExclude, hwndInsertBefore, lpt, prcFinalLocation);
 }
 
 // Adjust colorization parameters
