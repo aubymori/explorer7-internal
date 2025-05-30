@@ -159,13 +159,15 @@ VOID SetWindowIcon(PVOID This, HWND a2, HICON a3, int a4)
 		if (hc) SetIcon(This, a2, hc, a4);
 	}
 	else
+	{
 		SetIcon(This, a2, a3, a4);
+	}
 }
 
 VOID UpdateItemIcon(PVOID This, int a2)
 {
-	typedef void* (__fastcall* GetTaskItemFunc)(void*);
-	typedef HWND(__fastcall* GetWindowFunc)(void*);
+	typedef void* (WINAPI* GetTaskItemFunc)(void*);
+	typedef HWND(WINAPI* GetWindowFunc)(void*);
 
 	HDPA hdpaTaskThumbnails = *(HDPA*)((PBYTE)This + 0xB0);
 	auto v4 = DPA_FastGetPtr(hdpaTaskThumbnails, a2);
@@ -175,13 +177,16 @@ VOID UpdateItemIcon(PVOID This, int a2)
 	auto vtable_v5 = *(uintptr_t**)v5;
 	GetWindowFunc GetWindow = (GetWindowFunc)vtable_v5[0x98 / sizeof(uintptr_t)];
 	HWND v6 = GetWindow(v5);
+
 	if (IsShellFrameWindow && IsShellFrameWindow(v6))
 	{
 		HICON hc = GetUWPIcon(v6);
 		if (hc) SetIconThumb(This, hc, a2, 3);
 	}
 	else
+	{
 		UpdateItem(This, a2);
+	}
 
 }
 
@@ -276,8 +281,9 @@ void UpdateTrayWindowDefinitions()
 	// Hook and update definitions of what windows should be added to the tray - largely for UWP purposes, but essentially zero-cost so included on both immersive on and off modes.
 	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
 	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
-	MH_CreateHook(static_cast<LPVOID>(_ShouldAddWindowToTray), ShouldAddWindowToTray, reinterpret_cast<LPVOID*>(&_ShouldAddWindowToTray));
-	MH_CreateHook(static_cast<LPVOID>(_IsWindowNotDesktopOrTray), IsWindowNotDesktopOrTray, reinterpret_cast<LPVOID*>(&_IsWindowNotDesktopOrTray));
+
+	MH_CreateHook(_ShouldAddWindowToTray, ShouldAddWindowToTray, &_ShouldAddWindowToTray);
+	MH_CreateHook(_IsWindowNotDesktopOrTray, IsWindowNotDesktopOrTray, &_IsWindowNotDesktopOrTray);
 }
 
 void SetProgramListNscTreeAttributes()
@@ -287,7 +293,9 @@ void SetProgramListNscTreeAttributes()
 	{
 		CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 		if (CNSCHost_FillNSCOg)
+		{
 			MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now
+		}
 	}
 }
 
@@ -302,7 +310,7 @@ void HandleThumbnailColorization()
 
 		if (CTLWRPattern)
 		{
-			MH_CreateHook(static_cast<LPVOID>(CTLWRPattern), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
+			MH_CreateHook(CTLWRPattern, RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
 		}
 		else // 7779 and 7785
 		{
@@ -311,7 +319,7 @@ void HandleThumbnailColorization()
 
 			if (CTLWRPattern)
 			{
-				MH_CreateHook(static_cast<LPVOID>(CTLWRPattern), RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
+				MH_CreateHook(CTLWRPattern, RenderThumbnail, reinterpret_cast<LPVOID*>(&renderThumbnail_orig));
 			}
 		}
 	}
@@ -402,23 +410,30 @@ void CreateImmersiveShell()
 		MH_CreateHook(static_cast<LPVOID>(SetWindowBandApiOrg), SetWindowBandNew, reinterpret_cast<LPVOID*>(&SetWindowBandApiOrg));
 		MH_CreateHook(static_cast<LPVOID>(RegisterHotKeyApiOrg), RegisterWindowHotkeyNew, reinterpret_cast<LPVOID*>(&RegisterHotKeyApiOrg));
 
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2581), RetTrue, NULL); // GetWindowTrackInfoAsync
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2563), RetTrue, NULL); // ClearForeground
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2628), RetTrue, NULL); // CreateWindowGroup
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2629), RetTrue, NULL); // DeleteWindowGroup
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2631), RetTrue, NULL); // EnableWindowGroupPolicy
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2627), RetTrue, NULL); // SetBridgeWindowChild
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2511), RetTrue, NULL); // SetFallbackForeground
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2566), RetTrue, NULL); // SetWindowArrangement
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2632), RetTrue, NULL); // SetWindowGroup
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2579), RetTrue, NULL); // SetWindowShowState
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2585), RetTrue, NULL); // UpdateWindowTrackingInfo
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2514), RetTrue, NULL); // RegisterEdgy
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2542), RetTrue, NULL); // RegisterShellPTPListener
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2537), RetTrue, NULL); // SendEventMessage
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2513), RetTrue, NULL); // SetActiveProcessForMonitor
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2564), RetTrue, NULL); // RegisterWindowArrangementCallout
-		MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), (LPCSTR)2567), RetTrue, NULL); // EnableShellWindowManagementBehavior
+		int iImportsToPatch[] = {
+			2511, // SetFallbackForeground
+			2513, // SetActiveProcessForMonitor
+			2514, // RegisterEdgy
+			2537, // SendEventMessage
+			2542, // RegisterShellPTPListener
+			2563, // ClearForeground
+			2564, // RegisterWindowArrangementCallout
+			2566, // SetWindowArrangement
+			2567, // EnableShellWindowManagementBehavior
+			2579, // SetWindowShowState
+			2581, // GetWindowTrackInfoAsync
+			2585, // UpdateWindowTrackingInfo
+			2627, // SetBridgeWindowChild
+			2628, // CreateWindowGroup
+			2629, // DeleteWindowGroup
+			2631, // EnableWindowGroupPolicyAdd commentMore actions
+			2632, // SetWindowGroup
+		};
+
+		for (int i = 0; i < ARRAYSIZE(iImportsToPatch); ++i)
+		{
+			MH_CreateHook(GetProcAddress(GetModuleHandle(L"user32.dll"), MAKEINTRESOURCEA(iImportsToPatch[i])), RetTrue, NULL);
+		}
 	}
 }
 

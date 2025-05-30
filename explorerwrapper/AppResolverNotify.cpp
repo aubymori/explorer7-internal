@@ -18,12 +18,12 @@ HRESULT STDMETHODCALLTYPE CAppResolverNotify8::QueryInterface(REFIID riid,void *
 	return E_NOTIMPL;
 }
 
-ULONG STDMETHODCALLTYPE CAppResolverNotify8::AddRef(void)
+ULONG STDMETHODCALLTYPE CAppResolverNotify8::AddRef()
 {
 	return InterlockedIncrement(&m_cRef);
 }
 
-ULONG STDMETHODCALLTYPE CAppResolverNotify8::Release(void)
+ULONG STDMETHODCALLTYPE CAppResolverNotify8::Release()
 {
 	if (InterlockedDecrement(&m_cRef) == 0)
 	{
@@ -39,7 +39,7 @@ HRESULT STDMETHODCALLTYPE CAppResolverNotify8::OnChangeNotify(long p1,PVOID* p2,
 	return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE CAppResolverNotify8::AddHotkey(unsigned int p1, PVOID* p2, PVOID* p3, int p4)
+HRESULT STDMETHODCALLTYPE CAppResolverNotify8::AddHotkey(UINT p1, PVOID* p2, PVOID* p3, int p4)
 {
 	dbgprintf(L"CAppResolverNotify8::AddHotkey %p %p %p %p",p1,p2,p3,p4);
 	return E_NOTIMPL;

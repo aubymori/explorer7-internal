@@ -146,9 +146,7 @@ UINT WINAPI SetErrorModeNEW(UINT uMode)
 //Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
 BOOL WINAPI IsCompositionActiveNEW()
 {
-	if (s_DisableComposition) { return FALSE; }
-
-	return IsCompositionActive();
+	return s_DisableComposition ? FALSE : IsCompositionActive();
 }
 
 // Apply relevant Win8-era theme classes if they're defined
@@ -185,9 +183,7 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 // Disable composition where appropriate
 HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
 {
-	if (s_DisableComposition) { return DWM_E_COMPOSITIONDISABLED; } //0x80263001 is the value to signify composition being disabled for some reason
-
-	return DwmIsCompositionEnabled(pfEnabled);
+	return s_DisableComposition ? DWM_E_COMPOSITIONDISABLED : DwmIsCompositionEnabled(pfEnabled);
 }
 
 // Disable legacy DwmEnableBlurBehindWindow when new methods are in use
@@ -225,12 +221,11 @@ __int64 DwmpActivateLivePreviewNEW(int a1, __int64 a2, __int64 a3, int a4, void*
 // Adjust colorization parameters
 DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 {
-	CHAR buffer[0x28];
-	memset(buffer, 0, 0x28);
 	dbgprintf(L"DwmGetColorizationParameters\nColorizationColor %p\nColorizationAfterglow %p\nColorizationColorBalance %p\nColorizationAfterglowBalance %p\nColorizationBlurBalance %p\nColorizationGlassReflectionIntensity %p\nColorizationOpaqueBlend %p",
 		colors->ColorizationColor, colors->ColorizationAfterglow, colors->ColorizationColorBalance, colors->ColorizationAfterglowBalance, colors->ColorizationBlurBalance, colors->ColorizationGlassReflectionIntensity, colors->ColorizationOpaqueBlend);
-	DWORD ret = DwmGetColorizationParametersOrig(&buffer);
-	memcpy(colors, (PVOID)buffer, sizeof(DWMCOLORIZATIONPARAMS));
+
+	memset(colors, 0, sizeof(DWMCOLORIZATIONPARAMS));
+	DWORD ret = DwmGetColorizationParametersOrig(colors);
 	return ret;
 }
 

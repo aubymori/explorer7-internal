@@ -221,23 +221,23 @@ const LPWSTR sz_ShellFolder3 = L"SOFTWARE\\Classes\\CLSID\\{865e5e76-ad83-4dca-a
 
 static LRESULT RegGetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
 {
-	DWORD sz = 4;
+	DWORD sz = sizeof(DWORD);
 	return SHRegGetValueW(key, subkey, value, SRRF_RT_REG_DWORD, NULL, dwVal, &sz);
 }
 
 static LRESULT RegSetDWORD(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
 {
-	return SHSetValueW(key, subkey, value, REG_DWORD, dwVal, 4);
+	return SHSetValueW(key, subkey, value, REG_DWORD, dwVal, sizeof(DWORD));
 }
 
-static LRESULT RegSetSZ(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+static LRESULT RegSetSZ(HKEY key, LPWSTR subkey, LPWSTR value, LPCWSTR pszValue)
 {
-	return SHSetValueW(key, subkey, value, REG_SZ, dwVal, (DWORD)wcslen((wchar_t*)dwVal) * sizeof(dwVal[0]));
+	return SHSetValueW(key, subkey, value, REG_SZ, pszValue, (lstrlen(pszValue) + 1) * sizeof(WCHAR));
 }
 
-static LRESULT RegSetExpandSZ(HKEY key, LPWSTR subkey, LPWSTR value, DWORD* dwVal)
+static LRESULT RegSetExpandSZ(HKEY key, LPWSTR subkey, LPWSTR value, LPCWSTR pszValue)
 {
-	return SHSetValueW(key, subkey, value, REG_EXPAND_SZ, dwVal, 2 * ((DWORD)wcslen((wchar_t*)dwVal) * sizeof(dwVal[0])));
+	return SHSetValueW(key, subkey, value, REG_EXPAND_SZ, pszValue, (lstrlen(pszValue) + 1) * sizeof(WCHAR));
 }
 
 typedef struct {

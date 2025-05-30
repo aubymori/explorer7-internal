@@ -389,15 +389,22 @@ void HookImmersive()
 	}
 }
 
-// Basically this allows explorer to actually work on builds >9200
+// functions, which are deprecated end up in shunimpl.dll
+// applications calling those functions load shunimpl.dll, therefore executing its DllMain
+// in shunimpl.dll's DllMain, since >9200 it returns FALSE, preventing the entire application from loading
+// we patch it to make it return TRUE and allow program execution.
 void PatchShunimpl()
 {
-	uintptr_t shunImpl = (uintptr_t)GetModuleHandle(L"shunimpl.dll");
-	if (!shunImpl) return;
-	char* dllmainSHUNIMPL = (char*)FindPattern(shunImpl, "48 83 EC 28 83 FA 01");
+	HMODULE hShunimpl = GetModuleHandle(L"shunimpl.dll");
+	if (!hShunimpl) return;
+
+	// shunimpl.dll DllMain
+	char* dllmainSHUNIMPL = (char*)FindPattern((uintptr_t)hShunimpl, "48 83 EC 28 83 FA 01");
 
 	if (dllmainSHUNIMPL)
 	{
+		// mov al, 0x1
+		// ret
 		unsigned char bytes[] = { 0xB0,0x01,0xC3 };
 		ChangeImportedPattern(dllmainSHUNIMPL, bytes, sizeof(bytes));
 	}
@@ -407,8 +414,8 @@ void PatchShunimpl()
 void ExitExplorerSilently()
 {
 	// we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
-	LPDWORD exitCode;
-	GetExitCodeProcess(L"explorer.exe", exitCode); // compiler warning is wrong here - the variable is supplied the exit code by this function
+	DWORD exitCode;
+	GetExitCodeProcess(L"explorer.exe", &exitCode);
 	ExitProcess((UINT)exitCode); // exit explorer
 }
 
@@ -485,10 +492,8 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	LPVOID lpReserved)
 {
 	// Ittr: We initialise values for closing program if incompatible software is present
-	WCHAR programPath[MAX_PATH] = L"\\Stardock\\WindowBlinds 11\\unins000.exe";
-	WCHAR blacklistPath[MAX_PATH];
-	ExpandEnvironmentStringsW(L"%ProgramFiles%", (LPWSTR)blacklistPath, sizeof(blacklistPath));
-	lstrcat(blacklistPath, programPath);
+	WCHAR szStardockPath[MAX_PATH]; 
+	ExpandEnvironmentStrings(L"%ProgramFiles%\\Stardock\\WindowBlinds 11\\unins000.exe", szStardockPath, ARRAYSIZE(szStardockPath));
 
 	switch (ul_reason_for_call)
 	{
@@ -496,7 +501,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	{
 		PatchShunimpl();
 
-		if (GetFileAttributesW((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
+		if (GetFileAttributesW(szStardockPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
 			CrashError(); // The user-facing crash message - we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
 
 		/*if (g_osVersion.BuildNumber() >= 26100)
@@ -542,7 +547,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 			g_alttabhooked = TRUE;
 		}
 
-		if (GetFileAttributes((LPCWSTR)blacklistPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 2 - actually stops the program from running
+		if (GetFileAttributes(szStardockPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 2 - actually stops the program from running
 			ExitExplorerSilently(); //byebye WB users
 
 	}

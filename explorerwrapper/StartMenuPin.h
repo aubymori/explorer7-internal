@@ -50,7 +50,7 @@ public:
 	STDMETHOD_(DWORD, IsRestricted)() PURE;
 	STDMETHOD_(void, Unimpl2)() PURE;
 	STDMETHOD_(LRESULT, GetMenuStringID)(UINT* w) PURE;
-	STDMETHOD_(int, GetHelpText)(unsigned __int64, LPWSTR, UINT) PURE;
+	STDMETHOD_(int, GetHelpText)(UINT, LPWSTR, UINT) PURE;
 	STDMETHOD_(LRESULT, GetChangeCount)(DWORD* pdwVal) PURE;
 	STDMETHOD_(wchar_t*, GetVerb)(UINT op) PURE;
 	STDMETHOD_(void, SendPinRearrangeSQM)() PURE;
@@ -85,7 +85,7 @@ public:
 	DWORD IsRestricted();
 	void Unimpl2();
 	LRESULT GetMenuStringID(UINT* w);
-	int GetHelpText(unsigned __int64,LPWSTR,UINT);
+	int GetHelpText(UINT,LPWSTR,UINT);
 	LRESULT GetChangeCount(ULONG* pdwVal);
 	wchar_t* GetVerb(UINT op);
 	void SendPinRearrangeSQM();
