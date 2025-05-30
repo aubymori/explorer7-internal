@@ -3,13 +3,12 @@
 
 struct UXTHEMEFILE
 {
-	char header[7]; // must be "thmfile"
-	LPVOID sharableSectionView;
+	char szHead[8]; // must be "thmfile"
+	BYTE* pbSharableData;
 	HANDLE hSharableSection;
-	LPVOID nsSectionView;
-	HANDLE hNsSection;
-	char end[3]; // must be "end"
-
+	BYTE* pbNonSharableData;
+	HANDLE hNonSharableSection;
+	char szTail[4]; // must be "end"
 };
 
 extern HRESULT(WINAPI *GetThemeDefaults)(

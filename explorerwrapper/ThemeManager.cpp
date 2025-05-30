@@ -15,16 +15,16 @@ void FreeTheme(UXTHEMEFILE* file)
 {
 	if (file)
 	{
-		if (file->sharableSectionView)
+		if (file->pbSharableData)
 		{
-			UnmapViewOfFile(file->sharableSectionView);
+			UnmapViewOfFile(file->pbSharableData);
 		}
-		if (file->nsSectionView)
+		if (file->pbNonSharableData)
 		{
-			UnmapViewOfFile(file->nsSectionView);
+			UnmapViewOfFile(file->pbNonSharableData);
 		}
 
-		CloseHandle(file->hNsSection);
+		CloseHandle(file->hNonSharableSection);
 		CloseHandle(file->hSharableSection);
 
 		free(file);
@@ -109,15 +109,15 @@ HRESULT LoadThemeFile(wchar_t *Path)
 	{
 		if (g_loadedTheme)
 		{
-			if (g_loadedTheme->sharableSectionView)
+			if (g_loadedTheme->pbSharableData)
 			{
-				UnmapViewOfFile(g_loadedTheme->sharableSectionView);
+				UnmapViewOfFile(g_loadedTheme->pbSharableData);
 			}
-			if (g_loadedTheme->nsSectionView)
+			if (g_loadedTheme->pbNonSharableData)
 			{
-				UnmapViewOfFile(g_loadedTheme->nsSectionView);
+				UnmapViewOfFile(g_loadedTheme->pbNonSharableData);
 			}
-			CloseHandle(g_loadedTheme->hNsSection);
+			CloseHandle(g_loadedTheme->hNonSharableSection);
 			CloseHandle(g_loadedTheme->hSharableSection);
 			//free(g_loadedTheme);
 			g_loadedTheme = 0;
@@ -148,15 +148,15 @@ HRESULT LoadThemeFile(wchar_t *Path)
 	{
 		if (g_loadedTheme)
 		{
-			if (g_loadedTheme->sharableSectionView)
+			if (g_loadedTheme->pbSharableData)
 			{
-				UnmapViewOfFile(g_loadedTheme->sharableSectionView);
+				UnmapViewOfFile(g_loadedTheme->pbSharableData);
 			}
-			if (g_loadedTheme->nsSectionView)
+			if (g_loadedTheme->pbNonSharableData)
 			{
-				UnmapViewOfFile(g_loadedTheme->nsSectionView);
+				UnmapViewOfFile(g_loadedTheme->pbNonSharableData);
 			}
-			CloseHandle(g_loadedTheme->hNsSection);
+			CloseHandle(g_loadedTheme->hNonSharableSection);
 			CloseHandle(g_loadedTheme->hSharableSection);
 			//free(g_loadedTheme);
 			g_loadedTheme = 0;
@@ -165,12 +165,12 @@ HRESULT LoadThemeFile(wchar_t *Path)
 		return hr;
 	}
 
-	memcpy(g_loadedTheme->header, "thmfile", 7);
-	memcpy(g_loadedTheme->end, "end", 3);
-	g_loadedTheme->sharableSectionView = MapViewOfFile(hSharable, 4, 0, 0, 0);
+	memcpy(g_loadedTheme->szHead, "thmfile", ARRAYSIZE(g_loadedTheme->szHead));
+	memcpy(g_loadedTheme->szTail, "end", ARRAYSIZE(g_loadedTheme->szTail));
+	g_loadedTheme->pbSharableData = (BYTE*)MapViewOfFile(hSharable, FILE_MAP_READ, 0, 0, 0);
 	g_loadedTheme->hSharableSection = hSharable;
-	g_loadedTheme->nsSectionView = MapViewOfFile(hNonSharable, 4, 0, 0, 0);
-	g_loadedTheme->hNsSection = hNonSharable;
+	g_loadedTheme->pbNonSharableData = (BYTE*)MapViewOfFile(hNonSharable, FILE_MAP_READ, 0, 0, 0);
+	g_loadedTheme->hNonSharableSection = hNonSharable;
 
 	return S_OK;
 }
