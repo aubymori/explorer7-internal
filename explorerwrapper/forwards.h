@@ -6,6 +6,7 @@
 #pragma comment(linker,"/export:CoRegisterClassObject=Explorer_CoRegisterClassObject")
 #pragma comment(linker,"/export:CoRevokeClassObject=Explorer_CoRevokeClassObject")
 #pragma comment(linker,"/export:IUnknown_QueryService=IUnknown_QueryServiceNEW,@176")
+#pragma comment(linker,"/export:IUnknown_QueryServiceExec=IUnknown_QueryServiceExecNEW,@484,NONAME")
 #pragma comment(linker,"/export:InitProcessPriv=InitProcessPriv")
 #pragma comment(linker,"/export:SHGetSignature=SHGetSignature,@559,NONAME")
 #pragma comment(linker,"/export:SHInvokeCommandWithFlagsAndSite=SHInvokeCommandWithFlagsAndSite,@571")
@@ -116,7 +117,7 @@
 #pragma comment(linker,FORWARDO(SHLWAPI,476))
 #pragma comment(linker,FORWARDO(SHLWAPI,478))
 #pragma comment(linker,FORWARDO(SHLWAPI,479))
-#pragma comment(linker,FORWARDO(SHLWAPI,484))
+//#pragma comment(linker,FORWARDO(SHLWAPI,484)) IUnknown_QueryServiceExec
 #pragma comment(linker,FORWARDO(SHLWAPI,487))
 #pragma comment(linker,FORWARDO(SHLWAPI,502)) //x64 only
 #pragma comment(linker,FORWARDO(SHLWAPI,503)) //x64 only
