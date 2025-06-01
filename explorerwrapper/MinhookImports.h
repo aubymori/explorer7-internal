@@ -105,16 +105,16 @@ void RenderThumbnail(PVOID This, int animoffset, int bNoRedraw)
 	DwmpUpdateAccentBlurRect(hwnd, &rc);
 }
 
+
 HICON GetUWPIcon(HWND a2)
 {
 	HICON icon = NULL;
 	IShellItemImageFactory* psiif = nullptr;
 	IPropertyStore* ips;
 	SHGetPropertyStoreForWindow(a2, IID_PPV_ARGS(&ips));
-	GUID myGuid = { 0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3} };
-	PROPERTYKEY propertyKey = { myGuid, 5 };
+
 	PROPVARIANT pv;
-	ips->GetValue(propertyKey, &pv);
+	ips->GetValue(PKEY_AppUserModel_ID, &pv);
 	if (pv.vt == VT_LPWSTR)
 	{
 		LPCWSTR aumid = pv.pwszVal;

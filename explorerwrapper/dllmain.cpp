@@ -687,13 +687,13 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 
 	if (riid == IID_AutoDestList && result != S_OK)
 	{
-		dbgprintf(L"USE 10 AUTODESTLIST!!!!\n");
+		//dbgprintf(L"USE 10 AUTODESTLIST!!!!\n");
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_AutoDestList10, ppv);
 		*ppv = new CAutoDestWrapper((IAutoDestinationList10*)*ppv);
 	}
 	if (riid == IID_CustomDestList && result != S_OK)
 	{
-		dbgprintf(L"CUSTOMDESTLIST!!!!\n");
+		//dbgprintf(L"CUSTOMDESTLIST!!!!\n");
 		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_CustomDestList10, ppv);
 		if (result != S_OK || !*ppv)
 		{

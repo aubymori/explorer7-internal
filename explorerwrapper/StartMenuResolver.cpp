@@ -122,55 +122,59 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForShortcut(IShellItem* p1
 	return m_resolver8->GetAppIDForShortcut(p1, p2);
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForWindow(HWND* p1, DWORD* p2, DWORD* p3, DWORD* p4, DWORD* p5)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForWindow(HWND p1, LPWSTR* p2, int* p3, int* p4, int* p5)
 {
 	dbgprintf(L"GetAppIDForWindow");
 	return m_resolver8->GetAppIDForWindow(p1, p2, p3, p4, p5);
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForProcess(ULONG_PTR p1, DWORD* p2, DWORD* p3, DWORD* p4, DWORD* p5)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForProcess(ULONG_PTR p1, LPWSTR* p2, int* p3, int* p4, int* p5)
 {
 	dbgprintf(L"GetAppIDForProcess");
 	return m_resolver8->GetAppIDForProcess(p1, p2, p3, p4, p5);
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetShortcutForProcess(ULONG_PTR p1, IUnknown* p2)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetShortcutForProcess(ULONG_PTR p1, IShellItem** p2)
 {
 	dbgprintf(L"GetShortcutForProcess");
 	return m_resolver8->GetShortcutForProcess(p1, p2);
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetBestShortcutForAppID(DWORD* p1, IUnknown* p2)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetBestShortcutForAppID(LPWSTR p1, IShellItem** p2)
 {
-	dbgprintf(L"GetBestShortcutForAppID");
-	return m_resolver8->GetBestShortcutForAppID(p1, p2);
+	dbgprintf(L"GetBestShortcutForAppID %s", p1);
+	HRESULT hr = m_resolver8->GetBestShortcutForAppID(p1, p2);
+	return hr;
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetBestShortcutAndAppIDForAppPath(DWORD* p1, IUnknown* p2, DWORD* p3)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetBestShortcutAndAppIDForAppPath(LPWSTR p1, IShellItem** p2, LPWSTR* p3)
 {
 	dbgprintf(L"GetBestShortcutAndAppIDForAppPath");
 	return m_resolver8->GetBestShortcutAndAppIDForAppPath(p1, p2, p3);
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::CanPinApp(IUnknown* p1)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::CanPinApp(IShellItem* p1)
 {
 	dbgprintf(L"CanPinApp");
 	return m_resolver8->CanPinApp(p1);
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetRelaunchProperties(HWND* p1, DWORD* p2, DWORD* p3, DWORD* p4, DWORD* p5, DWORD* p6)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetRelaunchProperties(HWND p1, LPWSTR* p2, LPWSTR* p3, LPWSTR* p4, LPWSTR* p5, LPWSTR* p6)
 {
 	//dbgprintf(L"GetRelaunchProperties");
-	return m_resolver8->GetRelaunchProperties(p1, p2, p3, p4, p5, p6, nullptr);
+	HRESULT hr = m_resolver8->GetRelaunchProperties(p1, p2, p3, p4, p5, p6, nullptr);
+	return hr;
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromWindowProperties(HWND* p1, IUnknown* p2)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromWindowProperties(HWND p1, IShellItem** p2)
 {
 	dbgprintf(L"GenerateShortcutFromWindowProperties");
-	return m_resolver8->GenerateShortcutFromWindowProperties(p1, p2);
+	HRESULT hr = m_resolver8->GenerateShortcutFromWindowProperties(p1, p2);
+
+	return hr;
 }
 
-HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromItemProperties(IUnknown* p1, IUnknown* p2)
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromItemProperties(IShellItem2* p1, IShellItem** p2)
 {
 	dbgprintf(L"GenerateShortcutFromItemProperties");
 	return m_resolver8->GenerateShortcutFromItemProperties(p1, p2);

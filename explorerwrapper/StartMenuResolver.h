@@ -25,15 +25,15 @@ IAppResolver7: public IUnknown
 {
 public:
 	STDMETHOD(GetAppIDForShortcut)(IShellItem*, LPWSTR*) PURE;
-	STDMETHOD(GetAppIDForWindow)(HWND*,DWORD*,DWORD*,DWORD*,DWORD*) PURE;
-	STDMETHOD(GetAppIDForProcess)(ULONG_PTR,DWORD*,DWORD*,DWORD*,DWORD*) PURE;
-	STDMETHOD(GetShortcutForProcess)(ULONG_PTR,IUnknown*) PURE;
-	STDMETHOD(GetBestShortcutForAppID)(DWORD*,IUnknown*) PURE;
-	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(DWORD*,IUnknown*,DWORD*) PURE;
-	STDMETHOD(CanPinApp)(IUnknown*) PURE;
-	STDMETHOD(GetRelaunchProperties)(HWND*,DWORD*,DWORD*,DWORD*,DWORD*,DWORD*) PURE;
-	STDMETHOD(GenerateShortcutFromWindowProperties)(HWND*,IUnknown*) PURE;
-	STDMETHOD(GenerateShortcutFromItemProperties)(IUnknown*,IUnknown*) PURE;
+	STDMETHOD(GetAppIDForWindow)(HWND,LPWSTR*,int*,int*,int*) PURE;
+	STDMETHOD(GetAppIDForProcess)(ULONG_PTR, LPWSTR*, int*, int*, int*) PURE;
+	STDMETHOD(GetShortcutForProcess)(ULONG_PTR, IShellItem**) PURE;
+	STDMETHOD(GetBestShortcutForAppID)(LPWSTR, IShellItem**) PURE;
+	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(LPWSTR, IShellItem**,LPWSTR*) PURE;
+	STDMETHOD(CanPinApp)(IShellItem*) PURE;
+	STDMETHOD(GetRelaunchProperties)(HWND, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*) PURE;
+	STDMETHOD(GenerateShortcutFromWindowProperties)(HWND, IShellItem**) PURE;
+	STDMETHOD(GenerateShortcutFromItemProperties)(IShellItem2*, IShellItem**) PURE;
 };
 
 MIDL_INTERFACE("de25675a-72de-44b4-9373-05170450c140")
@@ -41,17 +41,17 @@ IAppResolver8: public IUnknown
 {
 public:
 	STDMETHOD(GetAppIDForShortcut)(IShellItem*, LPWSTR*) PURE;
-	STDMETHOD(GetAppIDForShortcutObject)(IUnknown*, IUnknown*, DWORD*) PURE;
-	STDMETHOD(GetAppIDForWindow)(HWND*,DWORD*,DWORD*,DWORD*,DWORD*) PURE;
-	STDMETHOD(GetAppIDForProcess)(ULONG_PTR,DWORD*,DWORD*,DWORD*,DWORD*) PURE;
-	STDMETHOD(GetShortcutForProcess)(ULONG_PTR,IUnknown*) PURE;
-	STDMETHOD(GetBestShortcutForAppID)(DWORD*,IUnknown*) PURE;
-	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(DWORD*,IUnknown*,DWORD*) PURE;
-	STDMETHOD(CanPinApp)(IUnknown*) PURE;
-	STDMETHOD(CanPinAppShortcut)(IUnknown*, IUnknown*) PURE;
-	STDMETHOD(GetRelaunchProperties)(HWND*,DWORD*,DWORD*,DWORD*,DWORD*,DWORD*, int* a7) PURE;
-	STDMETHOD(GenerateShortcutFromWindowProperties)(HWND*,IUnknown*) PURE;
-	STDMETHOD(GenerateShortcutFromItemProperties)(IUnknown*,IUnknown*) PURE;
+	STDMETHOD(GetAppIDForShortcutObject)(IShellLinkW*, IShellItem*, LPWSTR**) PURE;
+	STDMETHOD(GetAppIDForWindow)(HWND, LPWSTR*, int*, int*, int*) PURE;
+	STDMETHOD(GetAppIDForProcess)(ULONG_PTR,LPWSTR*,int*,int*,int*) PURE;
+	STDMETHOD(GetShortcutForProcess)(ULONG_PTR,IShellItem**) PURE;
+	STDMETHOD(GetBestShortcutForAppID)(LPWSTR, IShellItem**) PURE;
+	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(LPWSTR, IShellItem**, LPWSTR*) PURE;
+	STDMETHOD(CanPinApp)(IShellItem*) PURE;
+	STDMETHOD(CanPinAppShortcut)(IShellLinkW*, IShellItem*) PURE;
+	STDMETHOD(GetRelaunchProperties)(HWND,LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, int* a7) PURE;
+	STDMETHOD(GenerateShortcutFromWindowProperties)(HWND, IShellItem**) PURE;
+	STDMETHOD(GenerateShortcutFromItemProperties)(IShellItem2*, IShellItem**) PURE;
 };
 
 MIDL_INTERFACE("05a232fd-2bfb-4349-9d48-4787f317f50a")
@@ -146,15 +146,15 @@ public:
 
 	//IAppResolver7
 	STDMETHODIMP GetAppIDForShortcut(IShellItem*, LPWSTR*);
-	STDMETHODIMP GetAppIDForWindow(HWND*, DWORD*, DWORD*, DWORD*, DWORD*);
-	STDMETHODIMP GetAppIDForProcess(ULONG_PTR, DWORD*, DWORD*, DWORD*, DWORD*);
-	STDMETHODIMP GetShortcutForProcess(ULONG_PTR, IUnknown*);
-	STDMETHODIMP GetBestShortcutForAppID(DWORD*, IUnknown*);
-	STDMETHODIMP GetBestShortcutAndAppIDForAppPath(DWORD*, IUnknown*, DWORD*);
-	STDMETHODIMP CanPinApp(IUnknown*);
-	STDMETHODIMP GetRelaunchProperties(HWND*, DWORD*, DWORD*, DWORD*, DWORD*, DWORD*);
-	STDMETHODIMP GenerateShortcutFromWindowProperties(HWND*, IUnknown*);
-	STDMETHODIMP GenerateShortcutFromItemProperties(IUnknown*, IUnknown*);
+	STDMETHODIMP GetAppIDForWindow(HWND, LPWSTR*, int*, int*, int*);
+	STDMETHODIMP GetAppIDForProcess(ULONG_PTR, LPWSTR*, int*, int*, int*);
+	STDMETHODIMP GetShortcutForProcess(ULONG_PTR, IShellItem**);
+	STDMETHODIMP GetBestShortcutForAppID(LPWSTR, IShellItem**);
+	STDMETHODIMP GetBestShortcutAndAppIDForAppPath(LPWSTR, IShellItem**, LPWSTR*);
+	STDMETHODIMP CanPinApp(IShellItem*);
+	STDMETHODIMP GetRelaunchProperties(HWND, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*);
+	STDMETHODIMP GenerateShortcutFromWindowProperties(HWND, IShellItem**);
+	STDMETHODIMP GenerateShortcutFromItemProperties(IShellItem2*, IShellItem**);
 
 	//IStartMenuItemsCache7
 	STDMETHODIMP OnChangeNotify(unsigned int, long, PVOID*, PVOID*);
