@@ -19,4 +19,8 @@ public:
 
 static CRegistryManager g_registry;
 
+#ifdef PRERELEASE_COPY
+const LPWSTR c_szSubkey = L"SOFTWARE\\explorer7";
+#else
 const LPWSTR c_szSubkey = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
+#endif

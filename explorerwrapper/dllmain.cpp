@@ -786,7 +786,7 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject(DWORD dwRegister)
 
 // TODO: move
 DEFINE_GUID(SID_SM_DESTLIST, 0x0851942B, 0xA1D0, 0x4E2E, 0xBE, 0x3A, 0x68, 0x5D, 0xD6, 0xA2, 0x5D, 0x1C); // 0851942b-a1d0-4e2e-be3a-685dd6a25d1c
-DEFINE_GUID(le_guid, 0x39D63FD3, 0x04C3, 0x400D, 0xB3, 0x94, 0xF7, 0xD9, 0x9C, 0x0E, 0xFE, 0x61); // 39d63fd3-04c3-400d-b394-f7d99c0efe61
+DEFINE_GUID(GUID_39d63fd3_04c3_400d_b394_f7d99c0efe61, 0x39D63FD3, 0x04C3, 0x400D, 0xB3, 0x94, 0xF7, 0xD9, 0x9C, 0x0E, 0xFE, 0x61); // 39d63fd3-04c3-400d-b394-f7d99c0efe61
 
 // windows 7
 struct SMDESTINFO7
@@ -826,14 +826,17 @@ extern "C" HRESULT WINAPI IUnknown_QueryServiceExecNEW(
 	VARIANT* pvarargOut)
 {
 	if (IsEqualGUID(guidService, SID_SM_DESTLIST)
-		&& IsEqualGUID(*guid, le_guid)
+		&& IsEqualGUID(*guid, GUID_39d63fd3_04c3_400d_b394_f7d99c0efe61)
 		&& cmdID == 332)
 	{
-		SMDESTINFO7* info = (SMDESTINFO7*)pvarargIn->byref;
-		if (IsShellManagedWindow(info->hwndTask))
+		if (pvarargIn)
 		{
-			//dbgprintf(L"%d; LauncherName: %s; AppID: %s", info->iImage, info->pszLauncherName, info->pszAppId);
-			GetDisplayNameFromAUMID(info->pszAppId, &info->pszLauncherName);
+			SMDESTINFO7* info = (SMDESTINFO7*)pvarargIn->byref;
+			if (IsShellManagedWindow(info->hwndTask))
+			{
+				//dbgprintf(L"%d; LauncherName: %s; AppID: %s", info->iImage, info->pszLauncherName, info->pszAppId);
+				GetDisplayNameFromAUMID(info->pszAppId, &info->pszLauncherName);
+			}
 		}
 	}
 	
