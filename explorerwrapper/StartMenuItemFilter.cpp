@@ -97,39 +97,41 @@ bool IsMergedFolderGUID(IShellFolder* ShellFolder, LPCITEMIDLIST pidl, REFGUID G
 
 HRESULT __stdcall CStartMenuItemFilter::IncludeItem(IShellItem* psi)
 {
-    ULONG v11;
-    HRESULT v4;
-
-    IParentAndItem* ParentAndItem;
-    v4 = psi->QueryInterface(IID_PPV_ARGS(&ParentAndItem));
-    if (v4 >= 0)
+    IParentAndItem* ppai;
+    HRESULT hr = psi->QueryInterface(IID_PPV_ARGS(&ppai));
+    if (SUCCEEDED(hr))
     {
-        IShellFolder* v7;
-        LPCITEMIDLIST pv;
-        v4 = ParentAndItem->GetParentAndItem(0, &v7, (LPITEMIDLIST*)&pv);
-        if (v4 >= 0)
+        IShellFolder* psf;
+        LPCITEMIDLIST ppidl;
+        hr = ppai->GetParentAndItem(0, &psf, (LPITEMIDLIST*)&ppidl);
+        if (SUCCEEDED(hr))
         {
-            if (IsMergedFolderGUID(v7, pv, FOLDERID_AppsFolder))
+            if (IsMergedFolderGUID(psf, ppidl, FOLDERID_AppsFolder))
             {
-                IShellItem2* v10;
-                v4 = psi->QueryInterface(IID_PPV_ARGS(&v10));
-                if (v4 >= 0 && v10->GetUInt32(PKEY_AppUserModel_HostEnvironment, &v11) >= 0 && v11 != 1)
+                IShellItem2* psi2;
+                hr = psi->QueryInterface(IID_PPV_ARGS(&psi2));
+                if (SUCCEEDED(hr))
                 {
-                    v4 = 1;
+                    ULONG uHostEnvironment;
+                    hr = psi2->GetUInt32(PKEY_AppUserModel_HostEnvironment, &uHostEnvironment);
+                    if (SUCCEEDED(hr) && (uHostEnvironment != 1 && uHostEnvironment != 2)) // Ittr: Added centennial items to the filter
+                    {
+                        hr = S_FALSE;
+                    }
                 }
-                v10->Release();
+                psi2->Release();
             }
-            else if (!FilterPidl(v7, pv))
+            else if (!FilterPidl(psf, ppidl))
             {
-                v4 = 1;
+                hr = S_FALSE;
             }
-            v7->Release();
-            CoTaskMemFree((LPVOID)pv);
+            psf->Release();
+            CoTaskMemFree((LPVOID)ppidl);
         }
-        ParentAndItem->Release();
+        ppai->Release();
     }
 
-    return v4;
+    return hr;
 }
 
 HRESULT __stdcall CStartMenuItemFilter::GetEnumFlagsForItem(IShellItem* psi, SHCONTF* pgrfFlags)
