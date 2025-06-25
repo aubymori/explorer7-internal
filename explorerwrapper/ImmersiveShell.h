@@ -38,37 +38,12 @@ public:
 	STDMETHOD(CreateShell)(IImmersiveShellController** controller) PURE;
 };
 
-// Ittr: Needs to exist for legacy or 8.1 codepath
-class CImmersiveBehaviorWrapper : public IImmersiveBehavior
-{
-public:
-	CImmersiveBehaviorWrapper(IImmersiveBehavior* behavior);
-	~CImmersiveBehaviorWrapper();
-
-	//IUnknown
-	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
-	STDMETHODIMP_(ULONG) AddRef(void);
-	STDMETHODIMP_(ULONG) Release(void);
-
-	//IImmersiveBehavior
-	STDMETHODIMP OnImmersiveThreadStart(void);
-	STDMETHODIMP OnImmersiveThreadStop(void);
-	STDMETHODIMP GetMaximumComponentCount(unsigned int* count);
-	STDMETHODIMP CreateComponent(unsigned int number, IUnknown** component);
-	STDMETHODIMP ShouldCreateComponent(unsigned int number, int* allowed);
-private:
-	IImmersiveBehavior* m_behavior;
-	long m_cRef;
-};
-
-void CreateTwinUI();
-void CreateTwinUI_UWP();
-DWORD WINAPI TwinThread( LPVOID lpParameter );
+void InitializeImmersiveController();
 
 interface IImmersiveShellHookService : IUnknown
 {
 	STDMETHOD(Register)(void** a1,
-		IImmersiveShellHookService* thiss,
+		IImmersiveShellHookService* pThis,
 		const unsigned int* prgMessages,
 		unsigned int cMessages,
 		IUnknown* pNotification, //IImmersiveShellHookNotification
@@ -78,7 +53,7 @@ interface IImmersiveShellHookService : IUnknown
 	STDMETHOD(SetTargetWindowForSerialization)(HWND hwnd);
 	STDMETHOD(PostShellHookMessageWithSerialization)(bool a1,
 		int a2,
-		IImmersiveShellHookService* thiss,
+		IImmersiveShellHookService* pThis,
 		unsigned int msg,
 		int msgParam); //todo:args
 	STDMETHOD(UpdateWindowApplicationId)(HWND hwnd, LPCWSTR pszAppID);

@@ -584,7 +584,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 		HookImmersive();
 
 		if (s_EnableImmersiveShellStack == 1) // Ittr: Only create TWinUI UWP mode here if we are going to use it
-			CreateTwinUI_UWP();
+			InitializeImmersiveController();
 
 	}
 	if (rclsid == CLSID_RegTreeOptions && riid == IID_IRegTreeOptions7) //upgrading RegTreeOptions interface

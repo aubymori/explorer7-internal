@@ -138,7 +138,7 @@ UINT WINAPI SetErrorModeNEW(UINT uMode)
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
 	if (s_EnableImmersiveShellStack == 1)
-		CreateTwinUI_UWP();
+		InitializeImmersiveController();
 
 	return SetErrorMode(uMode);
 }
