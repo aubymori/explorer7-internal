@@ -16,8 +16,8 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IEnumStartMenuItem: public IUnknown
 {
 public:
-	STDMETHOD(Next)( ULONG celt, PSTARTMENUITEM rgelt, ULONG * pceltFetched ) PURE;
-	STDMETHOD(Skip)( ULONG celt ) PURE;
+	STDMETHOD(Next)(ULONG celt, PSTARTMENUITEM rgelt, ULONG* pceltFetched) PURE;
+	STDMETHOD(Skip)(ULONG celt) PURE;
 	STDMETHOD(Reset)(void) PURE;
 	STDMETHOD(Clone)(IEnumStartMenuItem**) PURE;
 };
@@ -29,13 +29,13 @@ public:
 	~CEnumStartMenu();
 
 	//IUnknown
-    STDMETHODIMP QueryInterface(REFIID riid,void **ppvObject);    
-	STDMETHODIMP_(ULONG) AddRef( void);
-	STDMETHODIMP_(ULONG) Release( void);
+    STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);    
+	STDMETHODIMP_(ULONG) AddRef(void);
+	STDMETHODIMP_(ULONG) Release(void);
 
 	//IEnumUnknown
-	STDMETHODIMP Clone(IEnumStartMenuItem **ppenum);
-	STDMETHODIMP Next(ULONG celt,PSTARTMENUITEM rgelt,ULONG *pceltFetched);
+	STDMETHODIMP Clone(IEnumStartMenuItem** ppenum);
+	STDMETHODIMP Next(ULONG celt, PSTARTMENUITEM rgelt, ULONG* pceltFetched);
 	STDMETHODIMP Reset();
 	STDMETHODIMP Skip(ULONG celt);
 

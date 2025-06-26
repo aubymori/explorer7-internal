@@ -2,7 +2,7 @@
 #include "EnumStartMenu.h"
 #include "dbgprint.h"
 
-int CALLBACK CleanStartMenuItem(void *p,void *pData)
+int CALLBACK CleanStartMenuItem(void* p,void* pData)
 {
 	PSTARTMENUITEM item = (PSTARTMENUITEM)p;
 	ILFree(item->pidlRelative);
@@ -16,16 +16,16 @@ CEnumStartMenu::CEnumStartMenu()
 	m_enumidx = 0;
 	m_count = 0;
 	m_limit = 1000;
-	hArrItems = DSA_Create(sizeof(STARTMENUITEM),4);	
+	hArrItems = DSA_Create(sizeof(STARTMENUITEM), 4);	
 	dbgprintf(L"CEnumStartMenu::CEnumStartMenu\n");
 }
 
 CEnumStartMenu::~CEnumStartMenu()
 {
-	DSA_DestroyCallback(hArrItems,CleanStartMenuItem,NULL);
+	DSA_DestroyCallback(hArrItems, CleanStartMenuItem, NULL);
 }
 
-HRESULT STDMETHODCALLTYPE CEnumStartMenu::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CEnumStartMenu::QueryInterface(REFIID riid, void** ppvObject)
 {
 	dbgprintf(L"CEnumStartMenu::QueryInterface NOT IMPLEMENTED\n");
 	return E_NOINTERFACE;
@@ -46,13 +46,13 @@ ULONG STDMETHODCALLTYPE CEnumStartMenu::Release(void)
 	return m_cRef;
 }
 
-HRESULT STDMETHODCALLTYPE CEnumStartMenu::Clone(IEnumStartMenuItem **ppenum)
+HRESULT STDMETHODCALLTYPE CEnumStartMenu::Clone(IEnumStartMenuItem** ppenum)
 {
 	dbgprintf(L"CEnumStartMenu::Clone\n");
 	return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE CEnumStartMenu::Next(ULONG celt,PSTARTMENUITEM rgelt,ULONG *pceltFetched)
+HRESULT STDMETHODCALLTYPE CEnumStartMenu::Next(ULONG celt, PSTARTMENUITEM rgelt, ULONG* pceltFetched)
 {
 	if ( celt != 1 )
 		return E_NOTIMPL;
@@ -61,9 +61,9 @@ HRESULT STDMETHODCALLTYPE CEnumStartMenu::Next(ULONG celt,PSTARTMENUITEM rgelt,U
 		if (pceltFetched) *pceltFetched = 0;
 		return S_FALSE;
 	}
-	DSA_GetItem(hArrItems,m_enumidx,rgelt);
-	dbgprintf(L"Pos %d R %X FT %X_%X Item %s",rgelt->iPinPos,rgelt->ueminfo.R,
-		rgelt->ueminfo.ftExecute.dwHighDateTime,rgelt->ueminfo.ftExecute.dwLowDateTime,rgelt->pszAppID);
+	DSA_GetItem(hArrItems, m_enumidx, rgelt);
+	dbgprintf(L"Pos %d R %X FT %X_%X Item %s", rgelt->iPinPos,rgelt->ueminfo.R,
+		rgelt->ueminfo.ftExecute.dwHighDateTime, rgelt->ueminfo.ftExecute.dwLowDateTime, rgelt->pszAppID);
 	m_enumidx++;
 	if (pceltFetched) *pceltFetched = 1;
 	return S_OK;
@@ -84,7 +84,7 @@ HRESULT STDMETHODCALLTYPE CEnumStartMenu::Skip(ULONG celt)
 
 void STDMETHODCALLTYPE CEnumStartMenu::AddItem(PSTARTMENUITEM item)
 {
-	DSA_InsertItem(hArrItems,DSA_APPEND,item);
+	DSA_InsertItem(hArrItems, DSA_APPEND, item);
 	m_count++;
 }
 
@@ -95,7 +95,7 @@ int inline PosForCompare(int pos)
 	return pos;
 }
 
-int CALLBACK CompareItems(void *p1,void *p2,LPARAM lParam)
+int CALLBACK CompareItems(void* p1, void* p2, LPARAM lParam)
 {
 	PSTARTMENUITEM item1 = (PSTARTMENUITEM)p1;
 	PSTARTMENUITEM item2 = (PSTARTMENUITEM)p2;
@@ -105,13 +105,13 @@ int CALLBACK CompareItems(void *p1,void *p2,LPARAM lParam)
 	if (compare == 0)
 		compare = item2->ueminfo.R - item1->ueminfo.R; //R - descending
 	if (compare == 0)
-		compare = CompareFileTime(&item2->ueminfo.ftExecute,&item1->ueminfo.ftExecute); //filetime - descending
+		compare = CompareFileTime(&item2->ueminfo.ftExecute, &item1->ueminfo.ftExecute); //filetime - descending
 	return compare;
 }
 
 void STDMETHODCALLTYPE CEnumStartMenu::Sort()
 {
-	DSA_Sort(hArrItems,CompareItems,0);
+	DSA_Sort(hArrItems, CompareItems, 0);
 }
 
 void STDMETHODCALLTYPE CEnumStartMenu::RemoveDuplicates()
@@ -119,13 +119,13 @@ void STDMETHODCALLTYPE CEnumStartMenu::RemoveDuplicates()
 	int i1 = 1;	
 	PSTARTMENUITEM item1;
 	PSTARTMENUITEM item2;
-	while ( (i1<m_limit) && (item1 = (PSTARTMENUITEM)DSA_GetItemPtr(hArrItems,i1)) )
+	while ((i1 < m_limit) && (item1 = (PSTARTMENUITEM)DSA_GetItemPtr(hArrItems, i1)))
 	{		
 		int i2 = i1+1;
 		BOOL duplicate = FALSE;
 		if (item1->iPinPos == -1)
 		{
-			while ( (i2<m_limit) && (item2 = (PSTARTMENUITEM)DSA_GetItemPtr(hArrItems,i2)) )
+			while ((i2 < m_limit) && (item2 = (PSTARTMENUITEM)DSA_GetItemPtr(hArrItems, i2)))
 			{
 				if (lstrcmp(item1->pszAppID,item2->pszAppID) == 0)
 				{
@@ -137,8 +137,8 @@ void STDMETHODCALLTYPE CEnumStartMenu::RemoveDuplicates()
 		}
 		if (duplicate)
 		{
-			CleanStartMenuItem(item2,NULL);
-			DSA_DeleteItem(hArrItems,i2);
+			CleanStartMenuItem(item2, NULL);
+			DSA_DeleteItem(hArrItems, i2);
 			m_count--;
 		}
 		else
