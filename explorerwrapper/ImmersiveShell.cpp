@@ -3,7 +3,7 @@
 #include "dbgprint.h"
 
 typedef HWND(WINAPI* GetTaskmanWindow)();
-typedef BOOL(WINAPI* SetTaskmanWindow)(HWND handle);
+typedef BOOL(WINAPI* SetTaskmanWindow)(HWND hwnd);
 
 GetTaskmanWindow GetTaskmanWindowFunc = NULL;
 SetTaskmanWindow SetTaskmanWindowFunc = NULL;
@@ -68,19 +68,10 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				return S_OK;
 			}
 
-			GUID guidImmersiveShell;
-			CLSIDFromString(L"{c2f03a33-21f5-47fa-b4bb-156362a2f239}", &guidImmersiveShell);
-
-			GUID SID_ImmersiveShellHookService;
-			CLSIDFromString(L"{4624bd39-5fc3-44a8-a809-163a836e9031}", &SID_ImmersiveShellHookService);
-
-			GUID SID_Unknown;
-			CLSIDFromString(L"{914d9b3a-5e53-4e14-bbba-46062acb35a4}", &SID_Unknown);
-
-			IServiceProvider* ImmersiveShell;
-			if (CoCreateInstance(guidImmersiveShell, 0, 0x404u, IID_IServiceProvider, (LPVOID*)&ImmersiveShell) >= 0)
+			IServiceProvider* serviceProvider; 
+			if (CoCreateInstance(_GUID_c2f03a33_21f5_47fa_b4bb_156362a2f239, nullptr, CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CODE_DOWNLOAD, IID_PPV_ARGS(&serviceProvider)) >= 0)
 			{
-				ImmersiveShell->QueryService(SID_ImmersiveShellHookService, SID_Unknown, (void**)&ShellHookService);
+				serviceProvider->QueryService(SID_ImmersiveShellHookService, IID_PPV_ARGS(&ShellHookService));
 			}
 		}
 	}
@@ -120,20 +111,21 @@ void InitializeImmersiveController()
 
 	CreateTaskmanWindow();
 
-	IImmersiveShellCreator* ImmersiveShellCreator;
-	HRESULT hr = CoCreateInstance(CLSID_ImmersiveShellBuilder, NULL, CLSCTX_INPROC_SERVER, IID_ImmersiveShellBuilder, (LPVOID*)&ImmersiveShellCreator);
+	IImmersiveShellBuilder* immersiveShellBuilder;
+	HRESULT hr = CoCreateInstance(CLSID_ImmersiveShellBuilder, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&immersiveShellBuilder));
 	if (SUCCEEDED(hr))
 	{
 		dbgprintf(L"TwinUI factory created!");
 
-		IImmersiveShellController* controller;
-		hr = ImmersiveShellCreator->CreateShell(&controller);
-		dbgprintf(L"TwinUI instance created %p %p", hr, controller);
+		IImmersiveShellController* immersiveShellController;
+		hr = immersiveShellBuilder->CreateImmersiveShellController(&immersiveShellController);
+		dbgprintf(L"TwinUI instance created %p %p", hr, immersiveShellController);
 		if (SUCCEEDED(hr))
 		{
-			hr = controller->Start();
+			hr = immersiveShellController->Start();
 
 			dbgprintf(L"Immersive Shell Controller Result: %x", hr);
 		}
+		immersiveShellController->Release();
 	}
 }

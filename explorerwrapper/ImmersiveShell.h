@@ -3,77 +3,41 @@
 #include "common.h"
 
 #pragma region GUID definitions
-DEFINE_GUID(CLSID_ImmersiveShellBuilder,0xc71c41f1, 0xddad, 0x42dc, 0xa8,0xfc,0xf5,0xbf,0xc6,0x1d,0xf9,0x57); //c71c41f1_ddad_42dc_a8fc_f5bfc61df957
-DEFINE_GUID(IID_ImmersiveShellBuilder,0x1c56b3e4, 0xe6ea, 0x4ced, 0x8a,0x74,0x73,0xb7,0x2c,0x6b,0xd4,0x35); //1c56b3e4_e6ea_4ced_8a74_73b72c6bd435
-
-DEFINE_GUID(IID_ImmersiveBehavior,0x139275e0, 0xd644, 0x4214, 0xb4,0x5e,0xd9,0x27,0x8c,0x4a,0x85,0x01); //139275e0_d644_4214_b45e_d9278c4a8501
-
-DEFINE_GUID(CLSID_NowPlayingSessionManager, 0xbcbb9860, 0xc012, 0x4ad7, 0xa9, 0x38, 0x6e, 0x33, 0x7a, 0xe6, 0xab, 0xa5);
+DEFINE_GUID(_GUID_c2f03a33_21f5_47fa_b4bb_156362a2f239, 0xC2F03A33, 0x21F5, 0x47FA, 0xB4, 0xBB, 0x15, 0x63, 0x62, 0xA2, 0xF2, 0x39); // c2f03a33_21f5_47fa_b4bb_156362a2f239
+DEFINE_GUID(CLSID_ImmersiveShellBuilder, 0xC71C41F1, 0xDDAD, 0x42DC, 0xA8, 0xFC, 0xF5, 0xBF, 0xC6, 0x1D, 0xF9, 0x57); // c71c41f1_ddad_42dc_a8fc_f5bfc61df957
+DEFINE_GUID(SID_ImmersiveShellHookService, 0x4624BD39, 0x5FC3, 0x44A8, 0xA8, 0x09, 0x16, 0x3A, 0x83, 0x6E, 0x90, 0x31); // 4624bd39_5fc3_44a8-a809_163a836e9031
 #pragma endregion
 
-MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
-IImmersiveBehavior: public IUnknown
+interface IImmersiveShellCreationBehavior;
+
+MIDL_INTERFACE("ffffffff-ffff-ffff-ffff-ffffffffffff")
+IImmersiveShellController : IUnknown
 {
-public:
-	STDMETHOD(OnImmersiveThreadStart)(void) PURE;
-	STDMETHOD(OnImmersiveThreadStop)(void) PURE;
-	STDMETHOD(GetMaximumComponentCount)(unsigned int *count) PURE;
-	STDMETHOD(CreateComponent)(unsigned int number, IUnknown** component) PURE;
-	STDMETHOD(ShouldCreateComponent)(unsigned int number, int* allowed) PURE;
+	virtual HRESULT STDMETHODCALLTYPE Start() = 0;
+	virtual HRESULT STDMETHODCALLTYPE Stop() = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetCreationBehavior(IImmersiveShellCreationBehavior*) = 0;
 };
 
-MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
-IImmersiveShellController: public IUnknown
+MIDL_INTERFACE("1c56b3e4-e6ea-4ced-8a74-73b72c6bd435")
+IImmersiveShellBuilder : IUnknown
 {
-public:
-	STDMETHOD(Start)(void) PURE;
-	STDMETHOD(Stop)(void) PURE;
-	STDMETHOD(SetCreationBehavior)(IImmersiveBehavior*) PURE;
-};
-
-MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
-IImmersiveShellCreator: public IUnknown
-{
-public:
-	STDMETHOD(CreateShell)(IImmersiveShellController** controller) PURE;
+	virtual HRESULT STDMETHODCALLTYPE CreateImmersiveShellController(IImmersiveShellController**) = 0;
 };
 
 void InitializeImmersiveController();
 
-interface IImmersiveShellHookService : IUnknown
+interface IImmersiveShellHookNotification;
+
+MIDL_INTERFACE("914d9b3a-5e53-4e14-bbba-46062acb35a4")
+IImmersiveShellHookService : IUnknown
 {
-	STDMETHOD(Register)(void** a1,
-		IImmersiveShellHookService* pThis,
-		const unsigned int* prgMessages,
-		unsigned int cMessages,
-		IUnknown* pNotification, //IImmersiveShellHookNotification
-		unsigned int* pdwCookie);//todo:args
-	STDMETHOD(Unregister)(UINT cookie);
-	STDMETHOD(PostShellHookMessage)(WPARAM wParam, LPARAM lParam);
-	STDMETHOD(SetTargetWindowForSerialization)(HWND hwnd);
-	STDMETHOD(PostShellHookMessageWithSerialization)(bool a1,
-		int a2,
-		IImmersiveShellHookService* pThis,
-		unsigned int msg,
-		int msgParam); //todo:args
-	STDMETHOD(UpdateWindowApplicationId)(HWND hwnd, LPCWSTR pszAppID);
-	STDMETHOD(HandleWindowReplacement)(HWND hwndOld, HWND hwndNew);
-	STDMETHOD_(BOOL, IsExecutionOnSerializedThread)();
+	virtual HRESULT STDMETHODCALLTYPE Register(const UINT_PTR* const, UINT, IImmersiveShellHookNotification*, DWORD*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE Unregister(DWORD) = 0;
+	virtual HRESULT STDMETHODCALLTYPE PostShellHookMessage(WPARAM, LPARAM) = 0;
+	virtual HRESULT STDMETHODCALLTYPE SetTargetWindowForSerialization(HWND) = 0;
+	virtual HRESULT STDMETHODCALLTYPE PostShellHookMessageWithSerialization(WPARAM, LPARAM) = 0;
+	virtual HRESULT STDMETHODCALLTYPE UpdateWindowApplicationId(HWND, const WCHAR*) = 0;
+	virtual HRESULT STDMETHODCALLTYPE HandleWindowReplacement(HWND, HWND) = 0;
+	virtual int STDMETHODCALLTYPE IsExecutionOnSerializedThread() = 0;
 };
 
-interface IImmersiveWindowMessageService : IUnknown
-{
-	STDMETHOD(Register)(UINT msg, void* pNotification, UINT* pdwCookie);
-	STDMETHOD(Unregister)(UINT dwCookie);
-	STDMETHOD(SendMessageW)(UINT nsg, WPARAM wParam, LPARAM lParam);
-	STDMETHOD(PostMessageW)(UINT nsg, WPARAM wParam, LPARAM lParam);
-	STDMETHOD(RequestHotkeys)(); //todo: args
-	STDMETHOD(UnrequestHotkeys)(UINT dwCookie);
-	STDMETHOD(RequestWTSSessionNotification)(void* pNotification, unsigned int* pdwCookie);
-	STDMETHOD(UnrequestWTSSessionNotification)(UINT dwCookie);
-	STDMETHOD(RequestPowerSettingNotification)(const GUID* pPowerSettingGuid, void* pNotification, UINT* pdwCookie);
-	STDMETHOD(UnrequestPowerSettingNotification)(UINT pdwCookie);
-	STDMETHOD(RequestPointerDeviceNotification)(void* pNotification, int notificationType, UINT* pdwCookie);
-	STDMETHOD(UnrequestPointerDeviceNotification)(UINT dwCookie);
-	STDMETHOD(RegisterDwmIconicThumbnailWindow)();
-};
