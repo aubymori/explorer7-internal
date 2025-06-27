@@ -177,12 +177,12 @@ static inline void* GetMemberFuncPtr(T Func) { return reinterpret_cast<void*&>(F
 #define MEMBER_FUNC(a) GetMemberFuncPtr(&a)
 
 #pragma function(memcpy)
-HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
+HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy, REFIID riid, PVOID* ppv)
 {
 	dbgprintf(L"StartMenuPin: NewCreateStartMenuPinInstance");
 	IUnknown* pinobj;
-	HRESULT rslt = CreateStartMenuPinInstance(dummy,IID_IShellExtInit,(PVOID*)&pinobj);
-	if ( SUCCEEDED(rslt))
+	HRESULT rslt = CreateStartMenuPinInstance(dummy, IID_IShellExtInit, (PVOID*)&pinobj);
+	if (SUCCEEDED(rslt))
 	{
 		int SetChangeCountIndex = 4 * sizeof(uintptr_t);
 		int OpenPinRegStreamIndex = 5 * sizeof(uintptr_t);
@@ -200,7 +200,7 @@ HRESULT WINAPI NewCreateStartMenuPinInstance(PVOID dummy,REFIID riid,PVOID* ppv)
 
 		PSTARTPINOBJ startobj = (PSTARTPINOBJ)pinobj;
 		PSTARTPINVTBL ogTable = startobj->pStartPinVtbl;
-		dbgprintf(L"CreateStartMenuPin pStartPinVtbl %p %p setchangecount %p",startobj,startobj->pStartPinVtbl, startobj->pStartPinVtbl->SetChangeCount);
+		dbgprintf(L"CreateStartMenuPin pStartPinVtbl %p %p setchangecount %p", startobj, startobj->pStartPinVtbl, startobj->pStartPinVtbl->SetChangeCount);
 		static CStartMenuPin* HackHack = new CStartMenuPin();
 		startobj->pStartPinVtbl = *(PSTARTPINVTBL*)(HackHack);
 
@@ -239,7 +239,7 @@ bool IsProcessAnExplorerHook()
 void StartMenuPin_PatchShell32() 
 {	
 	h_shell32 = GetModuleHandle(L"shell32.dll");
-	ChangeImportedAddress(h_shell32,"api-ms-win-core-libraryloader-l1-2-0.dll",GetProcAddress(GetModuleHandle(L"kernelbase.dll"),"LoadStringW"),Shell32_LoadString);
+	ChangeImportedAddress(h_shell32, "api-ms-win-core-libraryloader-l1-2-0.dll", GetProcAddress(GetModuleHandle(L"kernelbase.dll"), "LoadStringW"), Shell32_LoadString);
 	ChangeImportedAddress(GetModuleHandle(0), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "IsProcessAnExplorer"), IsProcessAnExplorerHook);
 
 	DWORD_PTR addr = FindPattern((uintptr_t)h_shell32, "48 85 C0 0F 85 ?? ?? ?? ?? 45 8B C5 4C 8D 15 ?? ?? ?? ??");
@@ -263,14 +263,14 @@ void StartMenuPin_PatchShell32()
 	PSHELLGUIDS table = (PSHELLGUIDS)addr;
 
 	dbgprintf(L"Got table at %p",table);
-	while ( &table->rclsid )
+	while (&table->rclsid)
 	{
-		if ( table->rclsid == CLSID_StartMenuPin )
+		if (table->rclsid == CLSID_StartMenuPin)
 		{
 			DWORD old;
-			VirtualProtect(table,sizeof(SHELLGUIDS),PAGE_EXECUTE_READWRITE,&old);
+			VirtualProtect(table, sizeof(SHELLGUIDS), PAGE_EXECUTE_READWRITE, &old);
 			CreateStartMenuPinInstance = table->CreateFunc;
-			dbgprintf(L"CreateStartMenuPinInstance = %p",CreateStartMenuPinInstance);
+			dbgprintf(L"CreateStartMenuPinInstance = %p", CreateStartMenuPinInstance);
 			table->CreateFunc = NewCreateStartMenuPinInstance;
 			break;
 		}

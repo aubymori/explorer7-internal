@@ -5,11 +5,11 @@
 #include "common.h"
 
 #pragma region GUID definitions
-DEFINE_GUID(CLSID_StartMenuPin,0xA2A9545D, 0xA0C2, 0x42B4, 0x97,0x08,0xA0,0xB2,0xBA,0xDD,0x77,0xC8); //{A2A9545D-A0C2-42B4-9708-A0B2BADD77C8}
-DEFINE_GUID(CLSID_TaskbarPin,0x90AA3A4E, 0x1CBA, 0x4233, 0xB8,0xBB,0x53,0x57,0x73,0xD4,0x84,0x49);
+DEFINE_GUID(CLSID_StartMenuPin, 0xA2A9545D, 0xA0C2, 0x42B4, 0x97, 0x08, 0xA0, 0xB2, 0xBA, 0xDD, 0x77, 0xC8); //{A2A9545D-A0C2-42B4-9708-A0B2BADD77C8}
+DEFINE_GUID(CLSID_TaskbarPin, 0x90AA3A4E, 0x1CBA, 0x4233, 0xB8, 0xBB, 0x53, 0x57, 0x73, 0xD4, 0x84, 0x49);
 #pragma endregion
 
-typedef HRESULT (WINAPI* CreateInstance_API)(PVOID,REFIID,PVOID*);
+typedef HRESULT (WINAPI* CreateInstance_API)(PVOID, REFIID, PVOID*);
 	typedef struct { 
 		PVOID dunno1;
 		DWORD_PTR dunno2;
@@ -33,7 +33,7 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IStartMenuShellExtInit
 {
 public:
-	STDMETHOD_(void,QueryInterface)() PURE;
+	STDMETHOD_(void, QueryInterface)() PURE;
 	STDMETHOD_(void, AddRef)() PURE;
 	STDMETHOD_(void, Release)() PURE;
 	STDMETHOD_(void, Initialize)() PURE;
@@ -85,7 +85,7 @@ public:
 	DWORD IsRestricted();
 	void Unimpl2();
 	LRESULT GetMenuStringID(UINT* w);
-	int GetHelpText(UINT,LPWSTR,UINT);
+	int GetHelpText(UINT, LPWSTR, UINT);
 	LRESULT GetChangeCount(ULONG* pdwVal);
 	wchar_t* GetVerb(UINT op);
 	void SendPinRearrangeSQM();
@@ -97,7 +97,7 @@ public:
 	/*HRESULT STDMETHODCALLTYPE QueryContextMenu( HMENU hmenu, UINT indexMenu, UINT idCmdFirst, UINT idCmdLast, UINT uFlags);*/
 };
 
-typedef HRESULT (__thiscall* GetMenuStringID_API)(PVOID,DWORD*);
+typedef HRESULT (__thiscall* GetMenuStringID_API)(PVOID, DWORD*);
 /*typedef HRESULT (__thiscall* QueryContextMenu_API)(PVOID,HMENU,UINT,UINT,UINT,UINT);*/
 
 typedef struct { 
