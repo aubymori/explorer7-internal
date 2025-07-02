@@ -19,7 +19,7 @@ class CProjectionFactory : public IClassFactory
 {
 public:
 	//IUnknown
-    STDMETHODIMP QueryInterface(REFIID riid, void**ppvObject);    
+    STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);    
     STDMETHODIMP_(ULONG) AddRef(void);    
     STDMETHODIMP_(ULONG) Release(void);
 

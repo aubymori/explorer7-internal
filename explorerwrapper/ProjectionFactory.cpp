@@ -80,7 +80,7 @@ static BOOL RunDisplaySwitchInjected()
 	return APCInject(path, ourdll) == 0;
 }
 
-HRESULT STDMETHODCALLTYPE CProjectionFactory::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CProjectionFactory::QueryInterface(REFIID riid, void** ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
