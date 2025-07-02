@@ -5,7 +5,7 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IAppResolverNotify7: public IUnknown
 {
 public:
-	STDMETHOD(RegisterNotification)(UINT,long,PVOID*,int) PURE;
+	STDMETHOD(RegisterNotification)(UINT, long, PVOID*, int) PURE;
 	STDMETHOD(UnregisterNotification)(UINT) PURE;
 	STDMETHOD(AddHotkey)(UINT, PVOID*, PVOID*, int) PURE;
 };
@@ -14,7 +14,7 @@ MIDL_INTERFACE("00000000-0000-0000-0000-000000000000")
 IAppResolverNotify8: public IUnknown
 {
 public:
-	STDMETHOD(OnChangeNotify)(long,PVOID*,PVOID*) PURE;
+	STDMETHOD(OnChangeNotify)(long, PVOID*, PVOID*) PURE;
 	STDMETHOD(AddHotkey)(UINT, PVOID*, PVOID*, int) PURE;
 };
 
