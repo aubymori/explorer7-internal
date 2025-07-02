@@ -15,7 +15,7 @@ extern "C" IStream* WINAPI SHOpenRegStream2WNEW(
   _In_      DWORD grfMode
 )
 {
-	if (lstrcmp(pszSubkey,sz_TrayNotify) == 0)
+	if (lstrcmp(pszSubkey, sz_TrayNotify) == 0)
 	{		
 		pszSubkey = sz_TrayNotify7;
 		//wipe cache
@@ -24,17 +24,17 @@ extern "C" IStream* WINAPI SHOpenRegStream2WNEW(
 			WCHAR ourpath[MAX_PATH];
 			WCHAR regpath[MAX_PATH];
 			LONG regsz = MAX_PATH;
-			GetModuleFileName(NULL,ourpath,MAX_PATH);
-			if ( RegQueryValue(hkey,pszSubkey,regpath,&regsz) != ERROR_SUCCESS || lstrcmpi(ourpath,regpath) != 0 )
+			GetModuleFileName(NULL, ourpath, MAX_PATH);
+			if (RegQueryValue(hkey, pszSubkey, regpath, &regsz) != ERROR_SUCCESS || lstrcmpi(ourpath, regpath) != 0)
 			{
-				RegDeleteKey(hkey,pszSubkey);
-				RegSetValue(hkey,pszSubkey,REG_SZ,ourpath,lstrlen(ourpath));
+				RegDeleteKey(hkey, pszSubkey);
+				RegSetValue(hkey, pszSubkey, REG_SZ, ourpath, lstrlen(ourpath));
 				dbgprintf(L"wiped traynotify cache");
 			}
 			verchecked = TRUE;
 		}
 	}
-	return SHOpenRegStream2(hkey,pszSubkey,pszValue,grfMode);
+	return SHOpenRegStream2(hkey, pszSubkey, pszValue, grfMode);
 }
 
 /*CTRAYNOTIFYFACTORY*/
@@ -50,7 +50,7 @@ CTrayNotifyFactory::~CTrayNotifyFactory()
 	m_origfactory->Release();
 }
 
-HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::QueryInterface(REFIID riid, void** ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -83,17 +83,17 @@ ULONG STDMETHODCALLTYPE CTrayNotifyFactory::Release(void)
 	return m_cRef;
 }
 
-HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::CreateInstance( IUnknown * pUnkOuter, REFIID riid, void ** ppvObject )
+HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::CreateInstance(IUnknown* pUnkOuter, REFIID riid, void** ppvObject)
 {
-	if ( pUnkOuter ) return CLASS_E_NOAGGREGATION;
+	if (pUnkOuter) return CLASS_E_NOAGGREGATION;
 	if (riid == IID_IUnknown)
 	{
 		IUnknown* obj;
-		HRESULT ret = m_origfactory->CreateInstance(pUnkOuter,IID_IUnknown,(PVOID*)&obj);
+		HRESULT ret = m_origfactory->CreateInstance(pUnkOuter, IID_IUnknown, (PVOID*)&obj);
 		if (ret == S_OK)
 		{
 			ITrayNotify7* oldnotify;
-			ret = obj->QueryInterface(IID_ITrayNotify7,(PVOID*)&oldnotify);
+			ret = obj->QueryInterface(IID_ITrayNotify7, (PVOID*)&oldnotify);
 			if (ret == S_OK)
 				*ppvObject = new CTrayNotifyWrapper(oldnotify);
 		}
@@ -102,7 +102,7 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::CreateInstance( IUnknown * pUnkOut
 	return E_FAIL; //BUGBUG BUGBUG BUGBUG BUGBUG BUGBUG
 }
 
-HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::LockServer( BOOL fLock )
+HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::LockServer(BOOL fLock)
 {
 	return m_origfactory->LockServer(fLock);
 }
@@ -120,7 +120,7 @@ CTrayNotifyWrapper::~CTrayNotifyWrapper()
 	m_notify7->Release();
 }
 
-HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::QueryInterface(REFIID riid,void **ppvObject)
+HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::QueryInterface(REFIID riid, void** ppvObject)
 {
 	if (riid == IID_IUnknown)
 	{
@@ -158,7 +158,7 @@ ULONG STDMETHODCALLTYPE CTrayNotifyWrapper::Release(void)
 	return m_cRef;
 }
 
-HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1,ULONG* p2)
+HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::RegisterCallback(IUnknown* p1, ULONG* p2)
 {
 	*p2 = 0;
 	if (g_osVersion.BuildNumber() >= 10240)
@@ -183,7 +183,7 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::EnableAutoTray(int p1)
 	return m_notify7->EnableAutoTray(p1);
 }
 
-HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::DoAction(PVOID*,int)
+HRESULT STDMETHODCALLTYPE CTrayNotifyWrapper::DoAction(PVOID*, int)
 {
 	dbgprintf(L"DOACTION");
 	return E_NOTIMPL;
