@@ -25,11 +25,11 @@ IAppResolver7: public IUnknown
 {
 public:
 	STDMETHOD(GetAppIDForShortcut)(IShellItem*, LPWSTR*) PURE;
-	STDMETHOD(GetAppIDForWindow)(HWND,LPWSTR*,int*,int*,int*) PURE;
+	STDMETHOD(GetAppIDForWindow)(HWND, LPWSTR*, int*, int*, int*) PURE;
 	STDMETHOD(GetAppIDForProcess)(ULONG_PTR, LPWSTR*, int*, int*, int*) PURE;
 	STDMETHOD(GetShortcutForProcess)(ULONG_PTR, IShellItem**) PURE;
 	STDMETHOD(GetBestShortcutForAppID)(LPWSTR, IShellItem**) PURE;
-	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(LPWSTR, IShellItem**,LPWSTR*) PURE;
+	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(LPWSTR, IShellItem**, LPWSTR*) PURE;
 	STDMETHOD(CanPinApp)(IShellItem*) PURE;
 	STDMETHOD(GetRelaunchProperties)(HWND, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*) PURE;
 	STDMETHOD(GenerateShortcutFromWindowProperties)(HWND, IShellItem**) PURE;
@@ -43,13 +43,13 @@ public:
 	STDMETHOD(GetAppIDForShortcut)(IShellItem*, LPWSTR*) PURE;
 	STDMETHOD(GetAppIDForShortcutObject)(IShellLinkW*, IShellItem*, LPWSTR**) PURE;
 	STDMETHOD(GetAppIDForWindow)(HWND, LPWSTR*, int*, int*, int*) PURE;
-	STDMETHOD(GetAppIDForProcess)(ULONG_PTR,LPWSTR*,int*,int*,int*) PURE;
-	STDMETHOD(GetShortcutForProcess)(ULONG_PTR,IShellItem**) PURE;
+	STDMETHOD(GetAppIDForProcess)(ULONG_PTR, LPWSTR*, int*, int*, int*) PURE;
+	STDMETHOD(GetShortcutForProcess)(ULONG_PTR, IShellItem**) PURE;
 	STDMETHOD(GetBestShortcutForAppID)(LPWSTR, IShellItem**) PURE;
 	STDMETHOD(GetBestShortcutAndAppIDForAppPath)(LPWSTR, IShellItem**, LPWSTR*) PURE;
 	STDMETHOD(CanPinApp)(IShellItem*) PURE;
 	STDMETHOD(CanPinAppShortcut)(IShellLinkW*, IShellItem*) PURE;
-	STDMETHOD(GetRelaunchProperties)(HWND,LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, int* a7) PURE;
+	STDMETHOD(GetRelaunchProperties)(HWND, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, LPWSTR*, int* a7) PURE;
 	STDMETHOD(GenerateShortcutFromWindowProperties)(HWND, IShellItem**) PURE;
 	STDMETHOD(GenerateShortcutFromItemProperties)(IShellItem2*, IShellItem**) PURE;
 };
@@ -58,14 +58,14 @@ MIDL_INTERFACE("05a232fd-2bfb-4349-9d48-4787f317f50a")
 IStartMenuItemsCache7: public IUnknown
 {
 public:
-	STDMETHOD(OnChangeNotify)(unsigned int,long,PVOID*,PVOID*) PURE;
+	STDMETHOD(OnChangeNotify)(unsigned int, long, PVOID*, PVOID*) PURE;
 	STDMETHOD(PinListChanged)(void) PURE;
 	STDMETHOD(GetPinnedItemsCount)(int*) PURE;
-	STDMETHOD(GetStartMenuMFUList)(unsigned int,IEnumStartMenuItem**,IEnumString**,FILETIME*) PURE;
+	STDMETHOD(GetStartMenuMFUList)(unsigned int, IEnumStartMenuItem**, IEnumString**, FILETIME*) PURE;
 	STDMETHOD(RegisterSMNotify)(IUnknown*) PURE;
 	STDMETHOD(RegisterARNotify)(IUnknown*) PURE;
-	STDMETHOD(SetAltName)(PVOID*,DWORD*,PVOID*) PURE;
-	STDMETHOD(GetAltName)(PVOID*,DWORD*) PURE;
+	STDMETHOD(SetAltName)(PVOID*, DWORD*, PVOID*) PURE;
+	STDMETHOD(GetAltName)(PVOID*, DWORD*) PURE;
 };
 
 //MIDL_INTERFACE("bb9786b2-efe6-4f1e-a3bd-67f97d0085bf")
@@ -73,7 +73,7 @@ MIDL_INTERFACE("934332dd-b0fe-41f9-bc63-9c7f9f3c3aec")
 IStartMenuItemsCache8: public IUnknown
 {
 public:
-	STDMETHOD(OnChangeNotify)(unsigned int,long,PVOID*,PVOID*) PURE;
+	STDMETHOD(OnChangeNotify)(unsigned int, long, PVOID*, PVOID*) PURE;
 	STDMETHOD(RegisterForNotifications)(void*) PURE;
 	STDMETHOD(UnregisterForNotifications)(void) PURE;
 	STDMETHOD(PauseNotifications)(void) PURE;
@@ -87,7 +87,7 @@ MIDL_INTERFACE("ba5a92ae-bfd7-4916-854f-6b3a402b84a8")
 IStartMenuItemsCache10: public IUnknown
 {
 public:
-	STDMETHOD(OnChangeNotify)(unsigned int,long,PVOID*,PVOID*) PURE;
+	STDMETHOD(OnChangeNotify)(unsigned int, long, PVOID*, PVOID*) PURE;
 	STDMETHOD(RegisterForNotifications)(void*) PURE;
 	STDMETHOD(UnregisterForNotifications)(void) PURE;
 	STDMETHOD(PauseNotifications)(void) PURE;

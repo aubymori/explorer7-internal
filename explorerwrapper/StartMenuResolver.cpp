@@ -192,13 +192,13 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromItemProperties
 //IStartMenuItemsCache7
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::OnChangeNotify(unsigned int p1, long p2, PVOID* p3, PVOID* p4)
 {
-	HRESULT rslt;
+	HRESULT hr;
 	if (m_startmenuitemscache8)
-		rslt = m_startmenuitemscache8->OnChangeNotify(p1, p2, p3, p4);
+		hr = m_startmenuitemscache8->OnChangeNotify(p1, p2, p3, p4);
 	else if (m_startmenuitemscache10)
-		rslt = m_startmenuitemscache10->OnChangeNotify(p1, p2, p3, p4);
-	dbgprintf(L"CStartMenuResolver::OnChangeNotify %p %p %p %p = %p", p1, p2, p3, p4, rslt);
-	return rslt;
+		hr = m_startmenuitemscache10->OnChangeNotify(p1, p2, p3, p4);
+	dbgprintf(L"CStartMenuResolver::OnChangeNotify %p %p %p %p = %p", p1, p2, p3, p4, hr);
+	return hr;
 }
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::PinListChanged(void)
@@ -213,12 +213,12 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetPinnedItemsCount(int* pCount)
 	dbgprintf(L"GetPinnedItemsCount");
 	*pCount = 0;
 	IPinnedList2* pinList2 = 0;
-	HRESULT rslt = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&pinList2);
-	if (SUCCEEDED(rslt))
+	HRESULT hr = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&pinList2);
+	if (SUCCEEDED(hr))
 	{
 		IEnumFullIDList* enumidlist;
-		rslt = pinList2->EnumObjects(&enumidlist);
-		if (SUCCEEDED(rslt))
+		hr = pinList2->EnumObjects(&enumidlist);
+		if (SUCCEEDED(hr))
 		{
 			LPITEMIDLIST pidl;
 			ULONG wat;
@@ -232,7 +232,7 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetPinnedItemsCount(int* pCount)
 		}
 		pinList2->Release();
 	}
-	return rslt;
+	return hr;
 }
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetStartMenuMFUList(unsigned int limit, IEnumStartMenuItem** penumStart, IEnumString** penumStrings, FILETIME* pNewFileTime)
@@ -245,26 +245,26 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetStartMenuMFUList(unsigned int l
 	//add pinned items
 	IPinnedList2* startpinnedlist;
 	IPinnedList2* taskbarpinnedlist;
-	HRESULT rslt = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&startpinnedlist);
-	if (FAILED(rslt)) return rslt;
-	rslt = Explorer_CoCreateInstance(CLSID_TaskbarPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&taskbarpinnedlist);
-	if (FAILED(rslt)) return rslt;
+	HRESULT hr = Explorer_CoCreateInstance(CLSID_StartMenuPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&startpinnedlist);
+	if (FAILED(hr)) return hr;
+	hr = Explorer_CoCreateInstance(CLSID_TaskbarPin, NULL, CLSCTX_INPROC_SERVER, IID_IPinnedList2, (PVOID*)&taskbarpinnedlist);
+	if (FAILED(hr)) return hr;
 	IEnumFullIDList* enumidlist;
-	rslt = startpinnedlist->EnumObjects(&enumidlist);
-	if (SUCCEEDED(rslt))
+	hr = startpinnedlist->EnumObjects(&enumidlist);
+	if (SUCCEEDED(hr))
 	{
 		STARTMENUITEM startitem = { 0 };
 		while (enumidlist->Next(1, &startitem.pidlRelative, NULL) == S_OK)
 		{
 			IShellItem* shellitem;
-			rslt = SHCreateItemFromIDList(startitem.pidlRelative, IID_IShellItem, (LPVOID*)&shellitem);
-			if (SUCCEEDED(rslt))
+			hr = SHCreateItemFromIDList(startitem.pidlRelative, IID_IShellItem, (LPVOID*)&shellitem);
+			if (SUCCEEDED(hr))
 			{
-				rslt = m_resolver8->GetAppIDForShortcut(shellitem, &startitem.pszAppID);
-				if (FAILED(rslt))
+				hr = m_resolver8->GetAppIDForShortcut(shellitem, &startitem.pszAppID);
+				if (FAILED(hr))
 				{
-					dbgprintf(L"GetAppIDForShortcut failed %p (shortcut broken?!)", rslt);
-					rslt = shellitem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &startitem.pszAppID);
+					dbgprintf(L"GetAppIDForShortcut failed %p (shortcut broken?!)", hr);
+					hr = shellitem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &startitem.pszAppID);
 				}
 				shellitem->Release();
 				startitem.iPinPos = cnt;
@@ -345,14 +345,14 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetStartMenuMFUList(unsigned int l
 						if (startpinnedlist->IsPinned(startitem.pidlRelative) == S_FALSE)
 						{
 							IShellItem* shellitem;
-							rslt = SHCreateItemFromIDList(startitem.pidlRelative, IID_IShellItem, (LPVOID*)&shellitem);
-							if (SUCCEEDED(rslt))
+							hr = SHCreateItemFromIDList(startitem.pidlRelative, IID_IShellItem, (LPVOID*)&shellitem);
+							if (SUCCEEDED(hr))
 							{
-								rslt = m_resolver8->GetAppIDForShortcut(shellitem, &startitem.pszAppID);
-								if (FAILED(rslt))
+								hr = m_resolver8->GetAppIDForShortcut(shellitem, &startitem.pszAppID);
+								if (FAILED(hr))
 								{
-									dbgprintf(L"GetAppIDForShortcut failed %p (shortcut broken?!)", rslt);
-									rslt = shellitem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &startitem.pszAppID);
+									dbgprintf(L"GetAppIDForShortcut failed %p (shortcut broken?!)", hr);
+									hr = shellitem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &startitem.pszAppID);
 								}
 								shellitem->Release();
 								startitem.iPinPos = -1;
