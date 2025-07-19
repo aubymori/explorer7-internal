@@ -686,6 +686,20 @@ void RepairRegionBehaviour()
 	}
 }
 
+void FixDestinationListForImmersive()
+{
+	// Ittr: This is a bit hacky as it involves the removal of a conditional check that blocks the display name being retrieved.
+	// Functionally, however, it seems to be the same as adding a proper check for immersive CTaskGroup entries.
+	char* CTaskGroup_GetLauncherName = "0F BA 64 24 48 10 ?? ?? 48 8B 4C 24 40";
+	char* CTGGLNPattern = (char*)FindPattern((uintptr_t)GetModuleHandle(NULL), CTaskGroup_GetLauncherName);
+
+	if (CTGGLNPattern)
+	{
+		unsigned char bytes[] = { 0x0F, 0xBA, 0x64, 0x24, 0x48, 0x10, 0x90, 0x90, 0x48, 0x8B, 0x4C, 0x24, 0x40 };
+		ChangeImportedPattern(CTGGLNPattern, bytes, sizeof(bytes));
+	}
+}
+
 void ChangePatternImports()
 {
 	// Remove Windows 8+ animation msstyle classes so that legacy msstyles from Vista onwards are compatible with our theming system
@@ -713,4 +727,9 @@ void ChangePatternImports()
 
 	// Amend some code behaviour so the start menu expand animation behaves more predictably
 	RepairRegionBehaviour();
+
+	// Ensure that pinned immersive items show a destination menu when right-clicked
+	// Additional note: It still doesn't show immediately after pinning until restarting explorer.
+	// There will need to be additional work to stabilise this area.
+	FixDestinationListForImmersive();
 }

@@ -32,5 +32,8 @@ void RevertFlyouts();
 // Forcefully enable a conditional check to allow SetWindowRgn to be applied at the right time
 void RepairRegionBehaviour();
 
+// Ensure pinned immersive applications show a destination list as expected
+void FixDestinationListForImmersive();
+
 // Main procedure we call from elsewhere
 void ChangePatternImports();
