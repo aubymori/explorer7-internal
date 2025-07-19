@@ -40,8 +40,8 @@ static RegisterHotKeyApi RegisterHotKeyApiOrg;
 typedef LONG(WINAPI* GetClassIconCB_t)(PVOID pThis, PVOID a2, int a3);
 static GetClassIconCB_t GetClassIconCB_orig;
 
-typedef LONG(WINAPI* setIcon_t)(PVOID pThis, HWND a2, HICON a3, int a4);
-static setIcon_t SetIcon;
+typedef LONG(WINAPI* CTaskBand_SetWindowIcon_t)(PVOID pThis, HWND a2, HICON a3, int a4);
+static CTaskBand_SetWindowIcon_t CTaskBand_SetWindowIconOrig;
 
 typedef VOID(WINAPI* updateItem_t)(PVOID pThis, int a2);
 static updateItem_t UpdateItem; 
@@ -50,7 +50,7 @@ typedef VOID(WINAPI* renderThumbnail_t)(PVOID pThis, int, int);
 static renderThumbnail_t renderThumbnail_orig;
 
 typedef LONG(WINAPI* setIconThumb_t)(PVOID pThis, HICON a2, int a3, unsigned int a4);
-static  setIconThumb_t SetIconThumb;
+static setIconThumb_t SetIconThumb;
 
 typedef VOID(WINAPI* CPniMainDlg_ShowFlyout_t)(HWND* hwnd, char a2);
 static CPniMainDlg_ShowFlyout_t CPniMainDlg_ShowFlyout;
