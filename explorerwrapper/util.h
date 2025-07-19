@@ -240,12 +240,12 @@ __forceinline WINDOWCOMPOSITIONATTRIBDATA GetTrayAccentProperties(bool isThumbna
 	// - we then define gradient color by pulling either DWM accent color or immersive color as applicable
 	// this is then passed into attribute data which we call back into whenever we need to get accent properties without retyping this whole function
 
-	if (g_osVersion.BuildNumber() >= 22621 && s_ColorizationOptions == 3) // Acrylic colorization misbehaves on 11. Removing 0x2 flag fixes this
+	if (g_osVersion.BuildNumber() < 10074 || (g_osVersion.BuildNumber() >= 21996 && s_ColorizationOptions == 3)) // Acrylic colorization misbehaves on 11. Removing 0x2 flag fixes this
 	{
 		WINDOWCOMPOSITIONATTRIBDATA attrData;
 		ACCENT_POLICY accentPolicy;
 
-		accentPolicy.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
+		accentPolicy.AccentState = (g_osVersion.BuildNumber() >= 21996) ? ACCENT_ENABLE_ACRYLICBLURBEHIND : ACCENT_ENABLE_TRANSPARENTGRADIENT;
 		accentPolicy.AccentFlags = (isThumbnail) ? (0x1 | 0x200) : (0x11); // very important that this is set up like this!
 		accentPolicy.GradientColor = GetColorizationColor();
 
@@ -512,7 +512,7 @@ HWND WINAPI CreateWindowInBandNew(DWORD dwExStyle,
 			DwmSetWindowAttribute(hwndRet, DWMWA_CLOAK, &shouldCloak, sizeof(shouldCloak));
 		}
 
-		SetProp(hwndRet, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+		SetProp(hwndRet, L"UIA_WindowVisibilityOverridden", (HANDLE)2);
 		SetProp(hwndRet, L"explorer7.WindowBand", (HANDLE)dwBand);
 
 		return hwndRet;
@@ -553,7 +553,7 @@ HWND WINAPI CreateWindowInBandExNew(DWORD exStyle, LPWSTR szClassName, PVOID p3,
 	dbgprintf(L"CreateWindowInBandEx %p %s %p %p %p %p %p %p %p %p %p %p %p = %p %p", exStyle, szClassName, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, hwndRet, GetLastError());
 	dbgprintf(L"CreateWindowInBandExOrig %i", p13);
 
-	SetProp(hwndRet, L"UIA_WindowVisibilityOverriden", (HANDLE)2);
+	SetProp(hwndRet, L"UIA_WindowVisibilityOverridden", (HANDLE)2);
 	SetProp(hwndRet, L"explorer7.WindowBand", (HANDLE)p13);
 	return hwndRet;
 }
