@@ -69,7 +69,7 @@ public:
 	~CAuthUIWrapper();
 
 	//IUnknown
-	STDMETHODIMP QueryInterface(REFIID riid,void **ppvObject);
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppvObject);
 	STDMETHODIMP_(ULONG) AddRef(void);
 	STDMETHODIMP_(ULONG) Release(void);
 
@@ -82,8 +82,8 @@ public:
 	STDMETHODIMP GetChoiceEnumerator(IUnknown**);
 	STDMETHODIMP GetDefaultChoice(ULONG*);
 	STDMETHODIMP UserHasShutdownRights(void);
-	STDMETHODIMP GetChoiceName(ULONG,int,LPWSTR,UINT);
-	STDMETHODIMP GetChoiceDesc(ULONG,LPWSTR,UINT);
+	STDMETHODIMP GetChoiceName(ULONG, int, LPWSTR, UINT);
+	STDMETHODIMP GetChoiceDesc(ULONG, LPWSTR, UINT);
 private:
 	IShutdownChoices8* m_authui8 = 0;
 	IShutdownChoices10* m_authui10 = 0;
