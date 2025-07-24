@@ -46,8 +46,8 @@ HRESULT STDMETHODCALLTYPE CSysTrayWrapper::Exec(const GUID* pguidCmdGroup, DWORD
 	if (pguidCmdGroup && *pguidCmdGroup == CGID_ShellServiceObject && nCmdID == 2)
 	{
 		VARIANT v;
-		InitVariantFromUInt32(0,&v);
-		HRESULT ret = m_stobject8->Exec(pguidCmdGroup,2,0,&v,NULL);
+		InitVariantFromUInt32(0, &v);
+		HRESULT ret = m_stobject8->Exec(pguidCmdGroup, 2, 0, &v, NULL);
 		return ret;
 	}
 	else
