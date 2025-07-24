@@ -14,7 +14,7 @@ static PVOID CoCreateInstanceBase;
 static PVOID SHGetValueWSHCore;
 
 //remove pintostart verb
-LSTATUS WINAPI SHGetValueNEW(
+LSTATUS WINAPI Shell32_SHGetValue(
   _In_         HKEY hkey,
   _In_opt_     LPCWSTR pszSubKey,
   _In_opt_     LPCWSTR pszValue,
@@ -30,16 +30,9 @@ LSTATUS WINAPI SHGetValueNEW(
 	return SHGetValueW(hkey,pszSubKey,pszValue,pdwType,pvData,pcbData);
 }
 
-bool(__fastcall* IsSearchEnabled)();
-extern "C" bool WINAPI IsSearchEnabledNEW()
+PVOID WINAPI Shell32_ResolveDelayLoadedAPI(PVOID ParentModuleBase, PVOID DelayloadDescriptor, PVOID FailureDllHook, PVOID FailureSystemHook,PIMAGE_THUNK_DATA ThunkAddress,ULONG Flags)
 {
-	//dbgprintf(L"IsSearchEnabledNEW\n");
-	return 1;
-}
-
-PVOID WINAPI ResolveDelayLoadedAPINEW(PVOID ParentModuleBase, PVOID DelayloadDescriptor, PVOID FailureDllHook, PVOID FailureSystemHook,PIMAGE_THUNK_DATA ThunkAddress,ULONG Flags)
-{
-	dbgprintf(L"ResolveDelayLoadedAPINEW\n");
+	dbgprintf(L"Shell32_ResolveDelayLoadedAPI\n");
 	PVOID retfunc = ResolveDelayLoadedAPI(ParentModuleBase,DelayloadDescriptor,FailureDllHook,FailureSystemHook,ThunkAddress,Flags);
 	if (retfunc == CoCreateInstanceBase)
 	{
@@ -48,15 +41,15 @@ PVOID WINAPI ResolveDelayLoadedAPINEW(PVOID ParentModuleBase, PVOID DelayloadDes
 	}
 	if (retfunc == SHGetValueWSHCore)
 	{
-		retfunc = SHGetValueNEW;
+		retfunc = Shell32_SHGetValue;
 		ThunkAddress->u1.Function = (DWORD_PTR)retfunc;
 	}
 	return retfunc;
 }
 
-BOOL __stdcall ILIsEqualNEW(LPCITEMIDLIST pidl1, LPCITEMIDLIST pidl2)
+BOOL __stdcall Explorer_ILIsEqual(LPCITEMIDLIST pidl1, LPCITEMIDLIST pidl2)
 {
-	dbgprintf(L"ILIsEqualNEW\n");
+	//dbgprintf(L"Explorer_ILIsEqual\n");
 	IShellFolder* ppshf = 0;
 	HRESULT v4 = SHGetDesktopFolder(&ppshf);
 	if (v4 >= 0)
@@ -65,13 +58,6 @@ BOOL __stdcall ILIsEqualNEW(LPCITEMIDLIST pidl1, LPCITEMIDLIST pidl2)
 		ppshf->Release();
 	}
 	return v4 == 0;
-}
-
-HRESULT __stdcall SHEvaluateSystemCommandTemplateNEW(PCWSTR pszCmdTemplate, PWSTR* ppszApplication, PWSTR* ppszCommandLine, PWSTR* ppszParameters)
-{
-	dbgprintf(L"SHEvaluateSystemCommandTemplateNEW\n");
-	return S_OK;
-	//return SHEvaluateSystemCommandTemplateWithOptions((unsigned __int16*)pszCmdTemplate, ppszParameters);
 }
 
 HRESULT(__stdcall* Shell32_DllGetClassObject)(REFCLSID rclsid, const IID* const riid, LPVOID* ppv);
@@ -93,8 +79,8 @@ void HookShell32()
 
 	dbgprintf(L"1\n");
 	ResolveDelayLoadedAPI = (ResolveDelayLoadedAPIAPI)GetProcAddress(GetModuleHandle(L"kernel32.dll"),"ResolveDelayLoadedAPI");
-	ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "API-MS-WIN-CORE-DELAYLOAD-L1-1-1.DLL", ResolveDelayLoadedAPI, ResolveDelayLoadedAPINEW);
-	//ResolveDelayLoadedAPI = (ResolveDelayLoadedAPIAPI)GetProcAddress(GetModuleHandle(L"api-ms-win-core-delayload-l1-1-1.dll"),"ResolveDelayLoadedAPI");
+	ChangeImportedAddress(GetModuleHandle(L"shell32.dll"), "API-MS-WIN-CORE-DELAYLOAD-L1-1-1.DLL", ResolveDelayLoadedAPI, Shell32_ResolveDelayLoadedAPI);
+
 	dbgprintf(L"%i\n",(unsigned long long)ResolveDelayLoadedAPI);
 	dbgprintf(L"2\n");
 	CoCreateInstanceBase = GetProcAddress(GetModuleHandle(L"combase.dll"),"CoCreateInstance");
@@ -105,14 +91,9 @@ void HookShell32()
 	SHGetValueWSHCore = GetProcAddress(LoadLibrary(L"shcore.dll"),"SHGetValueW");
 
 	dbgprintf(L"5\n");
-	//auto ordinal902 = GetProcAddress(LoadLibrary(L"shell32.dll"),(LPSTR)902);
-	//ChangeImportedAddress(LoadLibrary(L"shell32.dll"),"shlwapi.DLL", GetProcAddress(LoadLibrary(L"shlwapi.dll"), "SHAboutInfo"), SHAboutInfoWNEW);
-	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(shell32, (LPSTR)902), IsSearchEnabledNEW);
-
-	//ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(LoadLibrary(L"shell32.DLL"), (LPSTR)719), SHParseDarwinIDFromCacheWNew);
 
 	//todo: evaluate if this is needed
-	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(shell32, "ILIsEqual"), ILIsEqualNEW);
+	ChangeImportedAddress(GetModuleHandle(0),"shell32.DLL", GetProcAddress(shell32, "ILIsEqual"), Explorer_ILIsEqual);
 
 	uintptr_t Win32PinCheck = FindPattern((uintptr_t)shell32, "41 8B E9 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
 	if (g_osVersion.BuildNumber() >= 19041 && g_osVersion.BuildNumber() < 26100)
@@ -129,7 +110,7 @@ void HookShell32()
 			bytes[2] = 0xC3;
 			VirtualProtect(bytes, 3, old, 0);
 		}
-		else // Microsoft added a new signature for this in later 23H2 updates
+		else // Microsoft added a new signature for this in later 23H2 updates (last one it works for - 22621.4746)
 		{
 			uintptr_t Win32PinCheck2 = FindPattern((uintptr_t)shell32, "45 8B F1 49 8B F0 48 8B DA 48 8B F9 48 8D 0D ?? ?? ?? ?? E8");
 
