@@ -89,11 +89,11 @@ HRESULT STDMETHODCALLTYPE CTrayNotifyFactory::CreateInstance(IUnknown* pUnkOuter
 	if (riid == IID_IUnknown)
 	{
 		IUnknown* obj;
-		HRESULT ret = m_origfactory->CreateInstance(pUnkOuter, IID_IUnknown, (PVOID*)&obj);
+		HRESULT ret = m_origfactory->CreateInstance(pUnkOuter, IID_PPV_ARGS(&obj));
 		if (ret == S_OK)
 		{
 			ITrayNotify7* oldnotify;
-			ret = obj->QueryInterface(IID_ITrayNotify7, (PVOID*)&oldnotify);
+			ret = obj->QueryInterface(IID_PPV_ARGS(&oldnotify));
 			if (ret == S_OK)
 				*ppvObject = new CTrayNotifyWrapper(oldnotify);
 		}
