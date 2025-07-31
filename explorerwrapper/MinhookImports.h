@@ -79,7 +79,7 @@ HTHEME __stdcall OpenThemeDataEx_Hook(HWND hwnd, LPCWSTR pszClassList, DWORD dwF
 	return theme;
 }
 
-void CPniMainDlg_ShowFlyoutNEW() // don't bother with the parameters as we aren't going to use them
+void CPniMainDlg_ShowFlyoutHook() // don't bother with the parameters as we aren't going to use them
 {
 	// Open Network and Sharing Center instead inside the Windows Control Panel, as a non-immersive alternative
 	ShellExecuteW(nullptr, nullptr, L"control.exe", L"/name Microsoft.NetworkAndSharingCenter", nullptr, SW_SHOWNORMAL);
@@ -232,7 +232,7 @@ void FixNonImmersivePniDui()
 
 				if (_ShowFlyout) // first run, VB to NI
 				{
-					MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+					MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutHook, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyoutOrig));
 				}
 				else
 				{
@@ -240,7 +240,7 @@ void FixNonImmersivePniDui()
 
 					if (_ShowFlyout) // second run, RS4 to TI
 					{
-						MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+						MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutHook, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyoutOrig));
 					}
 					else
 					{
@@ -248,7 +248,7 @@ void FixNonImmersivePniDui()
 
 						if (_ShowFlyout) // third run, TH2 to RS3
 						{
-							MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+							MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutHook, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyoutOrig));
 						}
 						else
 						{
@@ -256,7 +256,7 @@ void FixNonImmersivePniDui()
 
 							if (_ShowFlyout) // fourth run, TH1
 							{
-								MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutNEW, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyout));
+								MH_CreateHook(static_cast<LPVOID>(_ShowFlyout), CPniMainDlg_ShowFlyoutHook, reinterpret_cast<LPVOID*>(&CPniMainDlg_ShowFlyoutOrig));
 							}
 						}
 					}
@@ -269,8 +269,8 @@ void FixNonImmersivePniDui()
 void UpdateTrayWindowDefinitions()
 {
 	// Hook and update definitions of what windows should be added to the tray - largely for UWP purposes, but essentially zero-cost so included on both immersive on and off modes.
-	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
-	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
+	void* _ShouldAddWindowToTray = (void*)FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB");
+	void* _IsWindowNotDesktopOrTray = (void*)FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B F9 33 DB FF 15 ?? ?? ?? ?? 3B C3 74 ?? 48 3B 3D");
 
 	MH_CreateHook(_ShouldAddWindowToTray, ShouldAddWindowToTray, &_ShouldAddWindowToTray);
 	MH_CreateHook(_IsWindowNotDesktopOrTray, IsWindowNotDesktopOrTray, &_IsWindowNotDesktopOrTray);
@@ -281,7 +281,7 @@ void SetProgramListNscTreeAttributes()
 	// If we are on Windows 10 or higher, query the original program list pattern and create our hook to fix the visual issues
 	if (g_osVersion.BuildNumber() >= 10074)
 	{
-		CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(0), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
+		CNSCHost_FillNSCOg = (decltype(CNSCHost_FillNSCOg))FindPattern((uintptr_t)GetModuleHandle(NULL), "48 89 5C 24 18 57 48 83 EC 30 33 DB 48 8B F9 39 99 CC 00 00 00");
 		if (CNSCHost_FillNSCOg)
 		{
 			MH_CreateHook(static_cast<LPVOID>(CNSCHost_FillNSCOg), CNSCHost_FillNSC, reinterpret_cast<LPVOID*>(&CNSCHost_FillNSCOg)); //this hook is in nsctree.h now

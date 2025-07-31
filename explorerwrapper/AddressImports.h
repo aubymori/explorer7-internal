@@ -7,9 +7,10 @@
 #include "TypeDefinitions.h"
 
 // Ittr: Address import patches are now in this file
+// Additional note: More re-organisation is pending - things to be reorganised further and have proper header/code separation
 
 // Adjust ShellURL so that searching by file extension is functional again
-HRESULT WINAPI SHCoCreateInstanceNEW(PCWSTR pszCLSID, const CLSID* pclsid, IUnknown* pUnkOuter, IID& riid, void** ppv)
+HRESULT WINAPI Shell32_SHCoCreateInstance(PCWSTR pszCLSID, const CLSID* pclsid, IUnknown* pUnkOuter, IID& riid, void** ppv)
 {
 	HRESULT res = SHCoCreateInstance(pszCLSID, pclsid, pUnkOuter, riid, ppv);
 	if (res != S_OK && riid == GUID_88df9332_6adb_4604_8218_508673ef7f8a)
@@ -57,7 +58,7 @@ SIZE AdjustWindowRectForTaskbar(RECT* lprc)
 }
 
 // Adjust by 8 pixels accordingly
-BOOL WINAPI CalculatePopupWindowPositionNEW(
+BOOL WINAPI Explorer_CalculatePopupWindowPosition(
 	const POINT* anchorPoint,
 	const SIZE* windowSize,
 	UINT         flags,
@@ -78,7 +79,7 @@ BOOL WINAPI CalculatePopupWindowPositionNEW(
 }
 
 // Additional helper for removing immersive menus. Better inter-operability between Windows versions. Used alongside the pattern method.
-BOOL SystemParametersInfoWNEW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT fWinIni)
+BOOL Shell32_SystemParametersInfoW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT fWinIni)
 {
 	if (uiAction == SPI_GETSCREENREADER)
 	{
@@ -90,7 +91,7 @@ BOOL SystemParametersInfoWNEW(UINT uiAction, UINT uiParam, PVOID pvParam, UINT f
 }
 
 // For SWCA, so we can import our colorization configuration
-BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised again 25/10/24
+BOOL WINAPI Explorer_SetWindowCompositionAttribute(HWND hwnd, WINDOWCOMPOSITIONATTRIBDATA* pAttrData) // Ittr: re-organised again 25/10/24
 {
 	dbgprintf(L"SetWindowCompositionAttribute %X %x %d", hwnd, pAttrData->Attrib, *(DWORD*)pAttrData->pvData);
 
@@ -121,7 +122,7 @@ BOOL WINAPI SetWindowCompositionAttributeNEW(HWND hwnd, WINDOWCOMPOSITIONATTRIBD
 }
 
 // Temporary partial bug workaround
-int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
+int WINAPI Explorer_SetWindowRgn(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 {
 	// Ittr: This hack (first written in 2012) cancels out a window region call that no longer behaves correctly post-RS4
 	if (hRgn == NULL && hwnd == GetStartMenuWnd()) return 0;
@@ -133,7 +134,7 @@ int WINAPI SetWindowRgnNEW(HWND hwnd, HRGN hRgn, BOOL bRedraw)
 }
 
 // Set applicable AUMID, create immersive stack where applicable
-UINT WINAPI SetErrorModeNEW(UINT uMode)
+UINT WINAPI Explorer_SetErrorMode(UINT uMode)
 {
 	SetCurrentProcessExplicitAppUserModelID(L"Microsoft.Windows.Explorer");
 
@@ -144,13 +145,13 @@ UINT WINAPI SetErrorModeNEW(UINT uMode)
 }
 
 //Ittr: Intercept these functions where appropriate for basic theme to be forced at compile time if required
-BOOL WINAPI IsCompositionActiveNEW()
+BOOL WINAPI Explorer_IsCompositionActive()
 {
 	return s_DisableComposition ? FALSE : IsCompositionActive();
 }
 
 // Apply relevant Win8-era theme classes if they're defined
-HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
+HRESULT WINAPI Explorer_SetWindowTheme(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList)
 {
 	if (IsThemeClassDefined(g_currentTheme, L"ShowDesktop8", L"Button", 0))
 	{
@@ -167,12 +168,12 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 
 	// We don't check here because, unlike ShowDesktop::Button, there is no inherited fallback class
 	// In other words, it already falls back to the 7-era class if required
-	if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0) && IsCompositionActiveNEW()) // updated thumbnail classes misbehave without DWM
+	if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") != 0) && Explorer_IsCompositionActive()) // updated thumbnail classes misbehave without DWM
 	{
 		return SetWindowTheme(hwnd, L"W8", pszSubIdList);
 	}
 
-	if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0) && IsCompositionActiveNEW())
+	if (hwnd == GetThumbnailWnd() && (lstrcmp(pszSubAppName, L"Vertical") == 0) && Explorer_IsCompositionActive())
 	{
 		return SetWindowTheme(hwnd, L"W8Vertical", pszSubIdList);
 	}
@@ -181,13 +182,13 @@ HRESULT WINAPI SetWindowThemeNEW(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSu
 }
 
 // Disable composition where appropriate
-HRESULT WINAPI DwmIsCompositionEnabledNEW(BOOL* pfEnabled)
+HRESULT WINAPI Explorer_DwmIsCompositionEnabled(BOOL* pfEnabled)
 {
 	return s_DisableComposition ? DWM_E_COMPOSITIONDISABLED : DwmIsCompositionEnabled(pfEnabled);
 }
 
 // Disable legacy DwmEnableBlurBehindWindow when new methods are in use
-HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
+HRESULT WINAPI Explorer_DwmEnableBlurBehindWindow(HWND hwnd, DWM_BLURBEHIND* pBlurBehind)
 {
 	if (hwnd == GetThumbnailWnd()) // does this even do anything??
 	{
@@ -203,7 +204,7 @@ HRESULT WINAPI DwmEnableBlurBehindWindowNEW(HWND hwnd, DWM_BLURBEHIND* pBlurBehi
 }
 
 // Adjust preview activation to prevent possible crashing
-HRESULT DwmpActivateLivePreviewNEW(BOOL fActivate, HWND hwndExclude, HWND hwndInsertBefore, LIVEPREVIEW_TRIGGER lpt, RECT* prcFinalLocation)
+HRESULT Explorer_DwmpActivateLivePreview(BOOL fActivate, HWND hwndExclude, HWND hwndInsertBefore, LIVEPREVIEW_TRIGGER lpt, RECT* prcFinalLocation)
 {
 	if (prcFinalLocation == (void*)8)
 	{
@@ -219,7 +220,7 @@ HRESULT DwmpActivateLivePreviewNEW(BOOL fActivate, HWND hwndExclude, HWND hwndIn
 }
 
 // Adjust colorization parameters
-DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
+DWORD WINAPI Explorer_DwmGetColorizationParameters(PDWMCOLORIZATIONPARAMS colors)
 {
 	dbgprintf(L"DwmGetColorizationParameters\nColorizationColor %p\nColorizationAfterglow %p\nColorizationColorBalance %p\nColorizationAfterglowBalance %p\nColorizationBlurBalance %p\nColorizationGlassReflectionIntensity %p\nColorizationOpaqueBlend %p",
 		colors->ColorizationColor, colors->ColorizationAfterglow, colors->ColorizationColorBalance, colors->ColorizationAfterglowBalance, colors->ColorizationBlurBalance, colors->ColorizationGlassReflectionIntensity, colors->ColorizationOpaqueBlend);
@@ -230,7 +231,7 @@ DWORD WINAPI DwmGetColorizationParametersNEW(PDWMCOLORIZATIONPARAMS colors)
 }
 
 // Prevent additional hotkey double-registration on Windows 11
-static BOOL WINAPI ShellRegisterHotKeyNEW(HWND hwnd, int a2, UINT key1, UINT key2, HWND target)
+static BOOL WINAPI TwinUI_ShellRegisterHotKey(HWND hwnd, int a2, UINT key1, UINT key2, HWND target)
 {
 	// Windows key
 	if (key1 == MOD_WIN && key2 == 0)
@@ -251,7 +252,7 @@ static BOOL WINAPI ShellRegisterHotKeyNEW(HWND hwnd, int a2, UINT key1, UINT key
 void PatchShell32()
 {
 	// Fixes the "search by extension" feature in the start menu
-	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "SHCoCreateInstance"), SHCoCreateInstanceNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", GetProcAddress(GetModuleHandle(L"shell32.dll"), "SHCoCreateInstance"), Shell32_SHCoCreateInstance);
 }
 
 // Import address changes for user32.dll modulename
@@ -260,14 +261,14 @@ void PatchUser32()
 	if (g_osVersion.BuildNumber() >= 10074)
 	{
 		// Update overflow positioning to account for OS changes if the user is using TH1 or higher
-		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), CalculatePopupWindowPositionNEW);
+		ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)"CalculatePopupWindowPosition"), Explorer_CalculatePopupWindowPosition);
 
 		// Ensure as much as we can that immersive menus are gone, if the pattern code isn't enough, e.g. Win11 Cobalt.
 		// Only applied to shell32, as application to ExplorerFrame breaks the program list hover behaviour.
 		HMODULE shell32 = GetModuleHandle(L"shell32.dll");
 		if (shell32)
 		{
-			ChangeImportedAddress(shell32, "user32.dll", SystemParametersInfoW, SystemParametersInfoWNEW);
+			ChangeImportedAddress(shell32, "user32.dll", SystemParametersInfoW, Shell32_SystemParametersInfoW);
 		}
 	}
 
@@ -275,21 +276,21 @@ void PatchUser32()
 	HMODULE user32 = LoadLibrary(L"user32.dll");
 	IsShellFrameWindow = (IsShellWindow_t)GetProcAddress(user32, (LPCSTR)2573);
 	GhostWindowFromHungWindow = (GhostWindowFromHungWindow_t)GetProcAddress(user32, "GhostWindowFromHungWindow");
-	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", IsWindowVisible, IsWindowVisibleNEW); // perform the actual hook
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", IsWindowVisible, Explorer_IsWindowVisible); // perform the actual hook
 
 	// Add DWM colorization attributes to taskbar and start menu (how this renders is theme-dependent).
 	SetWindowCompositionAttribute = (SetWindowCompositionAttributeAPI)GetProcAddress(GetModuleHandle(L"user32.dll"), "SetWindowCompositionAttribute");
-	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowCompositionAttribute, SetWindowCompositionAttributeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowCompositionAttribute, Explorer_SetWindowCompositionAttribute);
 
 	// Disable WindowRgn modifications under most circumstances temporarily due to visual issues
-	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowRgn, SetWindowRgnNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "user32.dll", SetWindowRgn, Explorer_SetWindowRgn);
 }
 
 // Import address changes for kernel32.dll modulename
 void PatchKernel32()
 {
 	// Change appid
-	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, SetErrorModeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "kernel32.dll", SetErrorMode, Explorer_SetErrorMode);
 }
 
 // Import address changes for uxtheme.dll modulename
@@ -298,10 +299,10 @@ void PatchUxTheme()
 	IsThemeClassDefined = (IsThemeClassDefined_t)GetProcAddress(GetModuleHandle(L"uxtheme.dll"), (LPSTR)0x32);
 
 	// Disable DWM composition as quickly as we can (if registry key set)
-	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, IsCompositionActiveNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", IsCompositionActive, Explorer_IsCompositionActive);
 
 	// Change show desktop button for Windows 8-based themes
-	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", SetWindowTheme, SetWindowThemeNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "uxtheme.dll", SetWindowTheme, Explorer_SetWindowTheme);
 }
 
 // Import address changes for dwmapi.dll modulename
@@ -311,16 +312,16 @@ void PatchDwmApi()
 	DwmpUpdateAccentBlurRect = (DwmpUpdateAccentBlurRect_t)GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)159);
 
 	// Force DwmIsCompositionEnabled calls to account for DisableComposition option
-	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmIsCompositionEnabled, DwmIsCompositionEnabledNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmIsCompositionEnabled, Explorer_DwmIsCompositionEnabled);
 
 	// Adjust DwmEnableBlurBehindWindow behaviour as necessary
-	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmEnableBlurBehindWindow, DwmEnableBlurBehindWindowNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmEnableBlurBehindWindow, Explorer_DwmEnableBlurBehindWindow);
 
 	// Adapt colorization api
 	DwmGetColorizationParametersOrig = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)127);
 	DwmpActivateLivePreview = (decltype(DwmpActivateLivePreview))GetProcAddress(GetModuleHandle(L"dwmapi.dll"), (LPSTR)113);
-	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmpActivateLivePreview, DwmpActivateLivePreviewNEW);
-	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmGetColorizationParametersOrig, DwmGetColorizationParametersNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmpActivateLivePreview, Explorer_DwmpActivateLivePreview);
+	ChangeImportedAddress(GetModuleHandle(NULL), "dwmapi.dll", DwmGetColorizationParametersOrig, Explorer_DwmGetColorizationParameters);
 }
 
 void PatchTwinUI()
@@ -329,7 +330,7 @@ void PatchTwinUI()
 	ShellRegisterHotKey = (ShellRegisterHotKey_t)GetProcAddress(GetModuleHandle(L"user32.dll"), (LPSTR)2671);
 
 	// Prevent additional hotkey double-registration on Windows 11
-	ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", ShellRegisterHotKey, ShellRegisterHotKeyNEW);
+	ChangeImportedAddress(GetModuleHandle(L"twinui.dll"), "user32.dll", ShellRegisterHotKey, TwinUI_ShellRegisterHotKey);
 }
 
 // Consolidate all of the above so they can be changed at runtime as needed

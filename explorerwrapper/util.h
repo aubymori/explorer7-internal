@@ -371,7 +371,7 @@ bool IsWindowNotDesktopOrTray(HWND hwnd)
 //removes immersive background windows
 //(Microsoft Text Input Host, Shell Experience Host, etc.)
 // this is defined here rather than in AddressImports.h so that utility ShouldAddWindowToTray can work properly
-BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
+BOOL WINAPI Explorer_IsWindowVisible(HWND hWnd)
 {
 	if (!IsWindowVisible(hWnd) || !IsValidDesktopZOrderBand(hWnd, TRUE))
 		return FALSE;
@@ -398,7 +398,7 @@ BOOL WINAPI IsWindowVisibleNEW(HWND hWnd)
 
 __int64 ShouldAddWindowToTray(HWND hwnd)
 {
-	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && IsWindowVisibleNEW(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
+	BOOL ret = IsWindowNotDesktopOrTray(hwnd) && Explorer_IsWindowVisible(hwnd) && ShouldAddWindowToTrayHelper(hwnd);
 	//dbgprintf(L"ShouldAddWindowToTray %i", (int)ret);
 	return ret;
 }

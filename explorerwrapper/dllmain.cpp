@@ -129,18 +129,18 @@ void ShimDesktop()
 	PostMessage(hwnd_desktop, 0x40B, 0, 0); //pins
 }
 
-PVOID WINAPI SHCreateDesktopNEW(PVOID p1)
+PVOID WINAPI Explorer_SHCreateDesktop(PVOID p1)
 {
 	PVOID ret = SHCreateDesktopOrig(p1);
 	ShimDesktop();
 	return ret;
 }
 
-PVOID WINAPI SHDesktopMessageLoopNEW(PVOID p1)
+PVOID WINAPI Explorer_SHDesktopMessageLoop(PVOID p1)
 {
 	PVOID ret = SHDesktopMessageLoop(p1);
 	SHPtrParamAPI SHCloseDesktopHandle;
-	SHCloseDesktopHandle = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"),(LPSTR)206);
+	SHCloseDesktopHandle = (SHPtrParamAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)206);
 	SHCloseDesktopHandle(p1);
 	return ret;
 }
@@ -303,9 +303,9 @@ void HookAPIs() // largely a legacy function now
 	// Change and fix core desktop components
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
-	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHCreateDesktopOrig, SHCreateDesktopNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHCreateDesktopOrig, Explorer_SHCreateDesktop);
 	SHDesktopMessageLoop = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)201);
-	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHDesktopMessageLoop, SHDesktopMessageLoopNEW);
+	ChangeImportedAddress(GetModuleHandle(NULL), "shell32.dll", SHDesktopMessageLoop, Explorer_SHDesktopMessageLoop);
 
 	// ???
 	ModifyDesktopHwnd();

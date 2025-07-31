@@ -53,7 +53,7 @@ typedef LONG(WINAPI* setIconThumb_t)(PVOID pThis, HICON a2, int a3, unsigned int
 static setIconThumb_t SetIconThumb;
 
 typedef VOID(WINAPI* CPniMainDlg_ShowFlyout_t)(HWND* hwnd, char a2);
-static CPniMainDlg_ShowFlyout_t CPniMainDlg_ShowFlyout;
+static CPniMainDlg_ShowFlyout_t CPniMainDlg_ShowFlyoutOrig;
 
 //typedef VOID(WINAPI* CTaskbandPin_CreateInstance_t)(PVOID);
 //static CTaskbandPin_CreateInstance_t CTaskbandPin_CreateInstance;
