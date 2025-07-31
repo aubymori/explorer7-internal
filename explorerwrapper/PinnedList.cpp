@@ -84,11 +84,6 @@ HRESULT __stdcall CPinnedListWrapper::EnumObjects(IEnumFullIDList** p1)
 
 HRESULT __stdcall CPinnedListWrapper::Modify(PCIDLIST_ABSOLUTE p1, PCIDLIST_ABSOLUTE p2)
 {
-	/*if (g_osVersion.BuildNumber() >= 26100)
-	{
-		return m_pinManager->PinItemFromTrustedCaller(p2, PMC_TASKBANDINSERT);
-	}*/
-
 	if (m_pinnedList25)
 		return m_pinnedList25->Modify(p1, p2);
 	if (m_flexList)

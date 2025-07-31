@@ -300,17 +300,6 @@ void ModifyDesktopHwnd()
 void HookShell32();
 void HookAPIs() // largely a legacy function now
 {
-	// 24H2+ - W32PTP
-	if (g_osVersion.BuildNumber() >= 26100)
-	{
-		HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
-
-		if (twinui_pcshell)
-		{
-			CTaskbandPin_CreateInstance = (CTaskbandPin_CreateInstance_t)FindPattern((uintptr_t)twinui_pcshell, "40 53 48 83 EC 20 48 8B D9 48 8D 15 ?? ?? ?? ?? B9 80 00 00 00 E8 ?? ?? ?? ?? 48 85 C0");
-		}
-	}
-
 	// Change and fix core desktop components
 	hEvent_DesktopVisible = CreateEvent(NULL, TRUE, FALSE, L"ShellDesktopVisibleEvent");
 	SHCreateDesktopOrig = (SHCreateDesktopAPI)GetProcAddress(GetModuleHandle(L"shell32.dll"), (LPSTR)200);
@@ -435,58 +424,6 @@ void EndThemeHandles()
 	delete themeHandles;
 }
 
-// WINDOWS 11
-void InitPinnedListHack()
-{
-	// == CPINNEDLIST HACK ==
-
-	HMODULE twinui_pcshell = LoadLibrary(L"twinui.pcshell.dll");
-
-	// CTaskbandPin_CreateInstance
-	if (twinui_pcshell)
-	{
-		// Method 1: Direct function preamble (dangerous; breaks if they modify the fields of CTaskbandPin or its superclass(es))
-		// 40 53 48 83 EC 20 48 8B D9 48 8D 15 ?? ?? ?? ?? B9 80 00 00 00 E8 ?? ?? ?? ?? 48 85 C0
-		/*matchCTaskbandPinCreateInstance = (PBYTE)FindPattern(
-			pFile,
-			dwSize,
-			"\x40\x53\x48\x83\xEC\x20\x48\x8B\xD9\x48\x8D\x15\x00\x00\x00\x00\xB9\x80\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x85\xC0",
-			"xxxxxxxxxxxx????xxxxxx????xxx",
-			&numMatchesCTaskbandPinCreateInstance
-		);*/
-
-		// Method 2: winrt::Windows::Internal::Shell::implementation::PinManager::IsItemPinned
-		// 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0
-		//                                                                   ^^^^^^^^^^^
-		PBYTE matchCTaskbandPinCreateInstance = (PBYTE)FindPattern((uintptr_t)twinui_pcshell, "48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0");
-
-		if (matchCTaskbandPinCreateInstance)
-		{
-			matchCTaskbandPinCreateInstance += 21;
-			matchCTaskbandPinCreateInstance += 5 + *(int*)(matchCTaskbandPinCreateInstance + 1);
-		}
-
-		if (!matchCTaskbandPinCreateInstance)
-		{
-			// wil::out_param() destructor inlined
-			// 0F 1F 44 00 00 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0
-			//                                                    ^^^^^^^^^^^
-			matchCTaskbandPinCreateInstance = (PBYTE)FindPattern((uintptr_t)twinui_pcshell, "0F 1F 44 00 00 48 83 64 24 ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 8D ?? ?? ?? ?? 85 C0");
-
-			if (matchCTaskbandPinCreateInstance)
-			{
-				matchCTaskbandPinCreateInstance += 16;
-				matchCTaskbandPinCreateInstance += 5 + *(int*)(matchCTaskbandPinCreateInstance + 1);
-			}
-		}
-
-		if (matchCTaskbandPinCreateInstance)
-		{
-			CTaskbandPin_CreateInstance = (CTaskbandPin_CreateInstance_t)matchCTaskbandPinCreateInstance;
-		}
-	}
-}
-
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved)
@@ -503,11 +440,6 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
 		if (GetFileAttributesW(szStardockPath) != INVALID_FILE_ATTRIBUTES) // Windowblinds blockage part 1 - create user-facing error
 			CrashError(); // The user-facing crash message - we do these blocks of code like this, so that the 0xc0000142 error doesn't appear
-
-		/*if (g_osVersion.BuildNumber() >= 26100)
-		{
-			InitPinnedListHack();
-		}*/
 
 		CreateShellFolder(); // Fix shell folder for 1607+...
 		EnsureWindowColorization(); // Correct colorization enablement setting for Win10/11
@@ -661,28 +593,11 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 			id = IID_IPinnedList3;
 		}
 
-		//if (rclsid == CLSID_TaskbarPin && CTaskbandPin_CreateInstance && build >= 26100) // Windows 11...
-		//{
-		//	CTaskbandPin_W32PTP* pTaskbandPin;
-		//	result = CTaskbandPin_CreateInstance(&pTaskbandPin);
-		//	dbgprintf(L"CTaskbandPin_CreateInstance result: %p", result);
-		//	if (SUCCEEDED(result))
-		//	{
-		//		result = ((IUnknown*)pTaskbandPin)->QueryInterface(id, ppv);
-		//		dbgprintf(L"CTaskbandPin_CreateInstance result 2: %p", result);
-		//		((IUnknown*)pTaskbandPin)->Release();
-		//	}
-		//}
-		//else
-		{
-			result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
-		}
-
+		result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, id, ppv);
 		if (SUCCEEDED(result))
 		{
 			*ppv = new CPinnedListWrapper((IUnknown*)*ppv, build);
 		}
-
 	}
 
 	if (riid == IID_AutoDestList && result != S_OK)
