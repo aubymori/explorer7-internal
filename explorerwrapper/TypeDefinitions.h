@@ -55,13 +55,6 @@ static setIconThumb_t SetIconThumb;
 typedef VOID(WINAPI* CPniMainDlg_ShowFlyout_t)(HWND* hwnd, char a2);
 static CPniMainDlg_ShowFlyout_t CPniMainDlg_ShowFlyoutOrig;
 
-//typedef VOID(WINAPI* CTaskbandPin_CreateInstance_t)(PVOID);
-//static CTaskbandPin_CreateInstance_t CTaskbandPin_CreateInstance;
-
-class CTaskbandPin_W32PTP;
-typedef HRESULT(*CTaskbandPin_CreateInstance_t)(CTaskbandPin_W32PTP**);
-static CTaskbandPin_CreateInstance_t CTaskbandPin_CreateInstance;
-
 wiktorArray<HTHEME>* themeHandles;
 
 // 7 {4376df10-a662-420b-b30d-958881461ef9}
