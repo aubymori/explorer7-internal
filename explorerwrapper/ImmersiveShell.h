@@ -39,5 +39,6 @@ IImmersiveShellHookService : IUnknown
 	virtual HRESULT STDMETHODCALLTYPE UpdateWindowApplicationId(HWND, const WCHAR*) = 0;
 	virtual HRESULT STDMETHODCALLTYPE HandleWindowReplacement(HWND, HWND) = 0;
 	virtual int STDMETHODCALLTYPE IsExecutionOnSerializedThread() = 0;
+	virtual HRESULT STDMETHODCALLTYPE InvokeShellHookMessage(WPARAM, LPARAM) = 0; // Added during Windows 11 development at some point - investigate further
 };
 
