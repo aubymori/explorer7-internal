@@ -146,7 +146,7 @@ void EnsureWindowColorization()
 DWORD GetColorizationColor()
 {
 	// has color in BGR format ?
-	DWMCOLORIZATIONPARAMS colors = { };
+	DWMCOLORIZATIONPARAMS colors = {};
 	DwmGetColorizationParametersOrig(&colors);
 
 	int a = (colors.ColorizationColor >> 24) & 0xFF;
@@ -155,30 +155,24 @@ DWORD GetColorizationColor()
 	int b = (colors.ColorizationColor) & 0xFF;
 
 	// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
-	if (g_osVersion.BuildNumber() >= 10074 && s_ColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00)) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
+	if (a == 0xC4 || (g_osVersion.BuildNumber() >= 10074 && s_ColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00))) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
 	{
-		a = 0xC4; // we default to this as it's used by the majority of win10/11 default colours
+		a = 0x74; // Approximate default Windows 8.1 translucency if user has regular 10/11 colours used and has not manually set to 0xC4
 	}
 
-	// Approximate default Windows 8.1 translucency if user has regular 10/11 colours used and has not manually set to 0xC4
-	if (a == 0xC4)
-	{
-		a = 0x74;
-	}
-
-	// mode 4 (gradient non-transparent is buggy) + current thumbnail edge case 
+	// mode 4 (solid accent type is buggy) + thumbnails edge case 
 	if (s_ColorizationOptions == 4)
 	{
 		a = 0xFF;
 	}
 
 	// Windows 10 and 11 users specifically without glass tools may struggle to adjust color opacity, this optional override fixes this
-	if (s_OverrideAlpha && (s_ColorizationOptions == 1 || s_ColorizationOptions == 2))
+	if (s_OverrideAlpha && (s_ColorizationOptions >= 1 || s_ColorizationOptions <= 3))
 	{
 		a = (s_AlphaValue) & 0xFF;
 	}
 
-	if (s_ColorizationOptions == 3)
+	if (s_ColorizationOptions == 3 && s_AcrylicAlt > 0)
 	{
 		GetThemeName = (GetThemeName_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)74);
 		RefreshImmersiveColorPolicyState = (RefreshImmersiveColorPolicyState_t)GetProcAddress(LoadLibrary(L"uxtheme.dll"), (LPSTR)104);
@@ -202,7 +196,7 @@ DWORD GetColorizationColor()
 		break;
 	}
 
-	DWORD color = (s_ColorizationOptions != 3 || s_AcrylicAlt == 3) ? ((a << 24) | (b << 16) | (g << 8) | r) : ((s_OverrideAlpha ? ((s_AlphaValue & 0xFF) << 24) : 0xCC000000) | (CImmersiveColor::GetColor(imclr) & 0xFFFFFF));
+	DWORD color = (s_ColorizationOptions != 3 || s_AcrylicAlt == 0) ? ((a << 24) | (b << 16) | (g << 8) | r) : ((s_OverrideAlpha ? ((s_AlphaValue & 0xFF) << 24) : 0xCC000000) | (CImmersiveColor::GetColor(imclr) & 0xFFFFFF));
 	return color;
 }
 
