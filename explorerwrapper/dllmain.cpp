@@ -669,7 +669,7 @@ extern "C" HRESULT WINAPI Explorer_CoRegisterClassObject(
 	if (rclsid == CLSID_TrayNotify)
 	{
 		pUnk = new CTrayNotifyFactory((IClassFactory*)pUnk);
-		if (g_osVersion.BuildNumber() < 10074 || s_EnableImmersiveShellStack == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - restoring this on 10 is now seemingly unnecessary
+		if (g_osVersion.BuildNumber() < 9888 || s_EnableImmersiveShellStack == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10 - restoring this on 10 is now seemingly unnecessary
 		{
 			//register immersive shell fake too
 			RegisterFakeImmersive();
@@ -690,7 +690,7 @@ extern "C" HRESULT WINAPI Explorer_CoRevokeClassObject(DWORD dwRegister)
 {
 	if (dwRegister == dwRegisterNotify)
 	{
-		if (g_osVersion.BuildNumber() < 10074 || s_EnableImmersiveShellStack == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
+		if (g_osVersion.BuildNumber() < 9888 || s_EnableImmersiveShellStack == 2) // Ittr: gate fakeimmersive to 8.1 due to functional issues (e.g. hanging) with 10
 		{
 			UnregisterFakeImmersive();
 			UnregisterProjection();

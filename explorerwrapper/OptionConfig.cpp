@@ -30,7 +30,7 @@ void InitializeConfiguration()
 	// - Defaults to disabled (0)
 	// - Pending stability improvements before default enablement
 	DWORD dwEnableUWP = 0;
-	if (g_osVersion.BuildNumber() >= 10074 && g_osVersion.BuildNumber() < 27686) // Note: Immersive is currently buggy in 27686 and later
+	if (g_osVersion.BuildNumber() >= 9888) // Note: Immersive is currently buggy in 27686 and later
 	{
 		// Immersive shell can only be enabled on TH1 onwards
 		// Consolidate the check to here so we don't have to do double comparisons elsewhere in the software
