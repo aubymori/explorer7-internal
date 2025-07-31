@@ -155,7 +155,7 @@ DWORD GetColorizationColor()
 	int b = (colors.ColorizationColor) & 0xFF;
 
 	// thanks to microsoft we have to account for automatic colorization being bugged on 10+ as alpha is set to 0. Yay...
-	if (a == 0xC4 || (g_osVersion.BuildNumber() >= 10074 && s_ColorizationOptions != 3 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00))) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
+	if (a == 0xC4 || (g_osVersion.BuildNumber() >= 10074 && a == 0x00 && (r != 0x00 || g != 0x00 || b != 0x00))) // only apply if it appears that the user is trying to set an actual colour - full transparency remains possible!
 	{
 		a = 0x74; // Approximate default Windows 8.1 translucency if user has regular 10/11 colours used and has not manually set to 0xC4
 	}
