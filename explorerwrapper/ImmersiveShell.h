@@ -1,12 +1,6 @@
 #pragma once
-#define INITGUID
 #include "common.h"
-
-#pragma region GUID definitions
-DEFINE_GUID(_GUID_c2f03a33_21f5_47fa_b4bb_156362a2f239, 0xC2F03A33, 0x21F5, 0x47FA, 0xB4, 0xBB, 0x15, 0x63, 0x62, 0xA2, 0xF2, 0x39); // c2f03a33_21f5_47fa_b4bb_156362a2f239
-DEFINE_GUID(CLSID_ImmersiveShellBuilder, 0xC71C41F1, 0xDDAD, 0x42DC, 0xA8, 0xFC, 0xF5, 0xBF, 0xC6, 0x1D, 0xF9, 0x57); // c71c41f1_ddad_42dc_a8fc_f5bfc61df957
-DEFINE_GUID(SID_ImmersiveShellHookService, 0x4624BD39, 0x5FC3, 0x44A8, 0xA8, 0x09, 0x16, 0x3A, 0x83, 0x6E, 0x90, 0x31); // 4624bd39_5fc3_44a8-a809_163a836e9031
-#pragma endregion
+#include "ImmersiveGUIDs.h"
 
 interface IImmersiveShellCreationBehavior;
 

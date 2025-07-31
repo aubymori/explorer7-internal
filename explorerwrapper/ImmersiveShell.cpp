@@ -69,7 +69,7 @@ LRESULT TaskmanWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 
 			IServiceProvider* serviceProvider; 
-			if (CoCreateInstance(_GUID_c2f03a33_21f5_47fa_b4bb_156362a2f239, nullptr, CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CODE_DOWNLOAD, IID_PPV_ARGS(&serviceProvider)) >= 0)
+			if (CoCreateInstance(CLSID_ImmersiveShell, nullptr, CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CODE_DOWNLOAD, IID_PPV_ARGS(&serviceProvider)) >= 0)
 			{
 				serviceProvider->QueryService(SID_ImmersiveShellHookService, IID_PPV_ARGS(&ShellHookService));
 				if (ShellHookService)

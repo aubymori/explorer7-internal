@@ -200,6 +200,7 @@
     <ClInclude Include="AugmentedShellFolder.h" />
     <ClInclude Include="AuthUI.h" />
     <ClInclude Include="AutoPlay.h" />
+    <ClInclude Include="ImmersiveGUIDs.h" />
     <ClInclude Include="MinhookImports.h" />
     <ClInclude Include="PatternImports.h" />
     <ClInclude Include="RegTreeOptions.h" />
@@ -225,7 +226,6 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="ShellTaskScheduler.h" />
     <ClInclude Include="ThemeManager.h" />
-    <ClInclude Include="trash.h" />
     <ClInclude Include="TrayNotify.h" />
     <ClInclude Include="TypeDefinitions.h" />
     <ClInclude Include="UserAssist.h" />
