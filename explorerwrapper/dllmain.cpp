@@ -41,51 +41,57 @@
 
 LRESULT CALLBACK NewTrayProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	if (uMsg == 0x56D) return 0;
-	if (uMsg == ThemeChangeMessage) //reinit thememanager on themechanged, so that inactive msstyles is updated
+	switch (uMsg)
 	{
-		for (int i = 0; i < themeHandles->size; ++i)
-		{
-			CloseThemeData(themeHandles->data[i]);
-		}
-		realloc(themeHandles->data, 0);
-		themeHandles->size = 0;
+		case 0x56D:
+			return 0;
 
-		ThemeManagerInitialize();
-		EnumWindows(RefreshWindows, (LPARAM)hwnd);
+		case 0x574:
+			switch (lParam)
+			{
+				case 1:
+					SetEvent(hEvent_DesktopVisible);
+				case 3:
+					return CallWindowProc(g_prevTrayProc, hwnd, 0x5B5, wParam, lParam); //fire ShellDesktopSwitch event
+			}
 
-		uMsg = WM_THEMECHANGED;
-		return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
-	}
+			return 0;
 
-	if (uMsg == WM_DISPLAYCHANGE || uMsg == WM_WINDOWPOSCHANGED)
-	{
-		RemoveProp(hwnd, L"TaskbarMonitor");
-		SetProp(hwnd, L"TaskbarMonitor", (HANDLE)MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY));
-		//send displaychanged to desktop
-		if (uMsg == WM_DISPLAYCHANGE) PostMessage(hwnd_desktop, 0x44B, 0, 0);
-	}
+		case ThemeChangeMessage:
+			for (int i = 0; i < themeHandles->size; ++i)
+			{
+				CloseThemeData(themeHandles->data[i]);
+			}
+			realloc(themeHandles->data, 0);
+			themeHandles->size = 0;
 
-	if (uMsg == 0x574) //handledelayboot
-	{
-		if (lParam == 3)
-			return CallWindowProc(g_prevTrayProc, hwnd, 0x5B5, wParam, lParam); //fire ShellDesktopSwitch event
-		if (lParam == 1)
-			SetEvent(hEvent_DesktopVisible);
-		return 0;
-	}
+			ThemeManagerInitialize();
+			EnumWindows(RefreshWindows, (LPARAM)hwnd);
 
-	if (uMsg == WM_THEMECHANGED)
-	{
-		EnsureWindowColorization(); // Ittr: Correct colorization enablement setting for Win10/11
-	}
+			uMsg = WM_THEMECHANGED;
+			break;
 
-	if (uMsg == WM_SETTINGCHANGE || uMsg == WM_ERASEBKGND || uMsg == WM_WININICHANGE) // Ittr: Fix taskbar colorization for non-legacy
-	{
-		if ((IsThemeActive() && !s_ClassicTheme && IsCompositionActive() && !s_DisableComposition) && hwnd == GetTaskbarWnd() && s_ColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
-		{
-			SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(false));
-		}
+		case WM_DISPLAYCHANGE:
+		case WM_WINDOWPOSCHANGED:
+			RemoveProp(hwnd, L"TaskbarMonitor");
+			SetProp(hwnd, L"TaskbarMonitor", (HANDLE)MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY));
+			//send displaychanged to desktop
+			if (uMsg == WM_DISPLAYCHANGE)
+			{
+				PostMessage(hwnd_desktop, 0x44B, 0, 0);
+			}
+			break;
+
+		case WM_THEMECHANGED:
+			EnsureWindowColorization();  // Ittr: Correct colorization enablement setting for Win10/11
+
+		case WM_SETTINGCHANGE:
+		case WM_ERASEBKGND:
+			if ((IsThemeActive() && !s_ClassicTheme && IsCompositionActive() && !s_DisableComposition) && hwnd == GetTaskbarWnd() && s_ColorizationOptions != 0) // Ittr: Only taskbar needs updating now, start menu and new thumbnail algo correct for themselves
+			{
+				SetWindowCompositionAttribute(hwnd, &GetTrayAccentProperties(false)); // Ittr: Fix taskbar colorization for non-legacy
+			}
+
 	}
 
 	return CallWindowProc(g_prevTrayProc, hwnd, uMsg, wParam, lParam);
@@ -359,7 +365,7 @@ void HookImmersive()
 
 	if (s_EnableImmersiveShellStack == 1)
 		CreateWindowInBandExOrig = (CreateWindowInBandExAPI)GetProcAddress(hUser32, "CreateWindowInBand");
-
+	
 	GetWindowBandOrig = (GetWindowBandAPI)GetProcAddress(hUser32, "GetWindowBand");
 	ChangeImportedAddress(immersiveui, "user32.dll", CreateWindowInBandOrig, CreateWindowInBandNew);
 	ChangeImportedAddress(immersiveui, "user32.dll", GetWindowBandOrig, GetWindowBandNew);
