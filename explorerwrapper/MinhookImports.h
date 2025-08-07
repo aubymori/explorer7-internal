@@ -161,7 +161,7 @@ VOID CTaskBand_SetWindowIconHook(PVOID This, HWND a2, HICON a3, int a4)
 
 	if (bIsImmersiveWnd(a2))
 	{
-		HICON hc = GetUWPIcon(a2);
+		HICON icon = GetUWPIcon(a2);
 		if (icon)
 		{
 			CTaskBand_SetWindowIconOrig(This, a2, icon, a4);
