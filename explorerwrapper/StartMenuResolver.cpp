@@ -14,7 +14,7 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 );
 
 //constructor
-CStartMenuResolver::CStartMenuResolver(IAppResolver8* newresolver)
+CStartMenuResolver::CStartMenuResolver(IApplicationResolver8* newresolver)
 {
 	m_cRef = 0; //?
 	m_resolver8 = newresolver;
@@ -31,7 +31,7 @@ CStartMenuResolver::CStartMenuResolver(IStartMenuItemsCache8 *newcache)
 		CLSID_StartMenuCacheAndAppResolver,
 		nullptr,
 		CLSCTX_INPROC_SERVER,
-		IID_IAppResolver8,
+		IID_IApplicationResolver8,
 		(LPVOID *)&m_resolver8
 	);
 }
@@ -45,7 +45,7 @@ CStartMenuResolver::CStartMenuResolver(IStartMenuItemsCache10 *newcache)
 		CLSID_StartMenuCacheAndAppResolver,
 		nullptr,
 		CLSCTX_INPROC_SERVER,
-		IID_IAppResolver8,
+		IID_IApplicationResolver8,
 		(LPVOID*)&m_resolver8
 	);
 }
@@ -64,14 +64,21 @@ CStartMenuResolver::~CStartMenuResolver()
 
 HRESULT STDMETHODCALLTYPE CStartMenuResolver::QueryInterface(REFIID riid, void** ppvObject)
 {
-	if (riid == IID_IAppResolver7)
+	if (riid == IID_IApplicationResolver6608)
 	{
-		//dbgprintf(L"IID_IAppResolver7\n");
-		*ppvObject = static_cast<IAppResolver7*>(this);
+		dbgprintf(L"IID_IApplicationResolver6608\n");
+		*ppvObject = static_cast<IApplicationResolver6608*>(this);
 		AddRef();
 		return S_OK;
 	}
-	if (riid == IID_IStartMenuItemsCache7)
+	if (riid == IID_IApplicationResolver7)
+	{
+		//dbgprintf(L"IID_IApplicationResolver7\n");
+		*ppvObject = static_cast<IApplicationResolver7*>(this);
+		AddRef();
+		return S_OK;
+	}
+	if (riid == IID_IStartMenuItemsCache7 || riid == IID_IStartMenuItemsCache6608)
 	{
 		dbgprintf(L"IID_IStartMenuItemsCache7\n");
 		HRESULT ret = E_NOINTERFACE;
@@ -113,6 +120,19 @@ ULONG STDMETHODCALLTYPE CStartMenuResolver::Release(void)
 		return 0;
 	}
 	return m_cRef;
+}
+
+//IApplicationResolver6608
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForWindow(HWND p1, LPWSTR* p2)
+{
+	dbgprintf(L"GetAppIDForWindow");
+	return m_resolver8->GetAppIDForWindow(p1, p2, 0, 0, 0);
+}
+
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::GetAppIDForProcess(ULONG_PTR p1, LPWSTR* p2)
+{
+	dbgprintf(L"GetAppIDForProcess");
+	return m_resolver8->GetAppIDForProcess(p1, p2, 0, 0, 0);
 }
 
 //IAppResolver7
@@ -187,6 +207,14 @@ HRESULT STDMETHODCALLTYPE CStartMenuResolver::GenerateShortcutFromItemProperties
 {
 	dbgprintf(L"GenerateShortcutFromItemProperties");
 	return m_resolver8->GenerateShortcutFromItemProperties(p1, p2);
+}
+
+//IStartMenuItemsCache6608
+HRESULT STDMETHODCALLTYPE CStartMenuResolver::RegisterNotify(IUnknown* p1)
+{
+	dbgprintf(L"CStartMenuResolver::RegisterNotify");
+	// Just call the newer method that still exists, it probably does the same anyway.
+	return CStartMenuResolver::RegisterSMNotify(p1);
 }
 
 //IStartMenuItemsCache7

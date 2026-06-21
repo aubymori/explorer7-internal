@@ -552,19 +552,19 @@ extern "C" HRESULT WINAPI Explorer_CoCreateInstance(
 
 	if (rclsid == CLSID_StartMenuCacheAndAppResolver && result != S_OK)
 	{
-		if (riid == IID_IAppResolver7)
+		if (riid == IID_IApplicationResolver7 || riid == IID_IApplicationResolver6608)
 		{
 			//dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8\n");
-			PVOID rslvr8 = NULL;
-			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_IAppResolver8, &rslvr8);
+			IApplicationResolver8* pAppResolver = nullptr;
+			CoCreateInstance(rclsid, pUnkOuter, dwClsContext, IID_PPV_ARGS(&pAppResolver));
 			//create our object
 
-			CStartMenuResolver* resolver7 = new CStartMenuResolver((IAppResolver8*)rslvr8);
+			CStartMenuResolver* resolver7 = new CStartMenuResolver((IApplicationResolver8*)pAppResolver);
 			result = resolver7->QueryInterface(riid, ppv);
 			//if (result == S_OK)
 				//dbgprintf(L"Explorer_CoCreateInstance: Resolver7 using iappresolver8 IS OK!!\n");
 		}
-		else if (riid == IID_IStartMenuItemsCache7)
+		else if (riid == IID_IStartMenuItemsCache7 || riid == IID_IStartMenuItemsCache6608)
 		{
 			int build = g_osVersion.BuildNumber();
 			IID iid = IID_IStartMenuItemsCache8;
